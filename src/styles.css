@@ -754,3 +754,28 @@ body { font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; 
 .bf-cell-status { min-width: 190px; }
 .bf-inline-note { display: grid; gap: 6px; width: 260px; padding: 10px; border-radius: 10px; background: var(--card); border: 1px solid color-mix(in oklab, var(--primary) 40%, var(--border)); box-shadow: var(--shadow-lift); animation: bf-rise .18s ease both; white-space: normal; }
 .bf-inline-note strong { font-size: 12.5px; } .bf-inline-note strong span { font-weight: 400; color: var(--muted-foreground); }
+/* Uniform row controls: same pill/chip everywhere; locked ones are quieter but still open an explanation. */
+.bf-status-trigger[data-locked] svg:last-child { opacity: .35; }
+.bf-assign-trigger { width: 168px; max-width: 168px; }
+.bf-assign-trigger[data-locked] { border-style: solid; color: var(--foreground); background: transparent; border-color: color-mix(in oklab, var(--border) 70%, transparent); }
+.bf-assign-trigger[data-locked][data-empty] { color: var(--muted-foreground); padding-left: 9px; }
+.bf-assign-trigger[data-locked] svg:last-child { opacity: .3; }
+.bf-menu-heading { font-size: 11px !important; font-weight: 700 !important; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-foreground); padding-bottom: 2px !important; }
+.bf-rowstatus { gap: 0; }
+
+/* Priority + severity in one chip */
+.bf-rating { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px 0 4px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); white-space: nowrap; }
+.bf-rating-trigger { cursor: pointer; transition: border-color .12s; }
+.bf-rating-trigger:hover { border-color: color-mix(in oklab, var(--primary) 55%, var(--border)); }
+.bf-rating-trigger > svg { opacity: .6; }
+.bf-rating-inner { display: inline-flex; align-items: center; gap: 8px; }
+.bf-rating .bf-pri { min-width: 30px; height: 22px; }
+.bf-rating-sev { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--c); }
+/* Equal-width controls so every row lines up */
+.bf-rating { min-width: 148px; justify-content: space-between; }
+.bf-status-trigger { min-width: 156px; justify-content: flex-start; }
+.bf-status-trigger > svg:last-child { margin-left: auto; }
+.bf-cell-status { min-width: 172px; }
+.bf-bug-table .bf-cell-summary { min-width: 190px; max-width: 240px; }
+.bf-bug-title { width: 190px; max-width: 190px; }
+.bf-assign-trigger > .truncate { flex: 1; text-align: left; }
