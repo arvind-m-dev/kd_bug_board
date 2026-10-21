@@ -31,7 +31,9 @@ export type DropdownOptions=z.infer<typeof optionsSchema>;
 export const DEFAULT_OPTIONS:DropdownOptions={modules:[],environments:['Development','Staging','Production'],devices:[],severities:DEFAULT_SEVERITIES};
 export function cleanOptions(v:unknown):DropdownOptions{const r=optionsSchema.safeParse(v);if(!r.success)return DEFAULT_OPTIONS;const u=(a:string[])=>[...new Set(a)];const severities=u(r.data.severities);return {modules:u(r.data.modules),environments:u(r.data.environments),devices:u(r.data.devices),severities:severities.length?severities:DEFAULT_SEVERITIES};}
 export type BugActor = {userId:string;portalId:string;name:string;role:Role;permissions:string[]};
-export type LiveBug = {id:string;code:string;title:string;projectId:string;project:string;reporterId:string;reporter:string;assigneeId:string|null;assignee:string;assignees?:{id:string;name:string}[];status:Status;priority:string;severity:string;description:string;expected:string;actual:string;browserDevice:string;environment:string;fixNotes:string;createdAt:string;updatedAt:string;version:string;steps:string[];evidenceUrls:string[];module:string;lastChange:LastChange};
+export type LiveBug = {id:string;code:string;title:string;projectId:string;project:string;reporterId:string;reporter:string;assigneeId:string|null;assignee:string;assignees?:{id:string;name:string}[];status:Status;priority:string;severity:string;description:string;expected:string;actual:string;browserDevice:string;environment:string;fixNotes:string;createdAt:string;updatedAt:string;version:string;steps:string[];evidenceUrls:string[];module:string;lastChange:LastChange;statusNote?:StatusNote};
+/** The reason recorded when the bug moved into its current status (e.g. why it was reopened). */
+export type StatusNote = {by:string;at:string;notes:string}|null;
 export type BugEvent = {id:string;bugId:string;actor:string;action:string;detail:Record<string,string>;createdAt:string};
 export type BugWorkspaceData = {options:DropdownOptions;actor:BugActor;projects:{id:string;name:string}[];developers:{id:string;name:string;role?:string;projectIds:string[]}[];bugs:LiveBug[];total:number;open:number;recheck:number;resolved:number;unassigned:number;statusCounts:StatusCount[];nextCursor:string|null};
 export function maySeeBug(actor:BugActor,bug:{reporterId:string;assigneeId:string|null}) {return actor.role==='admin'||actor.role==='qa'||actor.permissions.includes('view_all')||bug.reporterId===actor.userId||bug.assigneeId===actor.userId;}
@@ -80,5 +82,8 @@ export function matchesFilter(filter:string,b:{status:string;assigneeId:string|n
  if(filter==='open')return !['RESOLVED','DUPLICATE','NOT_A_BUG','WONT_FIX'].includes(b.status);
  const g=STATUS_GROUPS.find(x=>x.key===filter); return g?(g.statuses as readonly string[]).includes(b.status):b.status===filter;
 }
-export const NOTES_REQUIRED=['RECHECK','REOPENED','NEEDS_INFORMATION','NOT_A_BUG','DUPLICATE','WONT_FIX'];
+/** Statuses where a short reason helps the next person; the app asks for one but never requires it. */
+export const NOTES_SUGGESTED=['RECHECK','REOPENED','NEEDS_INFORMATION','NOT_A_BUG','DUPLICATE','WONT_FIX'];
+/** @deprecated notes are optional now; kept for older imports. */
+export const NOTES_REQUIRED=NOTES_SUGGESTED;
 export function attentionBugs<T extends {status:string;assigneeId:string|null}>(bugs:T[]){return bugs.filter(b=>['NEW','REOPENED','RECHECK','NEEDS_INFORMATION'].includes(b.status)||(['VALIDATED','READY_FOR_ASSIGNMENT'].includes(b.status)&&b.assigneeId===null));}

@@ -199,6 +199,8 @@ for i, (module, title, desc, expected, actual) in enumerate(BUGS):
             s.append(f"INSERT INTO bugflow.verifications(id,bug_id,actor_id,passed,notes,created_at) VALUES (gen_random_uuid(),b,{ref(actor)},{passed},{q(note)},{at(hours)});")
         action = 'bug.verify' if verify else 'bug.status'
         notes = {'RECHECK': 'Fix deployed to staging.', 'NEEDS_INFORMATION': 'Please share the exact steps and a screen recording.', 'NOT_A_BUG': 'Works as designed.', 'DUPLICATE': 'Same issue is already tracked.', 'WONT_FIX': 'Out of scope for this release.'}.get(new, '')
+        if verify:
+            notes = note  # the QA retest note is the reason for resolving or reopening
         s.append(f"INSERT INTO bugflow.activity(id,bug_id,actor_id,action,detail,created_at) VALUES (gen_random_uuid(),b,{ref(actor)},{q(action)},jsonb_build_object('previousStatus',{q(prev)},'status',{q(new)},'priority',{q(priority)},'previousPriority',{q(priority)},'notes',{q(notes)}),{at(hours)});")
     if rng.random() < 0.35:  # some discussion
         commenter = rng.choice([dev, qa, reporter]); ch = max(0.4, last - rng.uniform(0.2, 2))

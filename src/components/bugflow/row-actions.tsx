@@ -5,7 +5,7 @@ import { Check, ChevronDown, CircleCheck, CircleX, LoaderCircle, Lock, UserPlus,
 import { toast } from 'sonner';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { updateBug } from '@/lib/bug-workflow.functions';
-import { NOTES_REQUIRED, PRIORITIES, allowedStatuses, mayVerify, priorityNames, severityLevel, statusPath, type BugAccess, type BugChange, type BugWorkspaceData, type LiveBug } from '@/lib/bug-workflow';
+import { NOTES_SUGGESTED, PRIORITIES, allowedStatuses, mayVerify, priorityNames, severityLevel, statusPath, type BugAccess, type BugChange, type BugWorkspaceData, type LiveBug } from '@/lib/bug-workflow';
 import { STATUSES, type Status } from '@/lib/bugflow';
 import { actionError } from './action-feedback';
 
@@ -61,11 +61,12 @@ export function RowStatus({ bug, access, workspace }: { bug: LiveBug; access: Bu
 
   const move = (to: Status) => {
     // Open the note box after the menu has finished closing, so its focus handling can't dismiss it.
-    if (NOTES_REQUIRED.includes(to)) { setText(''); setNote({ kind: 'status', status: to }); return; }
+    if (NOTES_SUGGESTED.includes(to)) { setText(''); setNote({ kind: 'status', status: to }); return; }
     void send({ action: 'status', status: to }, `${bug.code} → ${statusLabel(to)}`);
   };
+  // Notes are optional: an empty note saves the change without one.
   const submitNote = async () => {
-    if (!note || !text.trim()) return;
+    if (!note) return;
     const ok = note.kind === 'verify'
       ? await send({ action: 'verify', passed: note.passed, notes: text.trim() }, `${bug.code} ${note.passed ? 'passed QA — resolved' : 'failed QA — reopened'}`)
       : await send({ action: 'status', status: note.status, notes: text.trim() }, `${bug.code} → ${statusLabel(note.status)}`);
@@ -91,24 +92,24 @@ export function RowStatus({ bug, access, workspace }: { bug: LiveBug; access: Bu
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{STATUS_HELP[bug.status]}</DropdownMenuLabel>
           {quick && <><DropdownMenuSeparator /><DropdownMenuLabel className="bf-menu-heading">Quick actions</DropdownMenuLabel>
             {canValidate && <DropdownMenuItem onSelect={() => void send({ action: 'status', status: 'READY_FOR_ASSIGNMENT' }, `${bug.code} validated — ready to assign`)}><Check size={14} className="text-success" />Validate<span className="ml-auto text-[11.5px] text-muted-foreground">→ Ready to assign</span></DropdownMenuItem>}
-            {rejectTo.map(st => <DropdownMenuItem key={st} onSelect={() => move(st)}><X size={14} className="text-destructive" />Reject · {statusLabel(st)}<span className="ml-auto text-[11px] text-muted-foreground">note</span></DropdownMenuItem>)}
+            {rejectTo.map(st => <DropdownMenuItem key={st} onSelect={() => move(st)}><X size={14} className="text-destructive" />Reject · {statusLabel(st)}<span className="ml-auto text-[11px] text-muted-foreground">reason</span></DropdownMenuItem>)}
             {verify && <>
               <DropdownMenuItem onSelect={() => void send({ action: 'verify', passed: true, notes: QUICK_NOTES['PASS']![0]! }, `${bug.code} passed QA — resolved`)}><CircleCheck size={14} className="text-success" />Pass retest<span className="ml-auto text-[11.5px] text-muted-foreground">→ Resolved</span></DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => { setText(''); setNote({ kind: 'verify', passed: false }); }}><CircleX size={14} className="text-destructive" />Fail retest<span className="ml-auto text-[11px] text-muted-foreground">note</span></DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => { setText(''); setNote({ kind: 'verify', passed: false }); }}><CircleX size={14} className="text-destructive" />Fail retest<span className="ml-auto text-[11px] text-muted-foreground">reason</span></DropdownMenuItem>
             </>}</>}
           {reachable.length > 0 && <><DropdownMenuSeparator /><DropdownMenuLabel className="bf-menu-heading">Move to</DropdownMenuLabel>
             {reachable.map(st => <DropdownMenuItem key={st} onSelect={() => move(st)} className="flex-col items-start gap-0">
-              <span className="flex items-center gap-2"><span className="bf-dot" data-tone={statusTone(st)} />{statusLabel(st)}{NOTES_REQUIRED.includes(st) && <span className="text-[11px] text-muted-foreground">· note</span>}</span>
+              <span className="flex items-center gap-2"><span className="bf-dot" data-tone={statusTone(st)} />{statusLabel(st)}{NOTES_SUGGESTED.includes(st) && <span className="text-[11px] text-muted-foreground">· reason</span>}</span>
               <span className="pl-4 text-[11.5px] text-muted-foreground">{STATUS_HELP[st]}</span>
             </DropdownMenuItem>)}</>}
           {locked && <><DropdownMenuSeparator /><DropdownMenuLabel className="flex items-center gap-2 text-xs font-normal text-muted-foreground"><Lock size={13} />{lockReason}</DropdownMenuLabel></>}
         </DropdownMenuContent>
       </DropdownMenu>
       {note && <form className="bf-inline-note" onSubmit={e => { e.preventDefault(); void submitNote(); }} onKeyDown={e => { if (e.key === 'Escape') setNote(null); }}>
-        <strong>{noteTitle}<span> · note required</span></strong>
+        <strong>{noteTitle}<span> · add a reason (optional)</span></strong>
         {(QUICK_NOTES[noteKey] ?? []).length > 0 && <div className="flex flex-wrap gap-1.5">{(QUICK_NOTES[noteKey] ?? []).map(n => <button key={n} type="button" className="bf-note-chip" data-active={text === n || undefined} onClick={() => setText(n)}>{n}</button>)}</div>}
-        <textarea autoFocus className="bf-note-input" rows={2} maxLength={4000} aria-label={`Note for ${noteTitle}`} placeholder="Short note…" value={text} onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submitNote(); } }} />
-        <div className="flex justify-end gap-1"><button type="button" className="bf-quick-btn" onClick={() => setNote(null)}>Cancel</button><button type="submit" className="bf-quick-btn" data-tone="primary" disabled={!text.trim() || busy}>{busy ? <LoaderCircle size={13} className="animate-spin" /> : <Check size={13} />}Save</button></div>
+        <textarea autoFocus className="bf-note-input" rows={2} maxLength={4000} aria-label={`Note for ${noteTitle}`} placeholder="Why? (optional — helps the next person)" value={text} onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submitNote(); } }} />
+        <div className="flex justify-end gap-1"><button type="button" className="bf-quick-btn" onClick={() => setNote(null)}>Cancel</button><button type="submit" className="bf-quick-btn" data-tone="primary" disabled={busy}>{busy ? <LoaderCircle size={13} className="animate-spin" /> : <Check size={13} />}{text.trim() ? 'Save' : 'Save without note'}</button></div>
       </form>}
     </div>;
 }

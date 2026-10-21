@@ -779,3 +779,27 @@ body { font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; 
 .bf-bug-table .bf-cell-summary { min-width: 190px; max-width: 240px; }
 .bf-bug-title { width: 190px; max-width: 190px; }
 .bf-assign-trigger > .truncate { flex: 1; text-align: left; }
+
+/* Reason for the current status (reopened, needs info, rejected, fix note) */
+.bf-status-note { --n: var(--warning); display: flex; align-items: center; gap: 5px; max-width: 220px; margin-top: 4px; font-size: 12px; color: var(--muted-foreground); }
+.bf-status-note[data-status=REOPENED] { --n: var(--destructive); }
+.bf-status-note[data-status=RECHECK] { --n: var(--success); }
+.bf-status-note svg { flex-shrink: 0; color: var(--n); }
+.bf-status-note b { flex-shrink: 0; font-weight: 600; color: var(--n); }
+.bf-status-note-box { --n: var(--warning); display: flex; gap: 12px; margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; border: 1px solid color-mix(in oklab, var(--n) 35%, transparent); background: color-mix(in oklab, var(--n) 10%, transparent); }
+.bf-status-note-box[data-status=REOPENED] { --n: var(--destructive); }
+.bf-status-note-box[data-status=RECHECK] { --n: var(--success); }
+.bf-status-note-box > svg { flex-shrink: 0; margin-top: 1px; color: var(--n); }
+.bf-status-note-box strong { display: block; font-size: 13px; color: var(--n); }
+.bf-status-note-box p { margin: 3px 0 4px; font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bf-status-note-box small { font-size: 12px; color: var(--muted-foreground); }
+
+/* ───────────── Titles: clearer and more prominent ───────────── */
+.bf-bug-table .bf-bug-title, .bf-bug-title { width: 250px; max-width: 250px; display: -webkit-box !important; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: auto !important; padding: 0 !important; text-align: left; white-space: normal !important; font-family: var(--font-heading); font-size: 14.5px !important; font-weight: 700 !important; line-height: 1.38 !important; letter-spacing: -.005em; color: var(--foreground) !important; text-decoration: none !important; transition: color .12s; }
+.bf-bug-title:hover { color: var(--primary) !important; text-decoration: underline !important; text-decoration-thickness: 1.5px !important; text-underline-offset: 3px; }
+.bf-bug-table tbody tr:hover .bf-bug-title { color: color-mix(in oklab, var(--primary) 70%, var(--foreground)) !important; }
+.bf-bug-table .bf-cell-summary { min-width: 180px; max-width: 220px; }
+.bf-detail-title { margin: 6px 0 0; font-family: var(--font-heading); font-size: 24px; font-weight: 800; line-height: 1.25; letter-spacing: -.015em; overflow-wrap: anywhere; }
+.bf-section-title { display: flex; align-items: center; gap: 8px; font-family: var(--font-heading); font-size: 14.5px; font-weight: 700; }
+.bf-section-title svg { color: var(--primary); }
+.bf-panel-heading h2 { font-family: var(--font-heading); font-weight: 700; letter-spacing: -.01em; }
