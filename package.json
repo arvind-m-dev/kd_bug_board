@@ -11,7 +11,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "demo:seed": "python3 database/demo/generate_seed.py > database/demo/seed.sql && node --env-file-if-exists=.env.local node_modules/jiti/lib/jiti-cli.mjs database/demo/apply.ts seed",
+    "demo:remove": "node --env-file-if-exists=.env.local node_modules/jiti/lib/jiti-cli.mjs database/demo/apply.ts remove"
   },
   "overrides": {
     "rolldown": "1.2.1"
