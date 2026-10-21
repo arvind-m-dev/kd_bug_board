@@ -4,7 +4,7 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { useServerFn } from '@tanstack/react-start';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipProps } from 'recharts';
-import { Search, UsersRound } from 'lucide-react';
+import { ChevronRight, Search, UsersRound } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { getPersonDetail, getPersonOverview, getTeamDetail } from '@/lib/person-reports.functions';
 import { getBugWorkspace } from '@/lib/bug-workflow.functions';
@@ -13,7 +13,8 @@ import { durationText, roleName, statusText } from '@/lib/activity';
 import { periodLabel as describePeriod, viewerTimeZone, type Period } from '@/lib/period';
 import { PeriodPicker } from './period-picker';
 import { DEFAULT_SEVERITIES, PRIORITIES, severityLevel, type BugAccess } from '@/lib/bug-workflow';
-import { PriorityBadge, SeverityBadge } from './bug-workspace';
+import { BugDetails, PriorityBadge, SeverityBadge } from './bug-workspace';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ThemedSelect } from './themed-select';
 import { ErrorNotice, actionError } from './action-feedback';
 
@@ -37,11 +38,11 @@ function headline(m: PersonMetrics, o: ReturnType<typeof outcomeCounts>): [strin
 }
 
 /** Severity order from Settings, so badges and bars use the same colours as the bug table. */
-function useSeverities() {
+function useAdminWorkspace() {
   const fetch = useServerFn(getBugWorkspace);
-  const q = useQuery({ queryKey: ['bug-workspace', admin, undefined], queryFn: () => fetch({ data: { access: admin } }), staleTime: 30000 });
-  return q.data?.options.severities ?? DEFAULT_SEVERITIES;
+  return useQuery({ queryKey: ['bug-workspace', admin, undefined], queryFn: () => fetch({ data: { access: admin } }), staleTime: 30000 });
 }
+function useSeverities() { return useAdminWorkspace().data?.options.severities ?? DEFAULT_SEVERITIES; }
 
 export function TeamReports() {
   const search = useSearch({ from: '/admin_/reports' }); const navigate = useNavigate();
@@ -136,7 +137,13 @@ function PersonReport({ m, trend, recent, severities, periodLabel }: { m: Person
   const showRetests = m.qaPassed + m.qaFailed > 0 || focus === 'qa';
   const showRaised = m.raised > 0 || focus === 'tester';
   const sevKeys = [...severities, ...Object.keys(m.raisedBySeverity).filter(s => !severities.includes(s))];
+  const [openBug, setOpenBug] = useState<string | null>(null); const workspace = useAdminWorkspace(); const client = useQueryClient();
   return <>
+    <Dialog open={openBug !== null} onOpenChange={o => { if (!o) { setOpenBug(null); void client.invalidateQueries({ queryKey: ['person-detail'] }); void client.invalidateQueries({ queryKey: ['person-overview'] }); void client.invalidateQueries({ queryKey: ['team-detail'] }); } }}>
+      <DialogContent className="max-w-3xl max-h-[88vh] overflow-y-auto"><DialogHeader><DialogTitle>Bug details</DialogTitle><DialogDescription>Full report, ownership and change history</DialogDescription></DialogHeader>
+        {openBug && (workspace.data ? <BugDetails key={openBug} id={openBug} access={admin} workspace={workspace.data} onDeleted={() => setOpenBug(null)} /> : <p className="text-sm text-muted-foreground">Loading…</p>)}
+      </DialogContent>
+    </Dialog>
     <section className="bf-person-hero">
       <span className="bf-avatar !size-14 !text-lg">{team ? <UsersRound size={24} /> : initials(m.name)}</span>
       <div className="min-w-0"><h2>{m.name}</h2><p>{team ? periodLabel : <>{roleName(m.role) || FOCUS_LABEL[focus]}{!m.current && ' · former member'} · {periodLabel}</>}</p></div>
@@ -186,10 +193,10 @@ function PersonReport({ m, trend, recent, severities, periodLabel }: { m: Person
     <div className="bf-report-grid bf-report-grid-wide">
       <Panel title="Weekly trend" sub="Raised vs fixed · last 12 weeks" legend={[['Raised', 'var(--viz-1)'], ['Fixed', 'var(--viz-3)']]}><TrendBars data={trend} /></Panel>
       <Panel title="Recent bugs" sub={team ? 'Latest changes across the team' : 'Raised by or assigned to them'}>
-        {recent.length ? <ul className="bf-recent bf-recent-scroll">{recent.map(b => <li key={b.id}>
-          <code>{b.code}</code><span className="truncate" title={b.title}>{b.title}</span>
-          <span className="bf-recent-meta"><PriorityBadge value={b.priority} />{b.relation !== 'team' && <span className="bf-tag">{b.relation === 'both' ? 'Raised & fixing' : b.relation === 'raised' ? 'Raised by them' : 'Assigned to them'}</span>}<span className="bf-recent-status">{statusText(b.status)}</span></span>
-        </li>)}</ul> : <p className="px-5 py-6 text-sm text-muted-foreground">No bugs yet</p>}
+        {recent.length ? <ul className="bf-recent bf-recent-scroll">{recent.map(b => <li key={b.id}><button type="button" className="bf-recent-item" onClick={() => setOpenBug(b.id)} title={`Open ${b.code} — ${b.title}`}>
+          <code>{b.code}</code><span className="truncate">{b.title}</span>
+          <span className="bf-recent-meta"><PriorityBadge value={b.priority} />{b.relation !== 'team' && <span className="bf-tag">{b.relation === 'both' ? 'Raised & fixing' : b.relation === 'raised' ? 'Raised by them' : 'Assigned to them'}</span>}<span className="bf-recent-status">{statusText(b.status)}</span><ChevronRight size={14} className="bf-recent-go" /></span>
+        </button></li>)}</ul> : <p className="px-5 py-6 text-sm text-muted-foreground">No bugs yet</p>}
       </Panel>
     </div>
   </>;
