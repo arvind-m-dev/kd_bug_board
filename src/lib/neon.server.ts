@@ -85,3 +85,8 @@ export async function neonExecute<T = NeonResult>(query: string | Statement[], p
   if (r.status >= 200 && r.status < 300) return r.json as T;
   throw neonFailure(r, true);
 }
+/** Run several read-only queries in a single request (one network round trip); results come back in order. */
+export async function neonBatch<const S extends readonly Statement[]>(statements: S): Promise<{ [K in keyof S]: NeonResult }> {
+  const r = await neonQuery<NeonBatchResult>([...statements], [], { 'Neon-Batch-Read-Only': 'true' });
+  return r.results as { [K in keyof S]: NeonResult };
+}

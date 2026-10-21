@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { SkeletonRows, SkeletonTiles } from './loading';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, type QueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipProps } from 'recharts';
 import { Activity, ArrowDown, ArrowRightLeft, ArrowUp, Bug, Check, ClipboardCheck, Flag, MessageSquare, Pencil, Search, Trash2, Trophy, UserPlus, UsersRound, X, type LucideIcon } from 'lucide-react';
@@ -240,4 +240,14 @@ function PerfStat({ label, value, sub }: { label: string; value: string; sub: st
 function PersonName({ name, role }: { name: string; role: string }) {
   const r = roleName(role);
   return <>{name}{r && <span className="bf-role"> ({r})</span>}</>;
+}
+
+/** Warm the Activity page's default queries (e.g. on hovering its menu link) so it opens with data ready. */
+export function prefetchActivityPage(client: QueryClient) {
+  const tz = viewerTimeZone(); const filters: ActivityFilters = { type: 'all', days: 30, query: '', tz }; const period = { days: 30 };
+  const opts = { staleTime: 15000 };
+  void client.prefetchQuery({ queryKey: ['activity', filters, ''], queryFn: () => getActivity({ data: filters }), ...opts });
+  void client.prefetchQuery({ queryKey: ['activity-insights', filters], queryFn: () => getActivityInsights({ data: filters }), ...opts });
+  void client.prefetchQuery({ queryKey: ['activity-people'], queryFn: () => getActivityPeople(), staleTime: 60000 });
+  void client.prefetchQuery({ queryKey: ['team-performance', period, tz], queryFn: () => getTeamPerformance({ data: { ...period, tz } }), staleTime: 30000 });
 }

@@ -4,6 +4,8 @@ import https from 'node:https';
 import type { LookupFunction } from 'node:net';
 
 const cache = new Map<string, { addresses: string[]; expires: number }>();
+// Reuse warm TLS connections: opening a new one costs several round trips to the database region.
+const agent = new https.Agent({ keepAlive: true, maxSockets: 8, keepAliveMsecs: 30_000 });
 
 async function resolve(hostname: string): Promise<string[]> {
   const hit = cache.get(hostname);
@@ -33,7 +35,7 @@ export async function dohFetch(input: string | URL | Request, init: RequestInit 
   const url = new URL(input instanceof Request ? input.url : input);
   const body = typeof init.body === 'string' ? init.body : init.body ? String(init.body) : undefined;
   return new Promise((resolveResponse, reject) => {
-    const req = https.request(url, { method: init.method ?? 'GET', headers: Object.fromEntries(new Headers(init.headers).entries()), lookup, signal: init.signal ?? undefined }, (res) => {
+    const req = https.request(url, { agent, method: init.method ?? 'GET', headers: Object.fromEntries(new Headers(init.headers).entries()), lookup, signal: init.signal ?? undefined }, (res) => {
       const chunks: Buffer[] = [];
       res.on('data', (c: Buffer) => chunks.push(c));
       res.on('end', () => {

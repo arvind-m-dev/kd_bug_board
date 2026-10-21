@@ -19,7 +19,7 @@ import { DropdownOptionsEditor } from './dropdown-options';
 import { ThemeToggle } from './theme-toggle';
 import { ThemedSelect } from './themed-select';
 import { ErrorNotice, actionError } from './action-feedback';
-import { ActivityView } from './activity-view';
+import { ActivityView, prefetchActivityPage } from './activity-view';
 import { TeamReports } from './team-reports';
 import { AppearanceSettings } from './appearance-settings';
 import { notificationLabel } from '@/lib/notifications';
@@ -47,6 +47,7 @@ function useNavCounts():Record<string,number|undefined>{
  return {'/admin/bugs':b.data?.total,'/admin/assignments':b.data?b.data.statusCounts.filter(c=>c.assigned).reduce((n,c)=>n+c.count,0):undefined,'/admin/users':m.data?m.data.filter(x=>x.type!=='admin').length:undefined};
 }
 export function Workspace({view='overview'}:{view?:View}) {
+ const queryClient=useQueryClient();
  const [menu,setMenu]=useState(false); const [dialog,setDialog]=useState<string|null>(null);
  const pathname=useRouterState({select:s=>s.location.pathname});const navCounts=useNavCounts();
  return <div className="bf-shell">
@@ -55,7 +56,7 @@ export function Workspace({view='overview'}:{view?:View}) {
    
    <nav className="bf-nav">{navigation.slice(0,3).map(n=><Link key={n.to} to={n.to} activeOptions={{exact:true}} className="bf-nav-link" data-status={n.to==='/admin'&&pathname==='/'?'active':undefined} onClick={()=>setMenu(false)}><n.icon/>{n.label}{n.count&&<span className="bf-nav-count">{navCounts[n.to]??'—'}</span>}</Link>)}</nav>
    <div className="bf-nav-label mt-7">Management</div>
-   <nav className="bf-nav">{navigation.slice(4,7).map(n=><Link key={n.to} to={n.to} activeOptions={{exact:true}} className="bf-nav-link" onClick={()=>setMenu(false)}><n.icon/>{n.label}{n.count&&<span className="bf-nav-count">{navCounts[n.to]??'—'}</span>}</Link>)}</nav>
+   <nav className="bf-nav">{navigation.slice(4,7).map(n=><Link key={n.to} to={n.to} activeOptions={{exact:true}} className="bf-nav-link" onClick={()=>setMenu(false)} onMouseEnter={n.to==='/admin/activity'?()=>prefetchActivityPage(queryClient):undefined} onFocus={n.to==='/admin/activity'?()=>prefetchActivityPage(queryClient):undefined}><n.icon/>{n.label}{n.count&&<span className="bf-nav-count">{navCounts[n.to]??'—'}</span>}</Link>)}</nav>
    <div className="bf-nav-label mt-7">Portals</div><nav className="bf-nav"><Link to="/portals" className="bf-nav-link" onClick={()=>setMenu(false)}><Link2/>Member portals</Link></nav>
    <div className="bf-sidebar-bottom"><Link to="/admin/settings" activeOptions={{exact:true}} className="bf-nav-link mb-2" onClick={()=>setMenu(false)}><Settings2/>Settings</Link>
    <Button variant="ghost" className="mb-3 w-full justify-start text-xs text-muted-foreground" onClick={()=>setDialog('help')}><CircleHelp size={16}/>Help & support</Button>
