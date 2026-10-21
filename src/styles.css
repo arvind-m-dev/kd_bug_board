@@ -327,16 +327,6 @@ body { font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; 
 .bf-summary-card, .bf-stat, .bf-status-card, .bf-portal-card { position: relative; overflow: hidden; border-radius: 12px; box-shadow: var(--shadow-panel); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease; }
 .bf-summary-card:hover, .bf-stat:hover, .bf-status-card:hover, .bf-portal-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); border-color: color-mix(in oklab, var(--primary) 45%, var(--border)); background: var(--card); }
 
-/* Each summary card gets its own accent colour */
-.bf-summary-card { --tone: var(--primary); padding: 18px 20px; gap: 10px; }
-.bf-summary-card:nth-child(2) { --tone: var(--info); } .bf-summary-card:nth-child(3) { --tone: var(--warning); } .bf-summary-card:nth-child(4) { --tone: var(--destructive); }
-.bf-summary-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; background: linear-gradient(90deg, var(--tone), color-mix(in oklab, var(--tone) 20%, transparent)); }
-.bf-summary-card::after { content: ""; position: absolute; right: -40px; top: -40px; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, color-mix(in oklab, var(--tone) 18%, transparent), transparent 70%); pointer-events: none; }
-.bf-summary-card > span { font-size: 13px; font-weight: 600; color: var(--muted-foreground); }
-.bf-summary-card > span svg { padding: 6px; width: 30px; height: 30px; border-radius: 9px; background: color-mix(in oklab, var(--tone) 15%, transparent); }
-.bf-summary-card strong { font-family: var(--font-heading); font-size: 32px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--foreground); }
-.bf-summary-card small { font-size: 12.5px; }
-
 .bf-stat-number, .bf-donut strong { color: var(--foreground); font-variant-numeric: tabular-nums; }
 .bf-status-card strong { font-family: var(--font-heading); font-size: 26px; font-variant-numeric: tabular-nums; }
 .bf-status-card[data-selected="true"] { background: color-mix(in oklab, var(--primary) 9%, var(--card)); }
@@ -414,3 +404,31 @@ body { font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; 
 .bf-activity { display: grid; gap: 2px; line-height: 1.35; }
 .bf-activity-action { font-size: 13px; font-weight: 600; color: var(--foreground); }
 .bf-activity-meta { font-size: 12px; color: var(--muted-foreground); }
+
+/* ───────────── Overview KPI cards ───────────── */
+.bf-kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
+.bf-kpi { --tone: var(--primary); display: flex; flex-direction: column; gap: 12px; padding: 18px 20px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--foreground); box-shadow: var(--shadow-panel); transition: border-color .15s, box-shadow .15s; }
+.bf-kpi[data-tone=info] { --tone: var(--info); } .bf-kpi[data-tone=warning] { --tone: var(--warning); } .bf-kpi[data-tone=danger] { --tone: var(--destructive); }
+.bf-kpi:hover { border-color: color-mix(in oklab, var(--foreground) 22%, var(--border)); box-shadow: var(--shadow-lift); }
+.bf-kpi:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.bf-kpi-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.bf-kpi-label { font-size: 13px; font-weight: 500; color: var(--muted-foreground); }
+.bf-kpi-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; color: var(--tone); background: color-mix(in oklab, var(--tone) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--tone) 22%, transparent); }
+.bf-kpi-value { display: flex; align-items: baseline; gap: 8px; font-family: var(--font-heading); font-size: 34px; font-weight: 700; line-height: 1; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+.bf-kpi-of { font-family: var(--font-sans); font-size: 13px; font-weight: 500; letter-spacing: 0; color: var(--muted-foreground); }
+.bf-kpi-meter { display: block; height: 4px; border-radius: 999px; background: var(--muted); overflow: hidden; }
+.bf-kpi-meter i { display: block; height: 100%; border-radius: inherit; background: var(--tone); transition: width .6s cubic-bezier(.2,.7,.2,1); }
+.bf-kpi-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--muted-foreground); min-width: 0; }
+.bf-kpi-go { flex-shrink: 0; opacity: 0; transform: translate(-3px, 3px); transition: opacity .15s, transform .15s; }
+.bf-kpi:hover .bf-kpi-go, .bf-kpi:focus-visible .bf-kpi-go { opacity: 1; transform: none; color: var(--foreground); }
+@media (max-width: 1100px) { .bf-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .bf-kpi-grid { grid-template-columns: 1fr; } }
+
+/* Overview breakdowns: proportion bars between label and count */
+.bf-glance-grid li a { display: grid; grid-template-columns: 170px 1fr 28px; gap: 14px; }
+.bf-glance-grid li a > :first-child { justify-self: start; }
+.bf-glance-grid li a[data-pri] .bf-glance-bar i { background: var(--c); }
+.bf-glance-grid li a strong { text-align: right; font-variant-numeric: tabular-nums; }
+.bf-glance-bar { display: block; height: 6px; border-radius: 999px; background: var(--muted); overflow: hidden; }
+.bf-glance-bar i { display: block; height: 100%; border-radius: inherit; background: color-mix(in oklab, var(--primary) 70%, transparent); }
+.bf-glance-grid h3, .bf-glance-recent h3 { font-size: 12px; letter-spacing: .06em; }
