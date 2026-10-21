@@ -1,5 +1,9 @@
 import { createServerFn } from '@tanstack/react-start';
+import { z } from 'zod';
 import { activityQuerySchema } from './activity';
+import { periodFields, validRange } from './period';
+
+const periodOnly = z.object(periodFields).strict().refine(validRange, 'The start date must be on or before the end date.');
 
 export const getActivity = createServerFn({ method: 'POST' })
   .inputValidator((v: unknown) => activityQuerySchema.parse(v))
@@ -11,11 +15,12 @@ export const getActivity = createServerFn({ method: 'POST' })
   });
 
 export const getActivityInsights = createServerFn({ method: 'POST' })
-  .inputValidator((v: unknown) => activityQuerySchema.omit({ cursor: true }).parse(v))
+  .inputValidator((v: unknown) => activityQuerySchema.parse(v))
   .handler(async ({ data }) => {
     const s = await import('./activity.server');
     const a = await import('./portal-access.server');
-    return a.databaseCall(() => s.activityInsights(data));
+    const { cursor: _cursor, ...filters } = data;
+    return a.databaseCall(() => s.activityInsights(filters));
   });
 
 export const getActivityPeople = createServerFn({ method: 'GET' }).handler(async () => {
@@ -25,9 +30,9 @@ export const getActivityPeople = createServerFn({ method: 'GET' }).handler(async
 });
 
 export const getTeamPerformance = createServerFn({ method: 'POST' })
-  .inputValidator((v: unknown) => activityQuerySchema.pick({ days: true }).parse(v))
+  .inputValidator((v: unknown) => periodOnly.parse(v))
   .handler(async ({ data }) => {
     const s = await import('./activity.server');
     const a = await import('./portal-access.server');
-    return a.databaseCall(() => s.teamPerformance(data.days));
+    return a.databaseCall(() => s.teamPerformance(data));
   });

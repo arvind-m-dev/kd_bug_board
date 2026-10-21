@@ -1,11 +1,12 @@
 import { z } from 'zod';
+import { periodFields, validRange } from './period';
 
 /** Client-safe types and helpers for per-person reports. */
 
 export const personReportQuerySchema = z.object({
-  days: z.union([z.literal(0), z.literal(7), z.literal(30), z.literal(90)]).default(0),
+  ...periodFields,
   person: z.string().uuid().optional(),
-}).strict();
+}).strict().refine(validRange, 'The start date must be on or before the end date.');
 
 export type Counts = Record<string, number>;
 export type PersonMetrics = {

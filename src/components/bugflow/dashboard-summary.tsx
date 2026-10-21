@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SkeletonRows } from './loading';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Link } from '@tanstack/react-router';
@@ -42,7 +43,7 @@ export function DashboardSummary() {
       <Kpi to="/admin/bugs" search={{ filter: 'open' }} tone="danger" icon={Bell} label="Needs attention" value={n(alerts, bugs.isPending)} of={bugList.length} share={bugList.length ? alerts / bugList.length : 0} foot="New, reopened, retest or info" />
     </div>
     <div className="bf-panel mb-6"><div className="bf-panel-heading"><h2>Bugs at a glance</h2><Link to="/admin/bugs">View all bugs<ArrowUpRight size={12} /></Link></div>
-      {bugs.isError ? <p className="p-5 text-xs text-muted-foreground">Bugs could not be loaded.</p> : bugs.isPending ? <p className="p-5 text-xs text-muted-foreground">Loading bugs…</p> : <>
+      {bugs.isError ? <p className="p-5 text-xs text-muted-foreground">Bugs could not be loaded.</p> : bugs.isPending ? <SkeletonRows rows={6} label="Loading bugs" /> : <>
         <div className="bf-glance-row"><strong>Total {bugList.length}</strong><span className="text-muted-foreground">{bugs.data?.open ?? 0} open · {bugs.data?.recheck ?? 0} in retest · {bugs.data?.unassigned ?? 0} unassigned · {bugs.data?.resolved ?? 0} resolved</span></div>
         <div className="bf-glance-grid">
           <div><h3>By status</h3><ul>{statusCounts.map(([s, c]) => <li key={s}><Link to="/admin/bugs" search={{ filter: s }}><span className="bf-status-pill" data-tone={statusTone(s)}><span className="bf-dot" />{label(s)}</span>{bar(c)}<strong>{c}</strong></Link></li>)}</ul></div>

@@ -616,7 +616,7 @@ body { font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; 
 .bf-reports-detail { min-width: 0; }
 .bf-reports-detail .bf-person-hero { margin-top: 0; animation: bf-rise .3s cubic-bezier(.2,.7,.2,1) both; }
 .bf-report-loading { display: grid; gap: 16px; }
-.bf-report-loading span { display: block; height: 120px; border-radius: 12px; background: var(--muted); animation: bf-fade 1.2s ease-in-out infinite alternate; }
+.bf-report-loading span { display: block; height: 120px; border-radius: 12px; background: linear-gradient(90deg, var(--muted) 0%, color-mix(in oklab, var(--muted) 45%, var(--card)) 50%, var(--muted) 100%); background-size: 200% 100%; animation: bf-shimmer 1.2s ease-in-out infinite; }
 .bf-report-loading span:first-child { height: 90px; }
 @keyframes bf-fade { from { opacity: .5; } to { opacity: 1; } }
 @media (max-width: 900px) {
@@ -641,3 +641,25 @@ body { font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; 
 .bf-updating { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted-foreground); }
 .bf-updating::before { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 2px solid color-mix(in oklab, var(--primary) 30%, transparent); border-top-color: var(--primary); animation: bf-spin .7s linear infinite; }
 @keyframes bf-spin { to { transform: rotate(360deg); } }
+
+/* ───────────── Loading: top progress bar and shimmer skeletons ───────────── */
+.bf-progress { position: fixed; inset: 0 0 auto; z-index: 100; height: 3px; pointer-events: none; opacity: 0; transition: opacity .3s ease; }
+.bf-progress[data-visible] { opacity: 1; }
+.bf-progress i { display: block; height: 100%; background: linear-gradient(90deg, var(--primary), var(--brand-2)); box-shadow: 0 0 10px color-mix(in oklab, var(--primary) 70%, transparent); border-radius: 0 3px 3px 0; transition: width .25s ease-out; }
+.bf-skeleton { display: block; height: 12px; border-radius: 6px; background: linear-gradient(90deg, var(--muted) 0%, color-mix(in oklab, var(--muted) 45%, var(--card)) 50%, var(--muted) 100%); background-size: 200% 100%; animation: bf-shimmer 1.2s ease-in-out infinite; }
+@keyframes bf-shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+.bf-skeleton-rows { display: grid; gap: 16px; padding: 18px 20px; }
+.bf-skeleton-rows > div { display: grid; grid-template-columns: 28px 1fr 32px; align-items: center; gap: 12px; }
+.bf-skeleton-dot { width: 28px; height: 28px; border-radius: 8px; }
+.bf-skeleton-num { height: 12px; }
+.bf-kpi-static .bf-skeleton + .bf-skeleton { margin-top: 2px; }
+@media (prefers-reduced-motion: reduce) { .bf-skeleton { animation: none; } .bf-progress i { transition: none; } }
+
+/* Period picker: presets plus an optional custom date range */
+.bf-period { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bf-range { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--card); color: var(--muted-foreground); font-size: 13px; animation: bf-rise .2s ease both; }
+.bf-range input { height: 30px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: var(--foreground); font: 13px var(--font-sans); color-scheme: inherit; }
+.bf-range input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.dark .bf-range input { color-scheme: dark; }
+.bf-range[data-invalid] { border-color: var(--destructive); }
+.bf-range-error { color: var(--destructive); font-size: 12px; font-weight: 600; }

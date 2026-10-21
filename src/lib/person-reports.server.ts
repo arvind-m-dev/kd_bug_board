@@ -2,6 +2,7 @@ import { neonQuery } from './neon.server';
 import { requireAdmin } from './portal-access.server';
 import { formatBugCode } from './bug-workflow';
 import type { Counts, PersonDetail, PersonMetrics } from './person-reports';
+import { periodWindow, type Period } from './period';
 
 /** Server-only per-person metrics. Admin-only, read-only over bugs, history and verifications. */
 
@@ -14,11 +15,10 @@ function counts(v: unknown): Counts {
   return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, n]) => [k, Number(n)]));
 }
 
-export async function personMetrics(days: number, person?: string): Promise<PersonMetrics[]> {
+export async function personMetrics(period: Period & { tz?: string }, person?: string): Promise<PersonMetrics[]> {
   await requireAdmin();
   const params: unknown[] = [];
-  let win = (_col: string) => 'true';
-  if (days > 0) { params.push(days); const p = `$${params.length}`; win = col => `${col}>=now()-(${p}::int||' days')::interval`; }
+  const win = periodWindow(period, params);
   let who = '';
   if (person) { params.push(person); who = `where u.id=$${params.length}::uuid`; }
   const agg = (col: string, where: string) => `(select coalesce(jsonb_object_agg(k,n),'{}'::jsonb) from (select ${col} as k,count(*)::int as n from b where ${where} group by ${col}) x)`;
@@ -63,17 +63,17 @@ export async function personMetrics(days: number, person?: string): Promise<Pers
 }
 
 /** All current members, plus former members with recorded work; current first, then busiest, then by name. */
-export async function personOverview(days: number) {
-  const all = await personMetrics(days);
+export async function personOverview(period: Period & { tz?: string }) {
+  const all = await personMetrics(period);
   const work = (m: PersonMetrics) => m.raised + m.owned + m.sentToQa + m.validated + m.rejected + m.revalidated + m.needsInfo + m.qaPassed + m.qaFailed;
   return all.filter(m => (m.current && m.role) || work(m) > 0)
     .sort((a, b) => Number(b.current) - Number(a.current) || work(b) - work(a) || a.name.localeCompare(b.name));
 }
 
-export async function personDetail(days: number, person: string): Promise<PersonDetail> {
+export async function personDetail(period: Period & { tz?: string }, person: string): Promise<PersonDetail> {
   await requireAdmin();
   // Metrics, weekly trend and recent bugs are independent: fetch them in parallel.
-  const [[metrics], trend, recent] = await Promise.all([personMetrics(days, person),
+  const [[metrics], trend, recent] = await Promise.all([personMetrics(period, person),
   // Weekly raised vs fixed for the last 12 weeks (Monday-start weeks).
   neonQuery(`with weeks as (select generate_series(date_trunc('week', now())-interval '11 weeks', date_trunc('week', now()), '1 week') as wk),
     b as (select * from bugflow.bugs where deleted_at is null),

@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { SkeletonRows, SkeletonTiles } from './loading';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipProps } from 'recharts';
@@ -6,9 +7,11 @@ import { Activity, ArrowDown, ArrowRightLeft, ArrowUp, Bug, Check, ClipboardChec
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getActivity, getActivityInsights, getActivityPeople, getTeamPerformance } from '@/lib/activity.functions';
-import { ACTIVITY_CATEGORIES, ACTIVITY_PERIODS, ACTIVITY_SERIES, ACTIVITY_SOURCES, changeText, durationText, formatWhen, nameWithRole, roleName, type PersonPerformance, type ActivityFilters, type ActivityInsights, type ActivityRow } from '@/lib/activity';
+import { ACTIVITY_CATEGORIES, ACTIVITY_SERIES, ACTIVITY_SOURCES, changeText, durationText, formatWhen, nameWithRole, roleName, type PersonPerformance, type ActivityFilters, type ActivityInsights, type ActivityRow } from '@/lib/activity';
 import { notificationLabel } from '@/lib/notifications';
 import { ThemedSelect } from './themed-select';
+import { PeriodPicker } from './period-picker';
+import { periodLabel as describePeriod, viewerTimeZone, type Period } from '@/lib/period';
 import { ErrorNotice, actionError } from './action-feedback';
 
 /** Icon + tone per activity kind, shared by the timeline and the category breakdown. */
@@ -37,14 +40,14 @@ const shortDay = (day: string) => new Date(`${day}T00:00:00`).toLocaleDateString
 
 export function ActivityView() {
   const fetchRows = useServerFn(getActivity); const fetchInsights = useServerFn(getActivityInsights); const fetchPeople = useServerFn(getActivityPeople);
-  const [type, setType] = useState('all'); const [days, setDays] = useState<ActivityFilters['days']>(30);
+  const [type, setType] = useState('all'); const [period, setPeriod] = useState<Period>({ days: 30 });
   const [actor, setActor] = useState(''); const [via, setVia] = useState('all');
   const [searchText, setSearchText] = useState(''); const [query, setQuery] = useState('');
   const [pages, setPages] = useState<(string | undefined)[]>([undefined]); const [page, setPage] = useState(0);
-  const tz = useMemo(() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; } }, []);
+  const tz = useMemo(viewerTimeZone, []);
   // Search applies after a short pause so typing doesn't fire a request per key.
   useEffect(() => { const t = setTimeout(() => { setQuery(searchText.trim()); setPages([undefined]); setPage(0); }, 350); return () => clearTimeout(t); }, [searchText]);
-  const filters: ActivityFilters = { type, days, query, tz, ...(actor ? { actor } : {}), ...(via !== 'all' ? { via: via as NonNullable<ActivityFilters['via']> } : {}) };
+  const filters: ActivityFilters = { type, days: period.days, ...(period.from ? { from: period.from } : {}), ...(period.to ? { to: period.to } : {}), query, tz, ...(actor ? { actor } : {}), ...(via !== 'all' ? { via: via as NonNullable<ActivityFilters['via']> } : {}) };
   const cursor = pages[page];
   const rows = useQuery({ queryKey: ['activity', filters, cursor ?? ''], queryFn: () => fetchRows({ data: { ...filters, ...(cursor ? { cursor } : {}) } }), placeholderData: keepPreviousData, retry: 1, staleTime: 15000, refetchInterval: 30000 });
   const insights = useQuery({ queryKey: ['activity-insights', filters], queryFn: () => fetchInsights({ data: filters }), placeholderData: keepPreviousData, retry: 1, staleTime: 15000, refetchInterval: 60000 });
@@ -59,7 +62,7 @@ export function ActivityView() {
     via !== 'all' && { label: ACTIVITY_SOURCES.find(s => s.value === via)?.label ?? via, clear: () => set(setVia)('all') },
     query && { label: `“${query}”`, clear: () => setSearchText('') },
   ].filter(Boolean) as { label: string; clear: () => void }[];
-  const ins = insights.data; const periodLabel = days ? `last ${days} days` : 'all time';
+  const ins = insights.data; const periodLabel = describePeriod(period);
 
   return <>
     <div className="bf-toolbar">
@@ -67,26 +70,27 @@ export function ActivityView() {
       <ThemedSelect label="Activity type" value={type} onChange={set(setType)} options={ACTIVITY_CATEGORIES.map(c => ({ value: c.key, label: c.label }))} />
       <ThemedSelect label="Person" value={actor || 'all'} onChange={v => set(setActor)(v === 'all' ? '' : v)} options={[{ value: 'all', label: 'Everyone' }, ...(people.data ?? []).map(p => ({ value: p.id, label: nameWithRole(p.name, p.role) }))]} />
       <ThemedSelect label="Source" value={via} onChange={set(setVia)} options={ACTIVITY_SOURCES} />
-      <ThemedSelect label="Period" value={String(days)} onChange={v => set(setDays)(Number(v) as ActivityFilters['days'])} options={ACTIVITY_PERIODS} />
+      <PeriodPicker value={period} onChange={set(setPeriod)} />
     </div>
     {chips.length > 0 && <div className="bf-chips"><span>Filtered by</span>{chips.map(c => <button key={c.label} type="button" className="bf-chip" onClick={c.clear} aria-label={`Remove filter ${c.label}`}>{c.label}<X size={12} /></button>)}<Button size="sm" variant="ghost" onClick={() => { setType('all'); setActor(''); setVia('all'); setSearchText(''); reset(); }}>Clear all</Button></div>}
 
     {insights.isError && <ErrorNotice message={actionError(insights.error, 'Activity insights could not load.')} onRetry={() => insights.refetch()} retrying={insights.isFetching} />}
     <div className="bf-kpi-grid" data-updating={insights.isPlaceholderData || undefined}>
-      <Tile label="Changes" value={ins?.totals.events} foot={`Recorded in the ${periodLabel}`} />
+      {!ins ? <SkeletonTiles /> : <>
+      <Tile label="Changes" value={ins?.totals.events} foot={`Recorded ${periodLabel.startsWith('last') || periodLabel === 'all time' ? 'in the ' : ''}${periodLabel}`} />
       <Tile label="Bugs touched" value={ins?.totals.bugs} foot="Distinct bugs with any change" />
       <Tile label="People active" value={ins?.totals.people} foot="Made at least one change" />
-      <Tile label="Resolved · reopened" value={ins ? `${ins.totals.resolved} · ${ins.totals.reopened}` : undefined} foot="Fixes passed vs sent back" />
+      <Tile label="Resolved · reopened" value={ins ? `${ins.totals.resolved} · ${ins.totals.reopened}` : undefined} foot="Fixes passed vs sent back" /></>}
     </div>
 
     <div className="bf-activity-grid" data-updating={insights.isPlaceholderData || undefined}>
       <section className="bf-panel" aria-labelledby="activity-people">
         <div className="bf-panel-heading"><div><h2 id="activity-people">Most active</h2><p className="bf-panel-sub">{ins ? `${ins.people.length} people · ` : ''}Click a person to filter</p></div></div>
-        <BarList scroll empty="No one yet" items={(ins?.people ?? []).map(p => ({ id: p.id, label: <PersonName name={p.name} role={p.role} />, title: nameWithRole(p.name, p.role), count: p.count, avatar: initials(p.name), active: actor === p.id }))} onPick={id => set(setActor)(actor === id ? '' : id)} />
+        {!ins ? <SkeletonRows rows={5} label="Loading people" /> : <BarList scroll empty="No one yet" items={(ins?.people ?? []).map(p => ({ id: p.id, label: <PersonName name={p.name} role={p.role} />, title: nameWithRole(p.name, p.role), count: p.count, avatar: initials(p.name), active: actor === p.id }))} onPick={id => set(setActor)(actor === id ? '' : id)} />}
       </section>
       <section className="bf-panel" aria-labelledby="activity-mix">
         <div className="bf-panel-heading"><div><h2 id="activity-mix">What changed</h2><p className="bf-panel-sub">Click a row to filter</p></div></div>
-        <BarList empty="No changes yet" items={(ins?.categories ?? []).map(c => ({ id: c.key, label: categoryLabel(c.key), title: categoryLabel(c.key), count: c.count, icon: KIND[c.key]?.icon, tone: KIND[c.key]?.tone, active: type === c.key }))} onPick={id => set(setType)(type === id ? 'all' : id)} />
+        {!ins ? <SkeletonRows rows={6} label="Loading changes" /> : <BarList empty="No changes yet" items={(ins?.categories ?? []).map(c => ({ id: c.key, label: categoryLabel(c.key), title: categoryLabel(c.key), count: c.count, icon: KIND[c.key]?.icon, tone: KIND[c.key]?.tone, active: type === c.key }))} onPick={id => set(setType)(type === id ? 'all' : id)} />}
       </section>
       <section className="bf-panel" aria-labelledby="activity-share">
         <div className="bf-panel-heading"><div><h2 id="activity-share">Activity mix</h2><p className="bf-panel-sub">Share of changes · {periodLabel}</p></div></div>
@@ -94,12 +98,12 @@ export function ActivityView() {
       </section>
     </div>
 
-    <TeamPerformanceSection days={days} periodLabel={periodLabel} onPerson={id => set(setActor)(id)} />
+    <TeamPerformanceSection period={period} tz={tz} periodLabel={periodLabel} onPerson={id => set(setActor)(id)} />
 
     {rows.isError && <ErrorNotice message={actionError(rows.error, 'Activity could not load. Try again.')} onRetry={() => rows.refetch()} retrying={rows.isFetching} />}
     <section className="bf-panel" aria-labelledby="activity-log">
       <div className="bf-panel-heading"><div><h2 id="activity-log">Activity log</h2><p className="bf-panel-sub">Every change, newest first</p></div>{(rows.isPlaceholderData || insights.isPlaceholderData) && <span className="bf-updating">Updating…</span>}</div>
-      {rows.isLoading ? <p className="p-5 text-sm text-muted-foreground">Loading activity…</p> : list.length === 0 && !rows.isError
+      {rows.isLoading ? <SkeletonRows rows={8} label="Loading activity" /> : list.length === 0 && !rows.isError
         ? <div className="bf-empty"><span className="bf-empty-icon"><Activity size={22} /></span><h3>No activity matches these filters</h3><p>Try a longer period or remove a filter.</p></div>
         : <div data-updating={rows.isPlaceholderData || undefined}><Timeline rows={list.slice(0, 50)} /></div>}
       {list.length > 0 && <div className="bf-table-footer"><span>Page {page + 1} · {Math.min(list.length, 50)} changes</span><div className="flex items-center gap-2"><Button variant="outline" size="sm" disabled={page === 0 || rows.isFetching} onClick={() => setPage(p => p - 1)}>Newer</Button><Button variant="outline" size="sm" disabled={!nextCursor || rows.isFetching} onClick={() => { const next = [...pages]; next[page + 1] = nextCursor; setPages(next); setPage(page + 1); }}>Older</Button></div></div>}
@@ -185,9 +189,9 @@ const PERF_COLUMNS: { key: SortKey; label: string; hint: string }[] = [
 ];
 
 /** Who raised, who fixed, and how fast — per person and overall. */
-function TeamPerformanceSection({ days, periodLabel, onPerson }: { days: ActivityFilters['days']; periodLabel: string; onPerson: (id: string) => void }) {
+function TeamPerformanceSection({ period, tz, periodLabel, onPerson }: { period: Period; tz: string; periodLabel: string; onPerson: (id: string) => void }) {
   const fetchPerf = useServerFn(getTeamPerformance);
-  const q = useQuery({ queryKey: ['team-performance', days], queryFn: () => fetchPerf({ data: { days } }), placeholderData: keepPreviousData, retry: 1, staleTime: 30000, refetchInterval: 60000 });
+  const q = useQuery({ queryKey: ['team-performance', period, tz], queryFn: () => fetchPerf({ data: { ...period, tz } }), placeholderData: keepPreviousData, retry: 1, staleTime: 30000, refetchInterval: 60000 });
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'fixed', dir: -1 });
   const t = q.data?.totals; const list = q.data?.people ?? [];
   const value = (p: PersonPerformance, k: SortKey) => k === 'name' ? p.name : k === 'qa' ? p.qaPassed + p.qaFailed : k === 'avgFixDays' ? (p.avgFixDays ?? Number.POSITIVE_INFINITY) : p[k];
@@ -206,7 +210,7 @@ function TeamPerformanceSection({ days, periodLabel, onPerson }: { days: Activit
         <PerfStat label="Avg. time to resolve" value={t ? durationText(t.avgResolveDays) : '…'} sub="Reported → resolved" />
         <PerfStat label="Avg. time to assign" value={t ? durationText(t.avgAssignDays) : '…'} sub="Reported → first owner" />
       </div>
-      {q.isPending ? <p className="px-5 pb-5 text-sm text-muted-foreground">Loading team performance…</p> : list.length === 0 ? <div className="bf-empty"><span className="bf-empty-icon"><UsersRound size={22} /></span><h3>No bug work in this period</h3><p>Try a longer period. Numbers appear once bugs are raised, assigned and fixed.</p></div> : <div className="bf-perf-body">
+      {q.isPending ? <SkeletonRows rows={4} label="Loading team performance" /> : list.length === 0 ? <div className="bf-empty"><span className="bf-empty-icon"><UsersRound size={22} /></span><h3>No bug work in this period</h3><p>Try a longer period. Numbers appear once bugs are raised, assigned and fixed.</p></div> : <div className="bf-perf-body">
         <div className="bf-perf-compare" aria-label="Raised vs fixed by person">
           <div className="bf-perf-compare-head"><h3>Raised vs fixed</h3><ul className="bf-legend-row"><li><span className="bf-swatch" style={{ background: 'var(--viz-1)' }} />Raised</li><li><span className="bf-swatch" style={{ background: 'var(--viz-3)' }} />Fixed</li></ul></div>
           <ul>{list.filter(p => p.raised + p.fixed > 0).sort((a, b) => b.raised + b.fixed - (a.raised + a.fixed)).slice(0, 8).map(p => <li key={p.id} title={`${p.name}: ${p.raised} raised · ${p.fixed} fixed`}>

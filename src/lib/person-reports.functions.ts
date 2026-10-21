@@ -2,17 +2,17 @@ import { createServerFn } from '@tanstack/react-start';
 import { personReportQuerySchema } from './person-reports';
 
 export const getPersonOverview = createServerFn({ method: 'POST' })
-  .inputValidator((v: unknown) => personReportQuerySchema.pick({ days: true }).parse(v))
+  .inputValidator((v: unknown) => personReportQuerySchema.parse(v))
   .handler(async ({ data }) => {
     const s = await import('./person-reports.server');
     const a = await import('./portal-access.server');
-    return a.databaseCall(() => s.personOverview(data.days));
+    return a.databaseCall(() => s.personOverview(data));
   });
 
 export const getPersonDetail = createServerFn({ method: 'POST' })
-  .inputValidator((v: unknown) => personReportQuerySchema.required({ person: true }).parse(v))
+  .inputValidator((v: unknown) => { const d = personReportQuerySchema.parse(v); if (!d.person) throw new Error('Choose a person.'); return { ...d, person: d.person }; })
   .handler(async ({ data }) => {
     const s = await import('./person-reports.server');
     const a = await import('./portal-access.server');
-    return a.databaseCall(() => s.personDetail(data.days, data.person));
+    return a.databaseCall(() => s.personDetail(data, data.person));
   });

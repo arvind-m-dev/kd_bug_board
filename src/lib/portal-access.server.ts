@@ -15,12 +15,22 @@ export function checkOrigin() {
   const request = getRequest(); const origin = request.headers.get('origin');
   if (origin && origin !== new URL(request.url).origin) throw new Error('This request must come from your Futurist Global Bug Board workspace.');
 }
+// Verified Admin sessions are remembered briefly per server instance so each request skips a database round trip.
+// Sign-out clears the entry; other revocations take effect within ADMIN_CACHE_MS.
+const ADMIN_CACHE_MS = 60_000;
+const adminCache = new Map<string, { admin: { id: string; userId: string; name: string }; until: number }>();
 export async function requireAdmin() {
   const token = getCookie('bugflow_admin');
   if (!token || !/^[a-f0-9]{64}$/.test(token)) throw new Error('Unlock private Admin access in Settings first.');
-  const { rows } = await neonQuery("select p.id, p.user_id, u.name from bugflow.admin_sessions s join bugflow.portals p on p.id=s.portal_id join bugflow.users u on u.id=p.user_id where s.token_hash=$1 and s.expires_at>now() and p.type='admin' and p.active and u.active and p.revoked_at is null and (p.expires_at is null or p.expires_at>now()) limit 1", [await hashToken(token)]);
+  const key = await hashToken(token); const hit = adminCache.get(key);
+  if (hit && hit.until > Date.now()) return hit.admin;
+  adminCache.delete(key);
+  const { rows } = await neonQuery("select p.id, p.user_id, u.name from bugflow.admin_sessions s join bugflow.portals p on p.id=s.portal_id join bugflow.users u on u.id=p.user_id where s.token_hash=$1 and s.expires_at>now() and p.type='admin' and p.active and u.active and p.revoked_at is null and (p.expires_at is null or p.expires_at>now()) limit 1", [key]);
   const admin = rows[0]; if (!admin) throw new Error('Admin access has expired or was revoked. Unlock access in Settings.');
-  return { id: String(admin['id']), userId: String(admin['user_id']), name: String(admin['name']) };
+  const result = { id: String(admin['id']), userId: String(admin['user_id']), name: String(admin['name']) };
+  if (adminCache.size > 500) adminCache.clear();
+  adminCache.set(key, { admin: result, until: Date.now() + ADMIN_CACHE_MS });
+  return result;
 }
 export async function adminStatus() {
   try { return { unlocked: true, name: (await requireAdmin()).name }; }
@@ -46,7 +56,7 @@ export async function unlockAdmin(data: z.infer<typeof unlockSchema>) {
 }
 export async function lockAdmin() {
   checkOrigin(); const token = getCookie('bugflow_admin');
-  if (token) await neonExecute('delete from bugflow.admin_sessions where token_hash=$1', [await hashToken(token)]);
+  if (token) { const key = await hashToken(token); adminCache.delete(key); await neonExecute('delete from bugflow.admin_sessions where token_hash=$1', [key]); }
   deleteCookie('bugflow_admin', { httpOnly: true, secure: true, sameSite: 'none', partitioned: true, path: '/' }); return { locked: true };
 }
 export async function listMembers() {

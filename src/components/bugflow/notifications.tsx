@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SkeletonRows } from './loading';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Link } from '@tanstack/react-router';
@@ -60,7 +61,7 @@ export function NotificationMenu() {
 export function NotificationsPage() {
   const q = useNotifications(200); const mark = useMark();
   const [tab, setTab] = useState<'all' | 'unread'>('all'); const [confirm, setConfirm] = useState(false);
-  if (q.isPending) return <p className="text-sm text-muted-foreground">Loading notifications…</p>;
+  if (q.isPending) return <SkeletonRows rows={5} label="Loading notifications" />;
   if (q.isError) return <ErrorNotice message={actionError(q.error, 'Notifications could not be loaded.')} onRetry={() => q.refetch()} />;
   const items = tab === 'unread' ? q.data.items.filter(n => n.unread) : q.data.items;
   return <div className="grid gap-4">

@@ -1,4 +1,5 @@
 import { Fragment, useState } from 'react';
+import { SkeletonRows } from './loading';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Bug, Search, Plus, ArrowUpRight, RefreshCw, CheckCircle2, Clock3, Pencil, Trash2, Copy, CopyCheck, ListChecks, X, ChevronDown, ChevronRight } from 'lucide-react';
@@ -36,7 +37,7 @@ export function BugWorkspace({access,initialFilter='all',assignmentsOnly=false,l
  async function copyBugs(ids:string[]){if(copying||ids.length===0)return;setCopying(true);try{const details=await Promise.all(ids.map(bid=>fetchDetail({data:{access,id:bid}})));const lines=details.map(({bug:b})=>[b.code,b.title,b.module,b.severity,b.priority,statusLabel(b.status),b.reporter,b.assignees?.length?b.assignees.map(a=>a.name).join(', '):b.assignee,dateLabel(b.createdAt),b.description,b.expected,b.actual,b.steps.map((s,i)=>`${i+1}. ${s}`).join(' '),b.environment,b.browserDevice,b.evidenceUrls.join(' ')].map(cell).join('\t'));await navigator.clipboard.writeText([SHEET_HEADERS.join('\t'),...lines].join('\n'));setCopied(ids.length===1?(ids[0]??'multi'):'multi');toast.success(ids.length===1?'Bug copied — paste it into your sheet':`${ids.length} bugs copied — paste them into your sheet`);setTimeout(()=>setCopied(null),2000);}catch{toast.error('Copy failed. Your browser may have blocked clipboard access.');}finally{setCopying(false);}}
  const toggleSelect=(bid:string)=>setSelected(old=>{const next=new Set(old);if(next.has(bid))next.delete(bid);else next.add(bid);return next;});
  const setFilter=(f:string)=>{setFilterRaw(f);setPage(0);};
- if(data.isPending)return <p role="status" className="py-10 text-sm text-muted-foreground">Loading bugs…</p>;
+ if(data.isPending)return <div className="bf-panel"><SkeletonRows rows={8} label="Loading bugs" /></div>;
  if(data.isError)return <ErrorNotice message={actionError(data.error,'Bugs could not be loaded. Please try again.')} onRetry={()=>{void data.refetch();}} retrying={data.isFetching}/>;
  const d=data.data;const counts=groupCounts(d.statusCounts??[],assignmentsOnly);
  const rows=d.bugs.filter(b=>(!assignmentsOnly||b.assigneeId!==null)&&matchesFilter(filter,b,d.actor.userId)&&(severity==='all'||b.severity===severity)&&(priority==='all'||b.priority===priority)&&`${b.code} ${b.title} ${b.project} ${b.reporter} ${b.assignee}`.toLowerCase().includes(query.toLowerCase()));

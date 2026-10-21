@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { periodFields, validRange } from './period';
 
 /** Client-safe activity types, filter categories and display helpers. */
 
@@ -49,12 +50,11 @@ export type ActivityInsights = {
 export const activityQuerySchema = z.object({
   cursor: z.string().regex(/^[^|]+\|[0-9a-f-]{36}$/).optional(),
   type: z.string().trim().max(20).default('all'),
-  days: z.union([z.literal(0), z.literal(7), z.literal(30), z.literal(90)]).default(0),
+  ...periodFields,
   query: z.string().trim().max(120).default(''),
   actor: z.string().uuid().optional(),
   via: z.enum(['admin', 'reporter', 'qa', 'developer', 'member']).optional(),
-  tz: z.string().regex(/^[A-Za-z_]+(\/[A-Za-z_+-]+){0,2}$/).max(60).default('UTC'),
-}).strict();
+}).strict().refine(validRange, 'The start date must be on or before the end date.');
 export type ActivityFilters = Omit<ActivityQuery, 'cursor'>;
 export type ActivityQuery = z.infer<typeof activityQuerySchema>;
 

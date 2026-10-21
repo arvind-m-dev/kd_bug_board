@@ -2,6 +2,7 @@ import { neonQuery } from './neon.server';
 import { requireAdmin } from './portal-access.server';
 import { formatBugCode } from './bug-workflow';
 import type { ActivityFilters, ActivityInsights, ActivityRow, TeamPerformance } from './activity';
+import { periodWindow, type Period } from './period';
 
 /** Server-only activity stream. Admin-only read over the shared audit trail. */
 
@@ -29,7 +30,7 @@ function filterSql(f: ActivityFilters, params: unknown[], opts: { skipType?: boo
   const conds: string[] = [];
   const acts = CATEGORY[f.type];
   if (acts && !opts.skipType) { params.push(acts); conds.push(`a.action=any($${params.length}::text[])`); }
-  if (f.days > 0) { params.push(f.days); conds.push(`a.created_at>=now()-($${params.length}::int||' days')::interval`); }
+  const inPeriod = periodWindow(f, params)('a.created_at'); if (inPeriod !== 'true') conds.push(inPeriod);
   if (f.actor && !opts.skipActor) { params.push(f.actor); conds.push(`a.actor_id=$${params.length}::uuid`); }
   if (f.via) { params.push(f.via); conds.push(`${VIA_SQL}=$${params.length}`); }
   const q = f.query.trim();
@@ -132,10 +133,9 @@ export async function activityPeople(): Promise<{ id: string; name: string; role
  * Fixed = bugs they own that are currently RESOLVED, resolved in the period.
  * Fix time = first assignment (or report, if never assigned) → resolution.
  */
-export async function teamPerformance(days: number): Promise<TeamPerformance> {
+export async function teamPerformance(period: Period & { tz?: string }): Promise<TeamPerformance> {
   await requireAdmin();
-  const win = (col: string) => (days > 0 ? `${col}>=now()-($1::int||' days')::interval` : 'true');
-  const params = days > 0 ? [days] : [];
+  const params: unknown[] = []; const win = periodWindow(period, params);
   const cte = `with b as (select * from bugflow.bugs where deleted_at is null),
     resolved as (select h.bug_id, max(h.created_at) as at from bugflow.status_history h join b on b.id=h.bug_id where h.new_status='RESOLVED' and b.status='RESOLVED' group by h.bug_id),
     first_assigned as (select bug_id, min(created_at) as at from bugflow.assignments group by bug_id),

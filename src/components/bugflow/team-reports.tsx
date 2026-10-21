@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { SkeletonRows } from './loading';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { useNavigate, useSearch } from '@tanstack/react-router';
@@ -8,13 +9,14 @@ import { Input } from '@/components/ui/input';
 import { getPersonDetail, getPersonOverview } from '@/lib/person-reports.functions';
 import { getBugWorkspace } from '@/lib/bug-workflow.functions';
 import { OUTCOMES, acceptanceRate, outcomeCounts, passRate, reportFocus, type Counts, type PersonMetrics, type PersonRecentBug } from '@/lib/person-reports';
-import { ACTIVITY_PERIODS, durationText, roleName, statusText } from '@/lib/activity';
+import { durationText, roleName, statusText } from '@/lib/activity';
+import { periodLabel as describePeriod, viewerTimeZone, type Period } from '@/lib/period';
+import { PeriodPicker } from './period-picker';
 import { DEFAULT_SEVERITIES, PRIORITIES, severityLevel, type BugAccess } from '@/lib/bug-workflow';
 import { PriorityBadge, SeverityBadge } from './bug-workspace';
 import { ThemedSelect } from './themed-select';
 import { ErrorNotice, actionError } from './action-feedback';
 
-type Days = 0 | 7 | 30 | 90;
 const admin: BugAccess = { kind: 'admin' };
 const initials = (name: string) => name.split(/\s+/).filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase() || '?';
 const FOCUS_LABEL = { tester: 'Tester', developer: 'Developer', qa: 'QA', admin: 'Admin' } as const;
@@ -43,9 +45,9 @@ function useSeverities() {
 export function TeamReports() {
   const search = useSearch({ from: '/admin_/reports' }); const navigate = useNavigate();
   const fetch = useServerFn(getPersonOverview); const fetchDetail = useServerFn(getPersonDetail); const client = useQueryClient();
-  const prefetch = (person: string) => void client.prefetchQuery({ queryKey: ['person-detail', person, days], queryFn: () => fetchDetail({ data: { person, days } }), staleTime: 30000 });
-  const [days, setDays] = useState<Days>(0); const [role, setRole] = useState('all'); const [text, setText] = useState('');
-  const q = useQuery({ queryKey: ['person-overview', days], queryFn: () => fetch({ data: { days } }), placeholderData: keepPreviousData, retry: 1, staleTime: 30000, refetchInterval: 60000 });
+  const prefetch = (person: string) => void client.prefetchQuery({ queryKey: ['person-detail', person, period], queryFn: () => fetchDetail({ data: { person, ...period, tz } }), staleTime: 30000 });
+  const [period, setPeriod] = useState<Period>({ days: 0 }); const tz = useMemo(viewerTimeZone, []); const [role, setRole] = useState('all'); const [text, setText] = useState('');
+  const q = useQuery({ queryKey: ['person-overview', period], queryFn: () => fetch({ data: { ...period, tz } }), placeholderData: keepPreviousData, retry: 1, staleTime: 30000, refetchInterval: 60000 });
   const people = useMemo(() => (q.data ?? []).filter(m => (role === 'all' || reportFocus(m) === role) && m.name.toLowerCase().includes(text.trim().toLowerCase())), [q.data, role, text]);
   // Selected person: from the URL when they're in the list, otherwise the first person shown.
   const selected = people.find(m => m.id === search.person) ?? people[0];
@@ -62,10 +64,10 @@ export function TeamReports() {
     <div className="bf-toolbar">
       <div className="bf-search"><Search /><Input aria-label="Search people" placeholder="Search people…" value={text} onChange={e => setText(e.target.value)} /></div>
       <ThemedSelect label="Role" value={role} onChange={setRole} options={ROLE_FILTERS} />
-      <ThemedSelect label="Period" value={String(days)} onChange={v => setDays(Number(v) as Days)} options={ACTIVITY_PERIODS} />
+      <PeriodPicker value={period} onChange={setPeriod} />
     </div>
     {q.isError && <ErrorNotice message={actionError(q.error, 'Team reports could not load.')} onRetry={() => q.refetch()} retrying={q.isFetching} />}
-    {q.isPending ? <p className="text-sm text-muted-foreground">Loading team reports…</p>
+    {q.isPending ? <div className="bf-reports"><div className="bf-people"><SkeletonRows rows={6} label="Loading people" /></div><div className="bf-report-loading" role="status"><span /><span /><span /></div></div>
       : people.length === 0 ? <div className="bf-panel bf-empty"><span className="bf-empty-icon"><UsersRound size={22} /></span><h3>No one matches</h3><p>Try another role or clear the search.</p></div>
       : <div className="bf-reports">
         <aside className="bf-people" aria-label="Team members">
@@ -79,7 +81,7 @@ export function TeamReports() {
               </button></li>; })}
           </ul>
         </aside>
-        <div className="bf-reports-detail" aria-live="polite">{selected && <PersonDetailView person={selected.id} days={days} />}</div>
+        <div className="bf-reports-detail" aria-live="polite">{selected && <PersonDetailView person={selected.id} period={period} tz={tz} />}</div>
       </div>}
   </>;
 }
@@ -103,13 +105,13 @@ function MiniStrip({ counts }: { counts: Counts }) {
 
 /* ───────────── Detail: everything about one person ───────────── */
 
-function PersonDetailView({ person, days }: { person: string; days: Days }) {
+function PersonDetailView({ person, period, tz }: { person: string; period: Period; tz: string }) {
   const fetch = useServerFn(getPersonDetail); const severities = useSeverities();
-  const q = useQuery({ queryKey: ['person-detail', person, days], queryFn: () => fetch({ data: { person, days } }), placeholderData: keepPreviousData, retry: 1, staleTime: 30000 });
+  const q = useQuery({ queryKey: ['person-detail', person, period], queryFn: () => fetch({ data: { person, ...period, tz } }), placeholderData: keepPreviousData, retry: 1, staleTime: 30000 });
   const d = q.data; const m = d?.metrics;
   if (q.isError) return <ErrorNotice message={actionError(q.error, 'This report could not load.')} onRetry={() => q.refetch()} retrying={q.isFetching} />;
   if (!m) return <div className="bf-report-loading" role="status"><span /><span /><span /></div>;
-  return <div data-updating={q.isPlaceholderData || undefined}><PersonReport m={m} trend={d.trend} recent={d.recent} severities={severities} periodLabel={days ? `last ${days} days` : 'all time'} /></div>;
+  return <div data-updating={q.isPlaceholderData || undefined}><PersonReport m={m} trend={d.trend} recent={d.recent} severities={severities} periodLabel={describePeriod(period)} /></div>;
 }
 
 function PersonReport({ m, trend, recent, severities, periodLabel }: { m: PersonMetrics; trend: { week: string; raised: number; fixed: number }[]; recent: PersonRecentBug[]; severities: readonly string[]; periodLabel: string }) {
