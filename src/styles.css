@@ -912,3 +912,15 @@ html body[data-scroll-locked] { margin-right: 0 !important; padding-right: 0 !im
 .bf-palette-text strong { display: flex; align-items: center; gap: 6px; font-size: 14px; }
 .bf-palette-text strong svg { color: var(--primary); }
 .bf-palette-text small { font-size: 12.5px; line-height: 1.4; color: var(--muted-foreground); }
+
+/* Needs your attention: scrolling list with pages */
+.bf-urgent-scroll { max-height: 520px; overflow-y: auto; overscroll-behavior: contain; animation: bf-rise .2s ease both; }
+.bf-pager { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: auto; padding: 10px 16px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--muted-foreground); }
+.bf-pager-size { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.bf-pager-size select { height: 30px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--foreground); font: 12.5px var(--font-sans); cursor: pointer; }
+.bf-pager-nav { display: inline-flex; align-items: center; gap: 8px; }
+.bf-pager-nav button { height: 30px; width: 30px; padding: 0; }
+.bf-ov-panel:has(.bf-pager) > :last-child { flex: none; }
+/* When the panel beside it grows, spread the pipeline stages instead of leaving a gap. */
+.bf-pipeline { height: 100%; }
+.bf-pipeline ol { flex: 1; align-content: space-evenly; }

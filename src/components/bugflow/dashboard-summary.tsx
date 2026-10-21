@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SkeletonRows } from './loading';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Link } from '@tanstack/react-router';
-import { Bell, Link2, UsersRound, CircleAlert, ArrowUpRight, CheckCircle2, type LucideIcon } from 'lucide-react';
+import { Bell, Link2, UsersRound, CircleAlert, ArrowUpRight, CheckCircle2, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { getMembers } from '@/lib/portal-access.functions';
@@ -46,6 +46,10 @@ const PRIORITY_RANK = (p: string) => { const i = PRIORITIES.indexOf(p as never);
 
 export function DashboardSummary() {
   const { members, bugs } = useAdminData(); const [profile, setProfile] = useState<string | null>(null);
+  const [perPage, setPerPageState] = useState(10);
+  useEffect(() => { try { const n = Number(localStorage.getItem('bugflow-attention-per-page')); if ([5, 10, 20, 50].includes(n)) setPerPageState(n); } catch { /* storage unavailable */ } }, []);
+  const [pageRaw, setPage] = useState(0);
+  const setPerPage = (n: number) => { setPerPageState(n); setPage(0); try { localStorage.setItem('bugflow-attention-per-page', String(n)); } catch { /* storage unavailable */ } };
   const list = members.data ?? []; const active = list.filter(m => m.active).length; const online = list.filter(m => m.online).length;
   const d = bugs.data; const bugList = d?.bugs ?? []; const severities = d?.options.severities ?? DEFAULT_SEVERITIES;
   const attention = attentionBugs(bugList);
@@ -57,7 +61,9 @@ export function DashboardSummary() {
   const stages = STAGES.map(st => ({ ...st, count: st.statuses.reduce((a, s) => a + (byStatus.get(s) ?? 0), 0) }));
   const closed = CLOSED.reduce((a, s) => a + (byStatus.get(s) ?? 0), 0);
   // Most urgent first: priority, then oldest.
-  const urgent = [...attention].sort((a, b) => PRIORITY_RANK(a.priority) - PRIORITY_RANK(b.priority) || +new Date(a.createdAt) - +new Date(b.createdAt)).slice(0, 6);
+  const urgentAll = [...attention].sort((a, b) => PRIORITY_RANK(a.priority) - PRIORITY_RANK(b.priority) || +new Date(a.createdAt) - +new Date(b.createdAt));
+  const pages = Math.max(1, Math.ceil(urgentAll.length / perPage)); const page = Math.min(pageRaw, pages - 1);
+  const urgent = urgentAll.slice(page * perPage, page * perPage + perPage);
   const count = (key: 'priority' | 'severity') => bugList.reduce<Record<string, number>>((acc, b) => { acc[b[key]] = (acc[b[key]] ?? 0) + 1; return acc; }, {});
   const pri = count('priority'); const sev = count('severity');
   const sevKeys = [...severities, ...Object.keys(sev).filter(s => !severities.includes(s))];
@@ -90,12 +96,17 @@ export function DashboardSummary() {
       <section className="bf-panel bf-ov-panel" aria-labelledby="ov-attention">
         <div className="bf-panel-heading"><div><h2 id="ov-attention">Needs your attention</h2><p className="bf-panel-sub">Most urgent first · priority, then oldest</p></div><Link to="/admin/bugs" search={{ filter: 'open' }}>All {attention.length}<ArrowUpRight size={12} /></Link></div>
         {loading ? <SkeletonRows rows={6} label="Loading bugs" /> : urgent.length === 0 ? <div className="bf-ov-empty"><CheckCircle2 size={22} />You’re all caught up</div> :
-          <ul className="bf-urgent">{urgent.map(b => <li key={b.id}><Link to="/admin/bugs" search={{ filter: b.status }}>
+          <><ul className="bf-urgent bf-urgent-scroll" key={`${page}-${perPage}`}>{urgent.map(b => <li key={b.id}><Link to="/admin/bugs" search={{ filter: b.status }}>
             <PriorityBadge value={b.priority} />
             <span className="bf-urgent-main"><span className="bf-urgent-title"><code>{b.code}</code><span className="truncate">{b.title}</span></span>
               <span className="bf-urgent-meta"><span className="bf-status-pill" data-tone={statusTone(b.status)}><span className="bf-dot" />{label(b.status)}</span><span>{b.assignees?.length ? b.assignees.map(a => a.name).join(', ') : b.assigneeId ? b.assignee : 'Unassigned'}</span></span></span>
             <span className="bf-urgent-age" title={new Date(b.createdAt).toLocaleString('en-GB')}>{ago(b.createdAt)}</span>
-          </Link></li>)}</ul>}
+          </Link></li>)}</ul>
+          <div className="bf-pager">
+            <span>Showing {page * perPage + 1}–{Math.min(urgentAll.length, (page + 1) * perPage)} of {urgentAll.length}</span>
+            <label className="bf-pager-size">Per page<select value={perPage} onChange={e => setPerPage(Number(e.target.value))} aria-label="Bugs per page">{[5, 10, 20, 50].map(n => <option key={n} value={n}>{n}</option>)}</select></label>
+            <span className="bf-pager-nav"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)} aria-label="Previous page"><ChevronLeft size={14} /></Button><span>{page + 1} / {pages}</span><Button variant="outline" size="sm" disabled={page >= pages - 1} onClick={() => setPage(page + 1)} aria-label="Next page"><ChevronRight size={14} /></Button></span>
+          </div></>}
       </section>
       <section className="bf-panel bf-ov-panel" aria-labelledby="ov-pipeline">
         <div className="bf-panel-heading"><div><h2 id="ov-pipeline">Bug pipeline</h2><p className="bf-panel-sub">{total} bugs by stage</p></div><Link to="/admin/bugs">View all<ArrowUpRight size={12} /></Link></div>
