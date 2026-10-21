@@ -1,0 +1,21 @@
+# BugFlow roadmap
+- [x] Improve Settings, centralize editable dropdown management, and refresh scoped assignment choices after member creation; signed-in option saving/renaming and new-member readback verified; 41 tests passed.
+- [x] Expandable bug rows, inline permitted assignment, copyable IDs, Total bugs / My bugs I raised views, and clearer description-and-steps-first reporting; signed-in expansion/copy, assignment choices, portal views and minimal report save/readback verified; 33 tests passed.
+- [x] Sticky scrollable tables with pages, themed dropdowns, inline member deactivate/delete, open/copy portal links, inline bug status, last-change tracking, clickable names, per-status dashboard cards, team/portal/notification summary, portal theme switch, faster page changes.
+- [x] Simplify sidebar and compact bug/member tables from the screenshots; move connections into bottom Settings and hide unnecessary project presentation without changing access; signed-in filters, details, profiles and navigation verified.
+- [x] Add saved sample bugs, editable member profiles and permissions, copyable encrypted portal links, deactivation and history-preserving deletion, first-visit welcomes, black/light themes and clearer navigation; verify member lifecycle.
+- [x] Build scoped bug panels and reporting, P0–P5 priorities, Drive evidence URLs, disabled media/compression, Admin assignment and priority/status history; verify real cross-portal flows.
+- [x] Add visible sign-out with confirmation, linked breadcrumbs, and recoverable workspace errors; verify signed-in flows.
+- [x] Fix embedded-preview session retention and verify sign-in and sign-out in an iframe.
+- [x] Show standalone sign-in before workspace navigation and verify login, all pages, portals and sign-out.
+- [x] Replace Admin setup form with configured email/password sign-in and verify rejection, sign-in and sign-out.
+- [x] Secure Admin unlock, saved members, revocable unique portals and saved onboarding guidance.
+- [x] Collaborator details, role-limited requested permissions, editable/copyable AI welcome draft; real Gateway call and unauthorized blocking verified.
+- [x] Authenticated onboarding end-to-end — Admin unlock, real AI guidance, saved member readback, private portal and revocation verified.
+- [x] Dashboard design system, shared navigation and all Admin pages.
+- [x] Role portal entry pages and submission presentation with safe unavailable states.
+- [x] Shared rules and tests for count definitions, workflow, scoped exports.
+- [x] Browser verification of navigation, filters, report dialog, template copy and direct links.
+- [x] Neon bug reporting, scoped lists, assignments, priority/status updates and independent QA verification with real cross-portal readback.
+- [ ] Private S3 media uploads, drag & drop and compression — deferred until the user supplies an approved bucket connection.
+- [ ] Published deep-link checks — requires explicit publishing approval.- [x] Sheet-ready bug copy: per-row Copy button and Select mode with checkboxes; copies a header row plus one tab-separated row per bug (ID, title, module, severity, priority, status, people, dates, description, expected/actual, steps, environment, evidence) so each field pastes into its own cell; verified signed-in (1-row and 2-row clipboard reads).
