@@ -80,17 +80,17 @@ export function ActivityView() {
     </div>
 
     <div className="bf-activity-grid">
-      <section className="bf-panel" aria-labelledby="activity-share">
-        <div className="bf-panel-heading"><div><h2 id="activity-share">Activity mix</h2><p className="bf-panel-sub">Share of changes · {periodLabel}</p></div></div>
-        {ins ? <MixDonut series={ins.series} /> : <div className="bf-donut-skeleton" />}
+      <section className="bf-panel" aria-labelledby="activity-people">
+        <div className="bf-panel-heading"><div><h2 id="activity-people">Most active</h2><p className="bf-panel-sub">Click a person to filter</p></div></div>
+        <BarList empty="No one yet" items={(ins?.people ?? []).map(p => ({ id: p.id, label: <PersonName name={p.name} role={p.role} />, title: nameWithRole(p.name, p.role), count: p.count, avatar: initials(p.name), active: actor === p.id }))} onPick={id => set(setActor)(actor === id ? '' : id)} />
       </section>
       <section className="bf-panel" aria-labelledby="activity-mix">
         <div className="bf-panel-heading"><div><h2 id="activity-mix">What changed</h2><p className="bf-panel-sub">Click a row to filter</p></div></div>
         <BarList empty="No changes yet" items={(ins?.categories ?? []).map(c => ({ id: c.key, label: categoryLabel(c.key), title: categoryLabel(c.key), count: c.count, icon: KIND[c.key]?.icon, tone: KIND[c.key]?.tone, active: type === c.key }))} onPick={id => set(setType)(type === id ? 'all' : id)} />
       </section>
-      <section className="bf-panel" aria-labelledby="activity-people">
-        <div className="bf-panel-heading"><div><h2 id="activity-people">Most active</h2><p className="bf-panel-sub">Click a person to filter</p></div></div>
-        <BarList empty="No one yet" items={(ins?.people ?? []).map(p => ({ id: p.id, label: <PersonName name={p.name} role={p.role} />, title: nameWithRole(p.name, p.role), count: p.count, avatar: initials(p.name), active: actor === p.id }))} onPick={id => set(setActor)(actor === id ? '' : id)} />
+      <section className="bf-panel" aria-labelledby="activity-share">
+        <div className="bf-panel-heading"><div><h2 id="activity-share">Activity mix</h2><p className="bf-panel-sub">Share of changes · {periodLabel}</p></div></div>
+        {ins ? <MixDonut series={ins.series} /> : <div className="bf-donut-skeleton" />}
       </section>
     </div>
 

@@ -491,7 +491,7 @@ body { font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; 
 .bf-timeline-actor { display: inline-flex; align-items: center; gap: 7px; color: var(--foreground); font-weight: 500; }
 .bf-timeline-meta time { min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
 
-@media (max-width: 1100px) { .bf-activity-grid { grid-template-columns: 1fr 1fr; } .bf-activity-grid > :first-child { grid-column: 1 / -1; } }
+@media (max-width: 1100px) { .bf-activity-grid { grid-template-columns: 1fr 1fr; } .bf-activity-grid > :last-child { grid-column: 1 / -1; } }
 @media (max-width: 760px) {
   .bf-activity-grid { grid-template-columns: 1fr; }
   .bf-timeline-day li { grid-template-columns: 28px minmax(0, 1fr); }
