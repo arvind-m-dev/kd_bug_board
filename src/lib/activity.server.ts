@@ -25,12 +25,12 @@ const VIA_SQL = roleOf('a.actor_id');
 const SERIES_SQL = `case when a.action in ('bug.created','bug.sample_created') then 'reported' when a.action in ('bug.status','bug.verify') then 'status' when a.action='bug.assign' then 'assign' else 'other' end`;
 
 /** Shared WHERE clause so the stream and the charts always agree. */
-function filterSql(f: ActivityFilters, params: unknown[], opts: { skipType?: boolean } = {}) {
+function filterSql(f: ActivityFilters, params: unknown[], opts: { skipType?: boolean; skipActor?: boolean } = {}) {
   const conds: string[] = [];
   const acts = CATEGORY[f.type];
   if (acts && !opts.skipType) { params.push(acts); conds.push(`a.action=any($${params.length}::text[])`); }
   if (f.days > 0) { params.push(f.days); conds.push(`a.created_at>=now()-($${params.length}::int||' days')::interval`); }
-  if (f.actor) { params.push(f.actor); conds.push(`a.actor_id=$${params.length}::uuid`); }
+  if (f.actor && !opts.skipActor) { params.push(f.actor); conds.push(`a.actor_id=$${params.length}::uuid`); }
   if (f.via) { params.push(f.via); conds.push(`${VIA_SQL}=$${params.length}`); }
   const q = f.query.trim();
   if (q) {
@@ -81,7 +81,7 @@ export async function activityStream(cursor: string | undefined, f: ActivityFilt
 /** Aggregates for the activity infographics, using the same filters as the stream. */
 export async function activityInsights(f: ActivityFilters): Promise<ActivityInsights> {
   await requireAdmin();
-  const base = (opts?: { skipType?: boolean }) => {
+  const base = (opts?: { skipType?: boolean; skipActor?: boolean }) => {
     const params: unknown[] = []; const conds = filterSql(f, params, opts);
     return { params, where: conds.length ? `where ${conds.join(' and ')}` : '' };
   };
@@ -106,8 +106,12 @@ export async function activityInsights(f: ActivityFilters): Promise<ActivityInsi
     byKey.set(key, (byKey.get(key) ?? 0) + Number(r['n']));
   }
 
-  const p = base();
-  const people = await neonQuery(`select u.id, u.name, ${roleOf('u.id')} as role, count(*)::int as n ${from} ${p.where} group by u.id, u.name order by n desc, u.name limit 6`, p.params);
+  // Everyone, so the list can highlight the selected person: ignores the person filter, and current members with no changes are listed with 0.
+  const p = base({ skipActor: true });
+  const people = await neonQuery(`with counted as (select u.id, count(*)::int as n ${from} ${p.where} group by u.id)
+    select u.id, u.name, ${roleOf('u.id')} as role, coalesce(c.n, 0)::int as n from bugflow.users u left join counted c on c.id=u.id
+    where c.id is not null or (u.active and u.deleted_at is null and exists(select 1 from bugflow.portals px where px.user_id=u.id))
+    order by n desc, u.name limit 200`, p.params);
 
   const tr = totals.rows[0] ?? {};
   return {

@@ -81,8 +81,8 @@ export function ActivityView() {
 
     <div className="bf-activity-grid">
       <section className="bf-panel" aria-labelledby="activity-people">
-        <div className="bf-panel-heading"><div><h2 id="activity-people">Most active</h2><p className="bf-panel-sub">Click a person to filter</p></div></div>
-        <BarList empty="No one yet" items={(ins?.people ?? []).map(p => ({ id: p.id, label: <PersonName name={p.name} role={p.role} />, title: nameWithRole(p.name, p.role), count: p.count, avatar: initials(p.name), active: actor === p.id }))} onPick={id => set(setActor)(actor === id ? '' : id)} />
+        <div className="bf-panel-heading"><div><h2 id="activity-people">Most active</h2><p className="bf-panel-sub">{ins ? `${ins.people.length} people · ` : ''}Click a person to filter</p></div></div>
+        <BarList scroll empty="No one yet" items={(ins?.people ?? []).map(p => ({ id: p.id, label: <PersonName name={p.name} role={p.role} />, title: nameWithRole(p.name, p.role), count: p.count, avatar: initials(p.name), active: actor === p.id }))} onPick={id => set(setActor)(actor === id ? '' : id)} />
       </section>
       <section className="bf-panel" aria-labelledby="activity-mix">
         <div className="bf-panel-heading"><div><h2 id="activity-mix">What changed</h2><p className="bf-panel-sub">Click a row to filter</p></div></div>
@@ -109,6 +109,15 @@ export function ActivityView() {
 
 function Tile({ label, value, foot }: { label: string; value: number | string | undefined; foot: string }) {
   return <div className="bf-kpi bf-kpi-static"><span className="bf-kpi-label">{label}</span><span className="bf-kpi-value">{value ?? '…'}</span><span className="bf-kpi-foot">{foot}</span></div>;
+}
+
+/** Scroll a list (not the page) so its highlighted row is visible. */
+function keepActiveInView(list: HTMLUListElement | null) {
+  const row = list?.querySelector<HTMLElement>('[data-active]')?.parentElement;
+  if (!list || !row) return;
+  const top = row.offsetTop, bottom = top + row.offsetHeight;
+  if (top < list.scrollTop) list.scrollTop = top - 8;
+  else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight + 8;
 }
 
 /** Part-to-whole donut of the four activity kinds, total in the centre, legend with counts and shares. */
@@ -139,10 +148,10 @@ function MixTooltip({ active, payload, total }: TooltipProps<number, string> & {
   return <div className="bf-tooltip"><ul><li><span className="bf-swatch" style={{ background: String(p.payload?.color) }} />{p.name}<b>{v}</b></li></ul><div className="bf-tooltip-total">Share<b>{total ? Math.round((v / total) * 100) : 0}%</b></div></div>;
 }
 
-function BarList({ items, onPick, empty }: { items: { id: string; label: ReactNode; title: string; count: number; icon?: LucideIcon | undefined; tone?: string | undefined; avatar?: string; active: boolean }[]; onPick: (id: string) => void; empty: string }) {
+function BarList({ items, onPick, empty, scroll }: { scroll?: boolean; items: { id: string; label: ReactNode; title: string; count: number; icon?: LucideIcon | undefined; tone?: string | undefined; avatar?: string; active: boolean }[]; onPick: (id: string) => void; empty: string }) {
   if (!items.length) return <p className="px-5 py-6 text-sm text-muted-foreground">{empty}</p>;
-  const max = Math.max(...items.map(i => i.count));
-  return <ul className="bf-barlist">{items.map(i => <li key={i.id}><button type="button" title={i.title} data-active={i.active || undefined} onClick={() => onPick(i.id)}>
+  const max = Math.max(1, ...items.map(i => i.count));
+  return <ul className="bf-barlist" data-scroll={scroll || undefined} ref={keepActiveInView}>{items.map(i => <li key={i.id}><button type="button" title={i.title} aria-pressed={i.active} data-active={i.active || undefined} data-zero={i.count === 0 || undefined} onClick={() => onPick(i.id)}>
     <span className="bf-barlist-label">{i.icon ? <span className="bf-kind" data-tone={i.tone}><i.icon size={13} /></span> : <span className="bf-avatar !size-6 !text-[10.5px]">{i.avatar}</span>}<span className="truncate">{i.label}</span></span>
     <span className="bf-barlist-track"><i style={{ width: `${Math.max(3, (i.count / max) * 100)}%` }} /></span>
     <b>{i.count}</b></button></li>)}</ul>;
