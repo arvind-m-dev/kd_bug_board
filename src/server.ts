@@ -44,12 +44,30 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+// Portal URLs carry a private access token: never cache, index, frame or leak them via Referer.
+const PORTAL_PATH = /^\/(member|qa|developer|reporter)\/[a-f0-9]{64}\/?$/;
+const PORTAL_HEADERS: Record<string, string> = {
+  "Cache-Control": "no-store, private",
+  "X-Robots-Tag": "noindex, nofollow",
+  "Referrer-Policy": "no-referrer",
+  "X-Frame-Options": "DENY",
+  "Content-Security-Policy": "frame-ancestors 'none'",
+  "X-Content-Type-Options": "nosniff",
+};
+
+function withPortalHeaders(request: Request, response: Response): Response {
+  if (!PORTAL_PATH.test(new URL(request.url).pathname)) return response;
+  const headers = new Headers(response.headers);
+  for (const [k, v] of Object.entries(PORTAL_HEADERS)) headers.set(k, v);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return withPortalHeaders(request, await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {

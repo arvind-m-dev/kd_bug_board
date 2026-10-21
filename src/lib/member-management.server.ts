@@ -22,7 +22,7 @@ export async function editMember(data:z.infer<typeof editMemberSchema>){
 export async function memberAction(data:z.infer<typeof memberActionSchema>){
  checkOrigin();const admin=await requireAdmin();const profile=await memberProfile(data.id);
  if(data.action==='copy'){
-  if(!profile.active)throw new Error('Activate this member before sharing their portal.');const {rows}=await neonQuery("select type,token_ciphertext from bugflow.portals where id=$1 and active and revoked_at is null and (expires_at is null or expires_at>now()) limit 1",[data.id]);const r=rows[0];if(!r)throw new Error('This portal is revoked or expired. Replace the link first.');if(!r['token_ciphertext'])throw new Error('This older link cannot be recovered. Replace it once to enable secure copying.');return {path:`/${String(r['type'])}/${await decryptPortal(String(r['token_ciphertext']))}`};
+  if(!profile.active)throw new Error('Activate this member before sharing their portal.');const {rows}=await neonQuery("select type,token_ciphertext from bugflow.portals where id=$1 and active and revoked_at is null and (expires_at is null or expires_at>now()) limit 1",[data.id]);const r=rows[0];if(!r)throw new Error('This portal is revoked or expired. Replace the link first.');if(!r['token_ciphertext'])throw new Error('This older link cannot be recovered. Replace it once to enable secure copying.');const token=await decryptPortal(String(r['token_ciphertext'])).catch(()=>null);if(!token)throw new Error('This link was saved with a previous encryption key and cannot be recovered. Use Replace link to issue a new one.');return {path:`/${String(r['type'])}/${token}`};
  }
  await neonExecute([
  {query:'select pg_advisory_xact_lock(7438592)'},
