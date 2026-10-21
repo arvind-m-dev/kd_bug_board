@@ -28,7 +28,8 @@ export function mayEditBug(actor:{userId:string;role:string;permissions:string[]
 const optionList=z.array(z.string().trim().min(1).max(80)).max(50);
 export const optionsSchema=z.object({modules:optionList,environments:optionList,devices:optionList,severities:z.array(z.string().trim().min(1).max(40)).max(12).default(DEFAULT_SEVERITIES)}).strict();
 export type DropdownOptions=z.infer<typeof optionsSchema>;
-export const DEFAULT_OPTIONS:DropdownOptions={modules:[],environments:['Development','Staging','Production'],devices:[],severities:DEFAULT_SEVERITIES};
+export const DEFAULT_DEVICES=['Chrome · Desktop','Safari · Desktop','Firefox · Desktop','Chrome · Android','Safari · iPhone','Android · Mobile','iOS · Mobile','Tablet · Android / iPad'];
+export const DEFAULT_OPTIONS:DropdownOptions={modules:[],environments:['Development','Staging','Production'],devices:DEFAULT_DEVICES,severities:DEFAULT_SEVERITIES};
 export function cleanOptions(v:unknown):DropdownOptions{const r=optionsSchema.safeParse(v);if(!r.success)return DEFAULT_OPTIONS;const u=(a:string[])=>[...new Set(a)];const severities=u(r.data.severities);return {modules:u(r.data.modules),environments:u(r.data.environments),devices:u(r.data.devices),severities:severities.length?severities:DEFAULT_SEVERITIES};}
 export type BugActor = {userId:string;portalId:string;name:string;role:Role;permissions:string[]};
 export type LiveBug = {id:string;code:string;title:string;projectId:string;project:string;reporterId:string;reporter:string;assigneeId:string|null;assignee:string;assignees?:{id:string;name:string}[];status:Status;priority:string;severity:string;description:string;expected:string;actual:string;browserDevice:string;environment:string;fixNotes:string;createdAt:string;updatedAt:string;version:string;steps:string[];evidenceUrls:string[];module:string;lastChange:LastChange;statusNote?:StatusNote};
