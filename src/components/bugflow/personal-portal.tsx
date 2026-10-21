@@ -14,6 +14,7 @@ import { BugWorkspace } from './bug-workspace';
 import { getBugWorkspace } from '@/lib/bug-workflow.functions';
 import { groupCounts } from '@/lib/bug-workflow';
 import { useMemberFavicon } from '@/hooks/use-member-favicon';
+import { usePresence } from '@/hooks/use-presence';
 export function PersonalPortal({token,type}:{token:string;type:'reporter'|'qa'|'developer'|'member'}){
  const client=useQueryClient();const acknowledge=useServerFn(dismissWelcome);const welcome=useMutation({mutationFn:acknowledge,onSuccess:()=>client.invalidateQueries({queryKey:['personal-portal']})});const read=useServerFn(getMemberPortal);const [tab,setTab]=useState('bugs');const [menu,setMenu]=useState(false);
  const navigate=useNavigate();
@@ -22,6 +23,8 @@ export function PersonalPortal({token,type}:{token:string;type:'reporter'|'qa'|'
  // Links keep working after an Admin changes the member's role: follow the portal's current type.
  useEffect(()=>{const t=portal.data?.type;if(t&&t!==type)void navigate({to:`/${t}/$portalToken`,params:{portalToken:token},replace:true});},[portal.data?.type,type,token,navigate]);
  useMemberFavicon(portal.data?{name:portal.data.name,code:portal.data.memberCode}:null);
+ // Online while this portal is open; offline as soon as it's closed.
+ usePresence(token,portal.data?.type??type,!!portal.data);
  if(portal.isPending)return <main className="bf-main"><div className="bf-access" role="status"><Bug className="mx-auto mb-4 animate-pulse text-primary" size={30}/><h1>Opening your portal…</h1><p><LiveClock/></p></div></main>;
  if(!portal.data)return <div className="min-h-screen bg-background"><header className="bf-topbar"><strong>Futurist Global Bug Board</strong></header><main className="bf-main"><div className="bf-access"><LockKeyhole className="mx-auto mb-5 text-primary" size={32}/><h1>Portal unavailable</h1><p>This link may be invalid, expired, or revoked. Ask your Admin for a new link if the problem continues.</p>{portal.isError&&<ErrorNotice message="This portal could not be verified. Please try again." onRetry={()=>{void portal.refetch();}} retrying={portal.isFetching}/>}</div></main></div>;
  const p=portal.data;const tabs=[{id:'bugs',label:'Total bugs',icon:Bug},{id:'permissions',label:'My access',icon:ShieldCheck}];

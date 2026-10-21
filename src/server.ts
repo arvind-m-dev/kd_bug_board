@@ -65,6 +65,10 @@ function withPortalHeaders(request: Request, response: Response): Response {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      if (request.method === 'POST' && new URL(request.url).pathname === '/api/presence') {
+        const { handlePresence } = await import('./lib/presence.server');
+        return await handlePresence(request);
+      }
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return withPortalHeaders(request, await normalizeCatastrophicSsrResponse(response));

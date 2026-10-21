@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "demo:seed": "python3 database/demo/generate_seed.py > database/demo/seed.sql && node --env-file-if-exists=.env.local node_modules/jiti/lib/jiti-cli.mjs database/demo/apply.ts seed",
-    "demo:remove": "node --env-file-if-exists=.env.local node_modules/jiti/lib/jiti-cli.mjs database/demo/apply.ts remove"
+    "demo:remove": "node --env-file-if-exists=.env.local node_modules/jiti/lib/jiti-cli.mjs database/demo/apply.ts remove",
+    "db:migrate": "node --env-file-if-exists=.env.local node_modules/jiti/lib/jiti-cli.mjs database/migrate.ts"
   },
   "overrides": {
     "rolldown": "1.2.1"

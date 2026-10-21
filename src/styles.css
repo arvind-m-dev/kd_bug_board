@@ -954,3 +954,6 @@ html body[data-scroll-locked] { margin-right: 0 !important; padding-right: 0 !im
 .bf-log-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-left: auto; }
 .bf-link-btn { font-size: 12.5px; font-weight: 600; color: var(--primary); cursor: pointer; }
 .bf-link-btn:hover { text-decoration: underline; text-underline-offset: 3px; }
+.bf-offline { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted-foreground); }
+.bf-offline::before { content: ''; width: 6px; height: 6px; border-radius: 999px; background: color-mix(in oklab, var(--muted-foreground) 55%, transparent); }
+.bf-ov-team small .bf-online, .bf-ov-team small .bf-offline { font-size: 11.5px; }

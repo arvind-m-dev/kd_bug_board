@@ -12,6 +12,7 @@ import { attentionBugs, DEFAULT_SEVERITIES, PRIORITIES, severityLevel, type BugA
 import { PriorityBadge, SeverityBadge } from './bug-workspace';
 import { MemberProfile } from './member-profile';
 import { PeriodPicker } from './period-picker';
+import { Presence } from './presence';
 import { getOverviewStats } from '@/lib/overview.functions';
 import { periodLabel as describePeriod, viewerTimeZone, type Period } from '@/lib/period';
 
@@ -20,7 +21,7 @@ const label = (v: string) => v.toLowerCase().replaceAll('_', ' ').replace(/^./, 
 function useAdminData() {
   const members = useServerFn(getMembers); const bugs = useServerFn(getBugWorkspace);
   return {
-    members: useQuery({ queryKey: ['members'], queryFn: () => members(), retry: false, staleTime: 10000, refetchInterval: 20000 }),
+    members: useQuery({ queryKey: ['members'], queryFn: () => members(), retry: false, staleTime: 5000, refetchInterval: 10000 }),
     bugs: useQuery({ queryKey: ['bug-workspace', admin, undefined], queryFn: () => bugs({ data: { access: admin } }), retry: false, staleTime: 10000, refetchInterval: 20000 }),
   };
 }
@@ -152,7 +153,7 @@ export function DashboardSummary() {
         {members.isError ? <p className="p-5 text-xs text-muted-foreground">Members could not be loaded.</p> : members.isPending ? <SkeletonRows rows={6} /> :
           <ul className="bf-ov-team bf-ov-scroll">{team.map(m => <li key={m.id}><button type="button" onClick={() => setProfile(m.id)}>
             <span className="bf-ov-avatar"><span className="bf-avatar !size-8 !text-[11px]">{initials(m.name)}</span>{m.online && <i title="Online" />}</span>
-            <span className="min-w-0 flex-1"><strong className="block truncate">{m.name}</strong><small>{roleText(m.role)}{!m.active && ' · inactive'}</small></span>
+            <span className="min-w-0 flex-1"><strong className="block truncate">{m.name}</strong><small>{roleText(m.role)}{!m.active && ' · inactive'} · <Presence online={m.online} lastSeen={m.lastSeen} /></small></span>
             <span className="bf-ov-open" title="Open bugs assigned">{openByUser.get(m.userId) ?? 0}</span>
           </button></li>)}</ul>}
       </section>
