@@ -19,8 +19,7 @@ import { DropdownOptionsEditor } from './dropdown-options';
 import { ThemeToggle } from './theme-toggle';
 import { ThemedSelect } from './themed-select';
 import { ErrorNotice, actionError } from './action-feedback';
-import { getActivity } from '@/lib/activity.functions';
-import { ACTIVITY_CATEGORIES, ACTIVITY_PERIODS, changeText, formatWhen, viaLabel } from '@/lib/activity';
+import { ActivityView } from './activity-view';
 import { notificationLabel } from '@/lib/notifications';
 import { SignOutButton } from './sign-out';
 import { getBugWorkspace } from '@/lib/bug-workflow.functions';
@@ -99,37 +98,6 @@ function UsersView({onDialog}:{onDialog:(s:string)=>void}){return <MemberPortals
 function SimpleTable({headers}:{headers:string[]}){return <div className="bf-table-wrap"><table className="bf-table"><thead><tr>{headers.map(h=><th key={h}>{h}</th>)}</tr></thead></table></div>;}
 function AssignmentsView(){return <><div className="bf-stats">{[{label:'Unassigned',filter:'unassigned',icon:CircleAlert},{label:'Assigned',filter:'ASSIGNED',icon:ListChecks},{label:'In progress',filter:'IN_PROGRESS',icon:Code2},{label:'Ready for retest',filter:'RECHECK',icon:ClipboardCheck}].map((s,i)=><Link to="/admin/bugs" search={{filter:s.filter}} className="bf-stat" key={s.label}><div className="bf-stat-top">{s.label}<span className={`bf-stat-icon bf-tone-${['warning','teal','info','success'][i]}`}><s.icon size={17}/></span></div><div className="bf-stat-number">—</div><div className="bf-stat-bottom">View bugs<ArrowUpRight size={13}/></div></Link>)}</div><div className="bf-toolbar"><div className="bf-search"><Search/><Input aria-label="Search assignments" placeholder="Search assignments…"/></div><select className="bf-select" aria-label="Filter by developer"><option>All developers</option></select></div><div className="bf-panel"><SimpleTable headers={['Bug ID','Title','Developer','QA owner','Status','Assigned on']}/><Empty icon={ListChecks} title="Every issue has an owner" text="Assignments and reassignment history will be available when shared records are connected."/></div></>;}
 function ProjectsView({onDialog}:{onDialog:(s:string)=>void}){return <><div className="bf-toolbar"><div className="bf-search"><Search/><Input aria-label="Search projects" placeholder="Search projects and modules…"/></div><select className="bf-select" aria-label="Project state"><option>All projects</option><option>Active projects</option><option>Archived projects</option></select></div><div className="bf-panel"><SimpleTable headers={['Project','Modules','Open bugs','Total bugs','Environment','Last updated']}/><Empty icon={FolderKanban} title="A home for every application" text="Connect shared records to organize your projects, modules, and test environments."><Button size="sm" variant="outline" onClick={()=>onDialog('project')}><Plus/>New project</Button></Empty></div></>;}
-function ActivityView(){
- const fetch=useServerFn(getActivity); const client=useQueryClient();
- const [type,setType]=useState('all'); const [days,setDays]=useState(0); const [searchText,setSearchText]=useState(''); const [query,setQuery]=useState('');
- const [pages,setPages]=useState<(string|undefined)[]>([undefined]); const [page,setPage]=useState(0);
- const cursor=pages[page];
- const data=useQuery({queryKey:['activity',type,days,query,cursor??''],queryFn:()=>fetch({data:{cursor,type,days,query}}),retry:false,staleTime:15000,refetchInterval:30000});
- const rows=data.data?.rows??[]; const nextCursor=data.data?.nextCursor??'';
- const errorMessage=data.error?actionError(data.error,'Activity could not load. Try again.'):'';
- function reset(){setPages([undefined]);setPage(0);}
- return <><div className="bf-toolbar">
-  <div className="bf-search"><Search/><Input aria-label="Search activity" placeholder="Search by bug ID or team member…" value={searchText} onChange={e=>setSearchText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){setQuery(searchText.trim());reset();}}}/></div>
-  <ThemedSelect label="Activity type" value={type} onChange={v=>{setType(v);reset();}} options={ACTIVITY_CATEGORIES.map(c=>({value:c.key,label:c.label}))}/>
-  <ThemedSelect label="Activity period" value={String(days)} onChange={v=>{setDays(Number(v));reset();}} options={ACTIVITY_PERIODS}/>
- </div>
- {errorMessage&&<ErrorNotice message={errorMessage} onRetry={()=>data.refetch()} retrying={data.isFetching}/>}
- <div className="bf-panel">
-  {data.isLoading&&<p className="p-5 text-xs text-muted-foreground">Loading activity…</p>}
-  <div className="bf-sticky-table"><table className="bf-table bf-activity-table"><thead><tr>{['Activity','Bug','Actor','Change','From','Date & time'].map(h=><th key={h}>{h}</th>)}</tr></thead>
-  <tbody>{rows.map(r=>(<tr key={r.id}>
-   <td><span className="bf-activity-label">{notificationLabel(r.action)}</span></td>
-   <td>{r.bugId?<span className="bf-bug-id" title={r.bugTitle||r.bugCode}>{r.bugCode}</span>:'—'}</td>
-   <td>{r.actor||'—'}</td>
-   <td className="bf-activity-change">{changeText(r)}</td>
-   <td>{viaLabel(r.via)}</td>
-   <td className="whitespace-nowrap">{formatWhen(r.at)}</td>
-  </tr>))}</tbody></table></div>
-  {!data.isLoading&&!rows.length&&!errorMessage&&<Empty icon={Activity} title="No activity matches these filters" text="Change the activity type or period, or clear the search to see recent changes.">{query&&<Button size="sm" variant="outline" onClick={()=>{setSearchText('');setQuery('');client.invalidateQueries({queryKey:['activity']});}}>Clear search</Button>}</Empty>}
-  {!data.isLoading&&rows.length>0&&<div className="bf-table-footer"><span>{`Page ${page+1} · ${rows.length} shown${page>0?' (older changes on previous pages)':''}`}</span><div className="flex items-center gap-2"><Button variant="outline" size="sm" disabled={page===0||data.isFetching} onClick={()=>setPage(p=>p-1)}>Previous</Button><Button variant="outline" size="sm" disabled={!nextCursor||data.isFetching} onClick={()=>{const next=[...pages];next[page+1]=nextCursor;setPages(next);setPage(page+1);}}>Next</Button></div></div>}
- </div>
- <div className="mt-6 bf-panel"><div className="bf-panel-heading"><h2>Reports</h2><span className="bf-tag">PLANNED</span></div><div className="bf-setting-row"><FileDown className="text-primary" size={21}/><div><h3>Bug reports & CSV exports</h3><p>Complete reproduction details, ownership, comments, and permission-checked evidence links.</p></div></div><div className="bf-setting-row"><Clock3 className="text-info" size={21}/><div><h3>QA verification & workload</h3><p>Pass/fail history, reopened fixes, project breakdowns, and assignments.</p></div></div></div></>;
-}
 function SettingsView({onAddMember}:{onAddMember:()=>void}){return <div className="bf-settings"><DropdownOptionsEditor onAddMember={onAddMember}/><div className="bf-panel mb-6"><div className="bf-panel-heading"><h2>Connected services</h2></div><div className="bf-setting-row"><span className="bf-stat-icon bf-tone-teal"><Database size={19}/></span><div><h3>Neon PostgreSQL</h3><p>Shared bug records, portal access, assignments, and history.<br/>Development database connected. Member portals are available.</p></div><span className="bf-tag">Connected</span></div><div className="bf-setting-row"><span className="bf-stat-icon bf-tone-info"><Upload size={19}/></span><div><h3>S3 media storage</h3><p>Private screenshots, videos, and evidence.<br/>Uploads, drag & drop and automatic compression are disabled until your bucket is added.</p></div><span className="bf-tag">Not connected</span></div></div>
  <div className="bf-panel mb-6"><div className="bf-panel-heading"><h2>Access & security</h2><LockKeyhole size={16} className="text-muted-foreground"/></div><div className="bf-setting-row"><ShieldCheck size={21} className="text-primary"/><div><h3>Private Admin access</h3><p>Admin sign-in verified. Private sessions expire after eight hours.</p></div><span className="bf-tag">Active</span></div><div className="bf-setting-row"><Link2 size={21} className="text-primary"/><div><h3>Restricted portal links</h3><p>Random, role-scoped links with expiry, revocation, and regeneration. No login screen required.</p></div></div><div className="bf-setting-row"><ShieldCheck size={21} className="text-warning"/><div><h3>Anonymous operation protection</h3><p>Every report and update verifies the active session or private portal, permissions and project scope.</p></div><span className="bf-tag">Active</span></div></div>
   <div className="bf-panel"><div className="bf-panel-heading"><h2>Workflow defaults</h2><span className="bf-tag">READ ONLY</span></div><div className="bf-setting-row"><Bug size={21} className="text-primary"/><div><h3>Permanent bug IDs</h3><p>BF-000001 · generated safely on submission and never reused.</p></div></div><div className="bf-setting-row"><ClipboardCheck size={21} className="text-info"/><div><h3>QA-controlled resolution</h3><p>New → validation → assignment → in progress → recheck → resolved. Only successful QA verification resolves a fix.</p></div></div><div className="bf-setting-row"><Upload size={21} className="text-primary"/><div><h3>Private evidence retention</h3><p>Evidence is retained after resolution. Deletion is manual, confirmed, and audited.</p></div></div></div></div>;}

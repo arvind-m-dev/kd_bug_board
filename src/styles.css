@@ -432,3 +432,73 @@ body { font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; 
 .bf-glance-bar { display: block; height: 6px; border-radius: 999px; background: var(--muted); overflow: hidden; }
 .bf-glance-bar i { display: block; height: 100%; border-radius: inherit; background: color-mix(in oklab, var(--primary) 70%, transparent); }
 .bf-glance-grid h3, .bf-glance-recent h3 { font-size: 12px; letter-spacing: .06em; }
+
+/* ───────────── Activity: charts, filters, timeline ───────────── */
+/* Categorical chart slots (validated: adjacent CVD ΔE ≥ 8.4, both modes). */
+:root { --viz-1: #2a78d6; --viz-2: #eb6834; --viz-3: #1baf7a; --viz-4: #eda100; --violet: oklch(.53 .18 292); }
+.dark { --viz-1: #3987e5; --viz-2: #d95926; --viz-3: #199e70; --viz-4: #c98500; --violet: oklch(.76 .15 292); }
+
+.bf-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -4px 0 18px; font-size: 13px; color: var(--muted-foreground); }
+.bf-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--foreground); background: color-mix(in oklab, var(--primary) 12%, transparent); border: 1px solid color-mix(in oklab, var(--primary) 30%, transparent); cursor: pointer; transition: background .15s; }
+.bf-chip:hover { background: color-mix(in oklab, var(--primary) 20%, transparent); }
+.bf-chip svg { opacity: .7; }
+
+.bf-kpi-static { cursor: default; }
+.bf-kpi-static:hover { box-shadow: var(--shadow-panel); border-color: var(--border); }
+
+.bf-panel-sub { margin: 3px 0 0; font-size: 12.5px; color: var(--muted-foreground); }
+.bf-activity-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; margin-bottom: 24px; }
+.bf-activity-grid > .bf-chart-panel { grid-row: span 2; display: flex; flex-direction: column; }
+.bf-chart-body { flex: 1; min-height: 280px; padding: 14px 16px 10px 8px; }
+.bf-chart-skeleton { height: 240px; border-radius: 8px; background: linear-gradient(90deg, var(--muted), color-mix(in oklab, var(--muted) 50%, transparent), var(--muted)); background-size: 200% 100%; animation: bf-shimmer 1.4s linear infinite; }
+@keyframes bf-shimmer { to { background-position: -200% 0; } }
+.bf-legend-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px 14px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; color: var(--muted-foreground); }
+.bf-legend-row li { display: inline-flex; align-items: center; gap: 6px; }
+.bf-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.bf-tooltip { min-width: 180px; padding: 10px 12px; border-radius: 10px; background: var(--card); border: 1px solid var(--border); box-shadow: var(--shadow-lift); font-size: 12.5px; color: var(--foreground); }
+.bf-tooltip strong { display: block; margin-bottom: 6px; font-size: 13px; }
+.bf-tooltip ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.bf-tooltip li, .bf-tooltip-total { display: flex; align-items: center; gap: 8px; color: var(--muted-foreground); }
+.bf-tooltip b { margin-left: auto; color: var(--foreground); font-variant-numeric: tabular-nums; }
+.bf-tooltip-total { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); font-weight: 600; }
+
+.bf-barlist { list-style: none; margin: 0; padding: 8px; display: grid; gap: 2px; }
+.bf-barlist button { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) 32px; align-items: center; gap: 12px; width: 100%; padding: 8px 10px; border-radius: 8px; text-align: left; font-size: 13px; color: var(--foreground); cursor: pointer; transition: background .12s; }
+.bf-barlist button:hover { background: var(--muted); }
+.bf-barlist button[data-active] { background: color-mix(in oklab, var(--primary) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primary) 35%, transparent); }
+.bf-barlist-label { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.bf-barlist-track { display: block; height: 8px; border-radius: 999px; background: var(--muted); overflow: hidden; }
+.bf-barlist-track i { display: block; height: 100%; border-radius: inherit; background: var(--viz-1); }
+.bf-barlist b { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Kind chips: icon tiles per activity type */
+.bf-kind { --k: var(--muted-foreground); display: inline-grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px; color: var(--k); background: color-mix(in oklab, var(--k) 14%, transparent); }
+.bf-kind[data-tone=info] { --k: var(--info); } .bf-kind[data-tone=teal] { --k: var(--primary); } .bf-kind[data-tone=success] { --k: var(--success); }
+.bf-kind[data-tone=warning] { --k: var(--warning); } .bf-kind[data-tone=danger] { --k: var(--destructive); } .bf-kind[data-tone=violet] { --k: var(--violet); }
+.bf-barlist .bf-kind { width: 24px; height: 24px; border-radius: 7px; }
+
+/* Timeline grouped by day */
+.bf-timeline-day h3 { position: sticky; top: 65px; z-index: 1; display: flex; align-items: baseline; gap: 10px; margin: 0; padding: 12px 20px 8px; font-size: 13px; font-weight: 700; background: color-mix(in oklab, var(--card) 94%, transparent); backdrop-filter: blur(6px); border-bottom: 1px solid var(--border); }
+.bf-timeline-day h3 span { font-size: 12px; font-weight: 500; color: var(--muted-foreground); }
+.bf-timeline-day ol { list-style: none; margin: 0; padding: 4px 0; position: relative; }
+.bf-timeline-day ol::before { content: ""; position: absolute; left: 33px; top: 14px; bottom: 14px; width: 1px; background: var(--border); }
+.bf-timeline-day li { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 11px 20px; transition: background .12s; }
+.bf-timeline-day li:hover { background: color-mix(in oklab, var(--muted) 55%, transparent); }
+.bf-timeline-day li .bf-kind { position: relative; box-shadow: 0 0 0 4px var(--card); }
+.bf-timeline-day li:hover .bf-kind { box-shadow: 0 0 0 4px color-mix(in oklab, var(--muted) 55%, var(--card)); }
+.bf-timeline-main { min-width: 0; padding-top: 3px; }
+.bf-timeline-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0; font-size: 13.5px; }
+.bf-timeline-bug { display: inline-flex; align-items: baseline; gap: 8px; min-width: 0; max-width: 100%; color: var(--muted-foreground); }
+.bf-timeline-bug code { font-size: 12px; color: var(--primary); }
+.bf-timeline-change { margin: 4px 0 0; font-size: 13px; color: var(--muted-foreground); overflow-wrap: anywhere; }
+.bf-timeline-meta { display: flex; align-items: center; gap: 10px; padding-top: 2px; font-size: 12.5px; color: var(--muted-foreground); white-space: nowrap; }
+.bf-timeline-actor { display: inline-flex; align-items: center; gap: 7px; color: var(--foreground); font-weight: 500; }
+.bf-timeline-meta time { min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 1100px) { .bf-activity-grid { grid-template-columns: 1fr 1fr; } .bf-activity-grid > .bf-chart-panel { grid-column: 1 / -1; grid-row: auto; } }
+@media (max-width: 760px) {
+  .bf-activity-grid { grid-template-columns: 1fr; }
+  .bf-timeline-day li { grid-template-columns: 28px minmax(0, 1fr); }
+  .bf-timeline-meta { grid-column: 2; flex-wrap: wrap; white-space: normal; }
+  .bf-legend-row { justify-content: flex-start; }
+}

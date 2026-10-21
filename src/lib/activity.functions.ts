@@ -6,5 +6,20 @@ export const getActivity = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const s = await import('./activity.server');
     const a = await import('./portal-access.server');
-    return a.databaseCall(() => s.activityStream(data.cursor, data.type, data.days, data.query));
+    const { cursor, ...filters } = data;
+    return a.databaseCall(() => s.activityStream(cursor, filters));
   });
+
+export const getActivityInsights = createServerFn({ method: 'POST' })
+  .inputValidator((v: unknown) => activityQuerySchema.omit({ cursor: true }).parse(v))
+  .handler(async ({ data }) => {
+    const s = await import('./activity.server');
+    const a = await import('./portal-access.server');
+    return a.databaseCall(() => s.activityInsights(data));
+  });
+
+export const getActivityPeople = createServerFn({ method: 'GET' }).handler(async () => {
+  const s = await import('./activity.server');
+  const a = await import('./portal-access.server');
+  return a.databaseCall(() => s.activityPeople());
+});

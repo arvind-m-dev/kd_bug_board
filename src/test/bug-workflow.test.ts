@@ -64,3 +64,18 @@ describe('configurable severities', () => {
     expect(bugChangeSchema.safeParse({ requestId: crypto.randomUUID(), id: '9', version: 'v', action: 'severity', severity: 'Blocker' }).success).toBe(true);
   });
 });
+
+import { activityQuerySchema, changeText } from '@/lib/activity';
+describe('activity filters and wording', () => {
+  it('accepts person, source, 90-day and time zone filters', () => {
+    const r = activityQuerySchema.safeParse({ type: 'status', days: 90, actor: crypto.randomUUID(), via: 'qa', tz: 'Asia/Kolkata' });
+    expect(r.success).toBe(true);
+    expect(activityQuerySchema.safeParse({ tz: "UTC'; drop table x" }).success).toBe(false);
+  });
+  it('describes changes in plain words', () => {
+    const row = (detail: Record<string, string>) => ({ id: '1', action: 'bug.status', at: '', bugId: '1', bugCode: 'BF-000001', bugTitle: '', actor: 'A', via: 'admin', detail });
+    expect(changeText(row({ previousStatus: 'VALIDATING', status: 'VALIDATED' }))).toBe('Validating → Validated');
+    expect(changeText(row({ priority: 'P3' }))).toBe('Priority P3');
+    expect(changeText(row({ previousSeverity: 'High', severity: 'Critical' }))).toBe('Severity High → Critical');
+  });
+});
