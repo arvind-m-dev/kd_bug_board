@@ -91,3 +91,12 @@ describe('fix-time formatting', () => {
     expect(durationText(0.029)).toBe('42 min');
   });
 });
+
+import { nameWithRole } from '@/lib/activity';
+describe('names with roles', () => {
+  it('adds the role in brackets when known', () => {
+    expect(nameWithRole('Arvind', 'admin')).toBe('Arvind (Admin)');
+    expect(nameWithRole('Priya', 'qa')).toBe('Priya (QA)');
+    expect(nameWithRole('Sam', '')).toBe('Sam');
+  });
+});

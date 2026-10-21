@@ -18,7 +18,8 @@ const CATEGORY: Record<string, string[]> = {
 };
 
 /** Source portal of an actor: their most recent portal type. */
-const VIA_SQL = `coalesce((select px.type from bugflow.portals px where px.user_id=a.actor_id order by px.created_at desc limit 1), '')`;
+const roleOf = (userCol: string) => `coalesce((select px.type from bugflow.portals px where px.user_id=${userCol} order by px.created_at desc limit 1), '')`;
+const VIA_SQL = roleOf('a.actor_id');
 
 /** Chart series bucket for an action (fixed order: reported, status, assign, other). */
 const SERIES_SQL = `case when a.action in ('bug.created','bug.sample_created') then 'reported' when a.action in ('bug.status','bug.verify') then 'status' when a.action='bug.assign' then 'assign' else 'other' end`;
@@ -106,22 +107,22 @@ export async function activityInsights(f: ActivityFilters): Promise<ActivityInsi
   }
 
   const p = base();
-  const people = await neonQuery(`select u.id, u.name, count(*)::int as n ${from} ${p.where} group by u.id, u.name order by n desc, u.name limit 6`, p.params);
+  const people = await neonQuery(`select u.id, u.name, ${roleOf('u.id')} as role, count(*)::int as n ${from} ${p.where} group by u.id, u.name order by n desc, u.name limit 6`, p.params);
 
   const tr = totals.rows[0] ?? {};
   return {
     totals: { events: Number(tr['events'] ?? 0), bugs: Number(tr['bugs'] ?? 0), people: Number(tr['people'] ?? 0), reopened: Number(tr['reopened'] ?? 0), resolved: Number(tr['resolved'] ?? 0) },
     series: { reported: 0, status: 0, assign: 0, other: 0, ...Object.fromEntries(series.rows.map(r => [String(r['series']), Number(r['n'])])) },
     categories: [...byKey].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count),
-    people: people.rows.map(r => ({ id: String(r['id']), name: String(r['name']), count: Number(r['n']) })),
+    people: people.rows.map(r => ({ id: String(r['id']), name: String(r['name']), role: String(r['role']), count: Number(r['n']) })),
   };
 }
 
 /** People who appear in the activity log, for the person filter. */
-export async function activityPeople(): Promise<{ id: string; name: string }[]> {
+export async function activityPeople(): Promise<{ id: string; name: string; role: string }[]> {
   await requireAdmin();
-  const { rows } = await neonQuery(`select distinct u.id, u.name from bugflow.activity a join bugflow.users u on u.id=a.actor_id order by u.name limit 200`);
-  return rows.map(r => ({ id: String(r['id']), name: String(r['name']) }));
+  const { rows } = await neonQuery(`select u.id, u.name, ${roleOf('u.id')} as role from bugflow.users u where exists(select 1 from bugflow.activity a where a.actor_id=u.id) order by u.name limit 200`);
+  return rows.map(r => ({ id: String(r['id']), name: String(r['name']), role: String(r['role']) }));
 }
 
 /**
@@ -143,7 +144,7 @@ export async function teamPerformance(days: number): Promise<TeamPerformance> {
   const people = await neonQuery(`${cte},
     reopened as (select distinct h.bug_id from bugflow.status_history h where h.new_status='REOPENED' and ${win('h.created_at')})
     select u.id, u.name, (u.active and u.deleted_at is null) as current,
-      coalesce((select px.type from bugflow.portals px where px.user_id=u.id order by px.created_at desc limit 1),'') as role,
+      ${roleOf('u.id')} as role,
       (select count(*) from b where b.reporter_id=u.id and ${win('b.created_at')})::int as raised,
       (select count(*) from owners o join b on b.id=o.bug_id where o.user_id=u.id and b.status not in ('RESOLVED','DUPLICATE','NOT_A_BUG','WONT_FIX'))::int as open_now,
       (select count(*) from bugflow.status_history h where h.actor_id=u.id and h.new_status='RECHECK' and ${win('h.created_at')})::int as submitted,

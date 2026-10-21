@@ -43,7 +43,7 @@ export type ActivityInsights = {
   totals: { events: number; bugs: number; people: number; reopened: number; resolved: number };
   series: Record<ActivitySeriesKey, number>;
   categories: { key: string; count: number }[];
-  people: { id: string; name: string; count: number }[];
+  people: { id: string; name: string; role: string; count: number }[];
 };
 
 export const activityQuerySchema = z.object({
@@ -74,6 +74,10 @@ export const VIA_LABELS: Record<string, string> = {
   admin: 'Admin', reporter: 'Reporter', qa: 'QA', developer: 'Developer', member: 'Member',
 };
 export function viaLabel(via: string) { return VIA_LABELS[via] ?? 'Workspace'; }
+/** Role label for a person (their latest portal type); empty when unknown. */
+export function roleName(role: string) { return VIA_LABELS[role] ?? ''; }
+/** "Arvind (Admin)" — name with role in brackets when the role is known. */
+export function nameWithRole(name: string, role: string) { const r = roleName(role); return r ? `${name} (${r})` : name; }
 
 export function formatWhen(at: string) {
   const date = new Date(at);

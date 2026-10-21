@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipProps } from 'recharts';
@@ -6,7 +6,7 @@ import { Activity, ArrowDown, ArrowRightLeft, ArrowUp, Bug, Check, ClipboardChec
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getActivity, getActivityInsights, getActivityPeople, getTeamPerformance } from '@/lib/activity.functions';
-import { ACTIVITY_CATEGORIES, ACTIVITY_PERIODS, ACTIVITY_SERIES, ACTIVITY_SOURCES, changeText, durationText, formatWhen, viaLabel, type PersonPerformance, type ActivityFilters, type ActivityInsights, type ActivityRow } from '@/lib/activity';
+import { ACTIVITY_CATEGORIES, ACTIVITY_PERIODS, ACTIVITY_SERIES, ACTIVITY_SOURCES, changeText, durationText, formatWhen, nameWithRole, roleName, type PersonPerformance, type ActivityFilters, type ActivityInsights, type ActivityRow } from '@/lib/activity';
 import { notificationLabel } from '@/lib/notifications';
 import { ThemedSelect } from './themed-select';
 import { ErrorNotice, actionError } from './action-feedback';
@@ -52,7 +52,7 @@ export function ActivityView() {
   const reset = () => { setPages([undefined]); setPage(0); };
   const set = <T,>(fn: (v: T) => void) => (v: T) => { fn(v); reset(); };
   const list = rows.data?.rows ?? []; const nextCursor = rows.data?.nextCursor ?? '';
-  const personName = people.data?.find(p => p.id === actor)?.name ?? 'Selected person';
+  const picked = people.data?.find(p => p.id === actor); const personName = picked ? nameWithRole(picked.name, picked.role) : 'Selected person';
   const chips = [
     type !== 'all' && { label: categoryLabel(type), clear: () => set(setType)('all') },
     actor && { label: personName, clear: () => set(setActor)('') },
@@ -65,7 +65,7 @@ export function ActivityView() {
     <div className="bf-toolbar">
       <div className="bf-search"><Search /><Input aria-label="Search activity" placeholder="Search by bug ID, title or person…" value={searchText} onChange={e => setSearchText(e.target.value)} /></div>
       <ThemedSelect label="Activity type" value={type} onChange={set(setType)} options={ACTIVITY_CATEGORIES.map(c => ({ value: c.key, label: c.label }))} />
-      <ThemedSelect label="Person" value={actor || 'all'} onChange={v => set(setActor)(v === 'all' ? '' : v)} options={[{ value: 'all', label: 'Everyone' }, ...(people.data ?? []).map(p => ({ value: p.id, label: p.name }))]} />
+      <ThemedSelect label="Person" value={actor || 'all'} onChange={v => set(setActor)(v === 'all' ? '' : v)} options={[{ value: 'all', label: 'Everyone' }, ...(people.data ?? []).map(p => ({ value: p.id, label: nameWithRole(p.name, p.role) }))]} />
       <ThemedSelect label="Source" value={via} onChange={set(setVia)} options={ACTIVITY_SOURCES} />
       <ThemedSelect label="Period" value={String(days)} onChange={v => set(setDays)(Number(v) as ActivityFilters['days'])} options={ACTIVITY_PERIODS} />
     </div>
@@ -86,11 +86,11 @@ export function ActivityView() {
       </section>
       <section className="bf-panel" aria-labelledby="activity-mix">
         <div className="bf-panel-heading"><div><h2 id="activity-mix">What changed</h2><p className="bf-panel-sub">Click a row to filter</p></div></div>
-        <BarList empty="No changes yet" items={(ins?.categories ?? []).map(c => ({ id: c.key, label: categoryLabel(c.key), count: c.count, icon: KIND[c.key]?.icon, tone: KIND[c.key]?.tone, active: type === c.key }))} onPick={id => set(setType)(type === id ? 'all' : id)} />
+        <BarList empty="No changes yet" items={(ins?.categories ?? []).map(c => ({ id: c.key, label: categoryLabel(c.key), title: categoryLabel(c.key), count: c.count, icon: KIND[c.key]?.icon, tone: KIND[c.key]?.tone, active: type === c.key }))} onPick={id => set(setType)(type === id ? 'all' : id)} />
       </section>
       <section className="bf-panel" aria-labelledby="activity-people">
         <div className="bf-panel-heading"><div><h2 id="activity-people">Most active</h2><p className="bf-panel-sub">Click a person to filter</p></div></div>
-        <BarList empty="No one yet" items={(ins?.people ?? []).map(p => ({ id: p.id, label: p.name, count: p.count, avatar: initials(p.name), active: actor === p.id }))} onPick={id => set(setActor)(actor === id ? '' : id)} />
+        <BarList empty="No one yet" items={(ins?.people ?? []).map(p => ({ id: p.id, label: <PersonName name={p.name} role={p.role} />, title: nameWithRole(p.name, p.role), count: p.count, avatar: initials(p.name), active: actor === p.id }))} onPick={id => set(setActor)(actor === id ? '' : id)} />
       </section>
     </div>
 
@@ -139,10 +139,10 @@ function MixTooltip({ active, payload, total }: TooltipProps<number, string> & {
   return <div className="bf-tooltip"><ul><li><span className="bf-swatch" style={{ background: String(p.payload?.color) }} />{p.name}<b>{v}</b></li></ul><div className="bf-tooltip-total">Share<b>{total ? Math.round((v / total) * 100) : 0}%</b></div></div>;
 }
 
-function BarList({ items, onPick, empty }: { items: { id: string; label: string; count: number; icon?: LucideIcon | undefined; tone?: string | undefined; avatar?: string; active: boolean }[]; onPick: (id: string) => void; empty: string }) {
+function BarList({ items, onPick, empty }: { items: { id: string; label: ReactNode; title: string; count: number; icon?: LucideIcon | undefined; tone?: string | undefined; avatar?: string; active: boolean }[]; onPick: (id: string) => void; empty: string }) {
   if (!items.length) return <p className="px-5 py-6 text-sm text-muted-foreground">{empty}</p>;
   const max = Math.max(...items.map(i => i.count));
-  return <ul className="bf-barlist">{items.map(i => <li key={i.id}><button type="button" data-active={i.active || undefined} onClick={() => onPick(i.id)}>
+  return <ul className="bf-barlist">{items.map(i => <li key={i.id}><button type="button" title={i.title} data-active={i.active || undefined} onClick={() => onPick(i.id)}>
     <span className="bf-barlist-label">{i.icon ? <span className="bf-kind" data-tone={i.tone}><i.icon size={13} /></span> : <span className="bf-avatar !size-6 !text-[10.5px]">{i.avatar}</span>}<span className="truncate">{i.label}</span></span>
     <span className="bf-barlist-track"><i style={{ width: `${Math.max(3, (i.count / max) * 100)}%` }} /></span>
     <b>{i.count}</b></button></li>)}</ul>;
@@ -159,7 +159,7 @@ function Timeline({ rows }: { rows: ActivityRow[] }) {
         <p className="bf-timeline-title"><strong>{notificationLabel(r.action)}</strong>{r.bugId && <span className="bf-timeline-bug"><code>{r.bugCode}</code>{r.bugTitle && <span className="truncate">{r.bugTitle}</span>}</span>}</p>
         {change && <p className="bf-timeline-change">{change}</p>}
       </div>
-      <div className="bf-timeline-meta"><span className="bf-timeline-actor"><span className="bf-avatar !size-6 !text-[10.5px]">{initials(r.actor)}</span>{r.actor || '—'}</span><span className="bf-tag">{viaLabel(r.via)}</span><time dateTime={r.at} title={formatWhen(r.at)}>{time(r.at)}</time></div>
+      <div className="bf-timeline-meta"><span className="bf-timeline-actor"><span className="bf-avatar !size-6 !text-[10.5px]">{initials(r.actor)}</span>{r.actor ? <PersonName name={r.actor} role={r.via} /> : '—'}</span><time dateTime={r.at} title={formatWhen(r.at)}>{time(r.at)}</time></div>
     </li>; })}</ol>
   </div>)}</div>;
 }
@@ -174,7 +174,6 @@ const PERF_COLUMNS: { key: SortKey; label: string; hint: string }[] = [
   { key: 'reopened', label: 'Reopened', hint: 'Their bugs sent back after a failed check' },
   { key: 'qa', label: 'QA checks', hint: 'Verifications passed / failed' },
 ];
-const roleLabel = (r: string) => (r === 'qa' ? 'QA' : r ? r[0]!.toUpperCase() + r.slice(1) : 'Member');
 
 /** Who raised, who fixed, and how fast — per person and overall. */
 function TeamPerformanceSection({ days, periodLabel, onPerson }: { days: ActivityFilters['days']; periodLabel: string; onPerson: (id: string) => void }) {
@@ -202,13 +201,13 @@ function TeamPerformanceSection({ days, periodLabel, onPerson }: { days: Activit
         <div className="bf-perf-compare" aria-label="Raised vs fixed by person">
           <div className="bf-perf-compare-head"><h3>Raised vs fixed</h3><ul className="bf-legend-row"><li><span className="bf-swatch" style={{ background: 'var(--viz-1)' }} />Raised</li><li><span className="bf-swatch" style={{ background: 'var(--viz-3)' }} />Fixed</li></ul></div>
           <ul>{list.filter(p => p.raised + p.fixed > 0).sort((a, b) => b.raised + b.fixed - (a.raised + a.fixed)).slice(0, 8).map(p => <li key={p.id} title={`${p.name}: ${p.raised} raised · ${p.fixed} fixed`}>
-            <span className="bf-perf-name"><span className="bf-avatar !size-6 !text-[10.5px]">{initials(p.name)}</span><span className="truncate">{p.name}</span></span>
+            <span className="bf-perf-name"><span className="bf-avatar !size-6 !text-[10.5px]">{initials(p.name)}</span><span className="truncate"><PersonName name={p.name} role={p.role} /></span></span>
             <span className="bf-perf-bars"><span><i style={{ width: `${(p.raised / maxBar) * 100}%`, background: 'var(--viz-1)' }} /><b>{p.raised}</b></span><span><i style={{ width: `${(p.fixed / maxBar) * 100}%`, background: 'var(--viz-3)' }} /><b>{p.fixed}</b></span></span>
           </li>)}</ul>
         </div>
         <div className="bf-table-wrap"><table className="bf-table bf-perf-table"><thead><tr>{head('name', 'Person')}{PERF_COLUMNS.map(c => <Fragment key={c.key}>{head(c.key, c.label, c.hint)}</Fragment>)}</tr></thead>
           <tbody>{sorted.map(p => <tr key={p.id}>
-            <td><button type="button" className="bf-perf-person" onClick={() => onPerson(p.id)} title="Show this person’s activity"><span className="bf-avatar !size-7 !text-[11px]">{initials(p.name)}</span><span className="min-w-0"><strong className="block truncate">{p.name}</strong><small>{roleLabel(p.role)}{!p.current && ' · former'}</small></span></button></td>
+            <td><button type="button" className="bf-perf-person" onClick={() => onPerson(p.id)} title="Show this person’s activity"><span className="bf-avatar !size-7 !text-[11px]">{initials(p.name)}</span><span className="min-w-0"><strong className="block truncate"><PersonName name={p.name} role={p.role} /></strong>{!p.current && <small>Former member</small>}</span></button></td>
             <td>{p.raised || <Dim />}</td><td>{p.openNow || <Dim />}</td><td>{p.submitted || <Dim />}</td>
             <td>{p.fixed ? <span className="bf-perf-fixed"><Check size={13} />{p.fixed}</span> : <Dim />}</td>
             <td>{p.avgFixDays == null ? <Dim /> : <span className="bf-perf-speed" data-speed={p.avgFixDays <= 2 ? 'fast' : p.avgFixDays <= 7 ? 'ok' : 'slow'}>{durationText(p.avgFixDays)}</span>}</td>
@@ -222,4 +221,10 @@ function TeamPerformanceSection({ days, periodLabel, onPerson }: { days: Activit
 const Dim = () => <span className="text-muted-foreground">—</span>;
 function PerfStat({ label, value, sub }: { label: string; value: string; sub: string }) {
   return <div className="bf-perf-stat"><span>{label}</span><strong>{value}</strong><small>{sub}</small></div>;
+}
+
+/** Name followed by the person's role in brackets, e.g. Arvind (Admin). */
+function PersonName({ name, role }: { name: string; role: string }) {
+  const r = roleName(role);
+  return <>{name}{r && <span className="bf-role"> ({r})</span>}</>;
 }
