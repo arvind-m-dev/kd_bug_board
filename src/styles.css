@@ -944,3 +944,13 @@ html body[data-scroll-locked] { margin-right: 0 !important; padding-right: 0 !im
 .bf-person-hero-stats span { max-width: 150px; text-align: right; }
 .bf-person-hero-stats em { margin-top: 2px; font-style: normal; font-size: 11px; line-height: 1.3; color: var(--muted-foreground); opacity: .8; }
 @media (max-width: 900px) { .bf-person-hero-stats span { text-align: left; } }
+
+/* Activity log: collapsible, with its own period */
+.bf-log-heading { flex-wrap: wrap; }
+.bf-log-toggle { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 0; text-align: left; cursor: pointer; color: var(--foreground); }
+.bf-log-toggle h2 { margin: 0; }
+.bf-log-toggle > span:nth-child(2) { display: grid; }
+.bf-bd-chevron[data-open] { transform: rotate(90deg); }
+.bf-log-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-left: auto; }
+.bf-link-btn { font-size: 12.5px; font-weight: 600; color: var(--primary); cursor: pointer; }
+.bf-link-btn:hover { text-decoration: underline; text-underline-offset: 3px; }

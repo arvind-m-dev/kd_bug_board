@@ -3,7 +3,7 @@ import { SkeletonRows, SkeletonTiles } from './loading';
 import { keepPreviousData, useQuery, type QueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipProps } from 'recharts';
-import { Activity, ArrowDown, ArrowRightLeft, ArrowUp, Bug, Check, ClipboardCheck, Flag, MessageSquare, Pencil, Search, Trash2, Trophy, UserPlus, UsersRound, X, type LucideIcon } from 'lucide-react';
+import { Activity, ChevronRight, ArrowDown, ArrowRightLeft, ArrowUp, Bug, Check, ClipboardCheck, Flag, MessageSquare, Pencil, Search, Trash2, Trophy, UserPlus, UsersRound, X, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getActivity, getActivityInsights, getActivityPeople, getTeamPerformance } from '@/lib/activity.functions';
@@ -48,8 +48,17 @@ export function ActivityView() {
   // Search applies after a short pause so typing doesn't fire a request per key.
   useEffect(() => { const t = setTimeout(() => { setQuery(searchText.trim()); setPages([undefined]); setPage(0); }, 350); return () => clearTimeout(t); }, [searchText]);
   const filters: ActivityFilters = { type, days: period.days, ...(period.from ? { from: period.from } : {}), ...(period.to ? { to: period.to } : {}), query, tz, ...(actor ? { actor } : {}), ...(via !== 'all' ? { via: via as NonNullable<ActivityFilters['via']> } : {}) };
+  // The log can use its own period; null means "same as the page".
+  const [logPeriod, setLogPeriodState] = useState<Period | null>(null);
+  const setLogPeriod = (p: Period | null) => { setLogPeriodState(p); setPages([undefined]); setPage(0); };
+  const lp = logPeriod ?? period;
+  const logFilters: ActivityFilters = { ...filters, days: lp.days, from: lp.from, to: lp.to };
+  if (!lp.from) delete logFilters.from; if (!lp.to) delete logFilters.to;
+  const [logOpen, setLogOpenState] = useState(true);
+  useEffect(() => { try { if (localStorage.getItem('bugflow-activity-log-open') === 'false') setLogOpenState(false); } catch { /* storage unavailable */ } }, []);
+  const setLogOpen = (o: boolean) => { setLogOpenState(o); try { localStorage.setItem('bugflow-activity-log-open', String(o)); } catch { /* storage unavailable */ } };
   const cursor = pages[page];
-  const rows = useQuery({ queryKey: ['activity', filters, cursor ?? ''], queryFn: () => fetchRows({ data: { ...filters, ...(cursor ? { cursor } : {}) } }), placeholderData: keepPreviousData, retry: 1, staleTime: 15000, refetchInterval: 30000 });
+  const rows = useQuery({ queryKey: ['activity', logFilters, cursor ?? ''], queryFn: () => fetchRows({ data: { ...logFilters, ...(cursor ? { cursor } : {}) } }), placeholderData: keepPreviousData, retry: 1, staleTime: 15000, refetchInterval: 30000 });
   const insights = useQuery({ queryKey: ['activity-insights', filters], queryFn: () => fetchInsights({ data: filters }), placeholderData: keepPreviousData, retry: 1, staleTime: 15000, refetchInterval: 60000 });
   const people = useQuery({ queryKey: ['activity-people'], queryFn: () => fetchPeople(), staleTime: 60000 });
   const reset = () => { setPages([undefined]); setPage(0); };
@@ -102,11 +111,23 @@ export function ActivityView() {
 
     {rows.isError && <ErrorNotice message={actionError(rows.error, 'Activity could not load. Try again.')} onRetry={() => rows.refetch()} retrying={rows.isFetching} />}
     <section className="bf-panel" aria-labelledby="activity-log">
-      <div className="bf-panel-heading"><div><h2 id="activity-log">Activity log</h2><p className="bf-panel-sub">Every change, newest first</p></div>{(rows.isPlaceholderData || insights.isPlaceholderData) && <span className="bf-updating">Updating…</span>}</div>
+      <div className="bf-panel-heading bf-log-heading">
+        <button type="button" className="bf-log-toggle" aria-expanded={logOpen} aria-controls="activity-log-body" onClick={() => setLogOpen(!logOpen)}>
+          <ChevronRight size={18} className="bf-bd-chevron" data-open={logOpen || undefined} />
+          <span><h2 id="activity-log">Activity log</h2><span className="bf-panel-sub">Every change, newest first · {describePeriod(lp)}</span></span>
+          <span className="bf-bd-count">{list.length ? `${Math.min(list.length, 50)}${nextCursor ? '+' : ''}` : 0}</span>
+        </button>
+        <div className="bf-log-tools">{rows.isPlaceholderData && <span className="bf-updating">Updating…</span>}
+          {logPeriod && <button type="button" className="bf-link-btn" onClick={() => setLogPeriod(null)} title="Use the page's period again">Match page</button>}
+          <PeriodPicker value={lp} onChange={setLogPeriod} />
+        </div>
+      </div>
+      {logOpen && <div id="activity-log-body">
       {rows.isLoading ? <SkeletonRows rows={8} label="Loading activity" /> : list.length === 0 && !rows.isError
         ? <div className="bf-empty"><span className="bf-empty-icon"><Activity size={22} /></span><h3>No activity matches these filters</h3><p>Try a longer period or remove a filter.</p></div>
         : <div data-updating={rows.isPlaceholderData || undefined}><Timeline rows={list.slice(0, 50)} /></div>}
       {list.length > 0 && <div className="bf-table-footer"><span>Page {page + 1} · {Math.min(list.length, 50)} changes</span><div className="flex items-center gap-2"><Button variant="outline" size="sm" disabled={page === 0 || rows.isFetching} onClick={() => setPage(p => p - 1)}>Newer</Button><Button variant="outline" size="sm" disabled={!nextCursor || rows.isFetching} onClick={() => { const next = [...pages]; next[page + 1] = nextCursor; setPages(next); setPage(page + 1); }}>Older</Button></div></div>}
+      </div>}
     </section>
   </>;
 }
