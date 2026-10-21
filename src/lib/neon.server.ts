@@ -2,7 +2,7 @@ type Statement = { query: string; params?: unknown[] };
 type NeonResult = { rows: Record<string, unknown>[]; fields: { name: string; dataTypeID: number }[]; rowCount: number | null; command: string };
 type NeonBatchResult = { results: NeonResult[] };
 type NeonResponse = { status: number; retryAfter: string | null; text: string; json: any; elapsedMs: number };
-type NeonErrorKind = 'stale_connection' | 'endpoint_blocked' | 'maybe_committed' | 'too_large' | 'rate_limited' | 'unavailable' | 'input' | 'statement' | 'rejected';
+type NeonErrorKind = 'unreachable' | 'stale_connection' | 'endpoint_blocked' | 'maybe_committed' | 'too_large' | 'rate_limited' | 'unavailable' | 'input' | 'statement' | 'rejected';
 type NeonError = Error & { status: number; code?: string; body: string; kind: NeonErrorKind };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const toBody = (q: string | Statement[], params: unknown[]) => typeof q === 'string' ? { query: q, params } : { queries: q };
@@ -18,6 +18,9 @@ async function directFetch(url: string, body: { query?: string; params?: unknown
     const json = JSON.parse(JSON.stringify(result));
     return { status: 200, retryAfter: null, text: '', json, elapsedMs: Date.now() - started };
   } catch (err: any) {
+    // DNS/connection failures happen before anything is sent, so nothing can have been saved.
+    const cause = err?.sourceError?.cause?.code ?? err?.cause?.code;
+    if (['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ENETUNREACH', 'EHOSTUNREACH'].includes(cause)) return { status: 0, retryAfter: null, text: '', json: { message: `Cannot reach database host (${cause})`, unreachable: true }, elapsedMs: Date.now() - started };
     const json = { message: String(err?.message ?? err), code: err?.code };
     return { status: err?.code ? 400 : 0, retryAfter: null, text: json.message, json, elapsedMs: Date.now() - started };
   }
@@ -31,7 +34,8 @@ const isStale = (json: any) => json?.code === '28P01' || json?.code === '28000' 
 const isEndpointBlocked = (json: any) => /^(The endpoint has been disabled|Control plane request failed: endpoint is)/.test(json?.message ?? '');
 function neonFailure(r: NeonResponse, write: boolean): NeonError {
   const { status, json, elapsedMs } = r; let hint: string; let kind: NeonErrorKind;
-  if (isStale(json)) { kind = 'stale_connection'; hint = 'the stored connection string no longer works: stop retrying; replace DATABASE_URL with a current Neon connection string'; }
+  if (json?.unreachable) { kind = 'unreachable'; hint = 'the database host could not be reached (DNS or network); nothing was sent'; }
+  else if (isStale(json)) { kind = 'stale_connection'; hint = 'the stored connection string no longer works: stop retrying; replace DATABASE_URL with a current Neon connection string'; }
   else if (isEndpointBlocked(json)) { kind = 'endpoint_blocked'; hint = 'Neon is not serving this endpoint (disabled, or a quota or billing limit): log Neon\'s message; never retry unchanged'; }
   else if (status === 413) { kind = 'too_large'; hint = 'request too large: split bulk writes into several `queries` batches; never retry unchanged'; }
   else if (status === 507) { kind = 'too_large'; hint = 'result too large: add LIMIT and paginate; never retry unchanged'; }
@@ -52,6 +56,7 @@ function neonFailure(r: NeonResponse, write: boolean): NeonError {
 }
 export function neonUserError(err: unknown): { status: number; message: string } {
   switch ((err as Partial<NeonError>)?.kind) {
+    case 'unreachable': return { status: 503, message: 'Cannot reach the database from this network. Nothing was saved — check your internet or DNS settings and try again.' };
     case 'stale_connection': return { status: 503, message: 'The database connection configured for this app no longer works. The app owner has to update DATABASE_URL.' };
     case 'endpoint_blocked': return { status: 503, message: 'The database behind this app is not available right now. The app owner should check its endpoint and plan in Neon.' };
     case 'maybe_committed': return { status: 503, message: 'The change may have been saved. Refresh to check before trying again.' };
