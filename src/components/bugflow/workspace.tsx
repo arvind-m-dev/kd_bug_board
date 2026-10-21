@@ -54,7 +54,9 @@ export function Workspace({view='overview'}:{view?:View}) {
   <aside className="bf-sidebar" data-open={menu} aria-label="Main navigation">
    <Link to="/" className="bf-brand"><span className="bf-logo"><Bug size={23}/></span><span className="bf-brand-name">Futurist Global Bug Board<span className="text-primary">.</span></span></Link>
    
-   <nav className="bf-nav">{navigation.slice(0,3).map(n=><Link key={n.to} to={n.to} activeOptions={{exact:true}} className="bf-nav-link" data-status={n.to==='/admin'&&pathname==='/'?'active':undefined} onClick={()=>setMenu(false)}><n.icon/>{n.label}{n.count&&<span className="bf-nav-count">{navCounts[n.to]??'—'}</span>}</Link>)}</nav>
+   <nav className="bf-nav">{navigation.slice(0,1).map(n=><Link key={n.to} to={n.to} activeOptions={{exact:true}} className="bf-nav-link" data-status={n.to==='/admin'&&pathname==='/'?'active':undefined} onClick={()=>setMenu(false)}><n.icon/>{n.label}{n.count&&<span className="bf-nav-count">{navCounts[n.to]??'—'}</span>}</Link>)}</nav>
+   <div className="bf-nav-label mt-7">Bugs</div>
+   <nav className="bf-nav">{navigation.slice(1,3).map(n=><Link key={n.to} to={n.to} activeOptions={{exact:true}} className="bf-nav-link" data-status={n.to==='/admin'&&pathname==='/'?'active':undefined} onClick={()=>setMenu(false)}><n.icon/>{n.label}{n.count&&<span className="bf-nav-count">{navCounts[n.to]??'—'}</span>}</Link>)}</nav>
    <div className="bf-nav-label mt-7">Management</div>
    <nav className="bf-nav">{navigation.slice(4,5).map(n=><Link key={n.to} to={n.to} activeOptions={{exact:true}} className="bf-nav-link" onClick={()=>setMenu(false)} onMouseEnter={n.to==='/admin/activity'?()=>prefetchActivityPage(queryClient):undefined} onFocus={n.to==='/admin/activity'?()=>prefetchActivityPage(queryClient):undefined}><n.icon/>{n.label}{n.count&&<span className="bf-nav-count">{navCounts[n.to]??'—'}</span>}</Link>)}</nav>
    <div className="bf-nav-label mt-7">Reports</div>
