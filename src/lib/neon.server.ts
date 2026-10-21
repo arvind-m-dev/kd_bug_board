@@ -10,7 +10,8 @@ const toBody = (q: string | Statement[], params: unknown[]) => typeof q === 'str
 async function directFetch(url: string, body: { query?: string; params?: unknown[]; queries?: Statement[] }, headers: Record<string, string>): Promise<NeonResponse> {
   const started = Date.now();
   try {
-    const { neon } = await import('@neondatabase/serverless');
+    const { neon, neonConfig } = await import('@neondatabase/serverless');
+    if (process.env['DATABASE_DOH'] === '1' && !neonConfig.fetchFunction) neonConfig.fetchFunction = (await import('./dev-dns.server')).dohFetch;
     const sql = neon(url, { fullResults: true });
     const result = body.queries
       ? { results: await sql.transaction(body.queries.map((s) => sql.query(s.query, s.params ?? [])), { readOnly: headers['Neon-Batch-Read-Only'] === 'true' }) }
