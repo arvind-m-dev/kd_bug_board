@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from '@/components/bugflow/theme-toggle';
 import { TopProgress } from '@/components/bugflow/loading';
+import { THEME_BOOT_SCRIPT } from '@/lib/appearance';
 import { Button } from "@/components/ui/button";
 
 function NotFoundComponent() {
@@ -93,8 +94,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
+        {/* Apply the saved light/dark mode and colour palette before first paint (no flash). */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <HeadContent />
       </head>
       <body>

@@ -891,3 +891,24 @@ html body[data-scroll-locked] { margin-right: 0 !important; padding-right: 0 !im
 .bf-recent-item:hover .bf-recent-go { opacity: 1; transform: translateX(2px); color: var(--primary); }
 .bf-recent-item .bf-tag, .bf-recent-item .bf-recent-status { white-space: nowrap; }
 .bf-recent-item .bf-recent-meta { gap: 6px; }
+
+/* ───────────── Settings → Appearance ───────────── */
+.bf-mode { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--muted); }
+.bf-mode button { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--muted-foreground); cursor: pointer; }
+.bf-mode button[aria-checked=true] { color: var(--foreground); background: var(--card); box-shadow: var(--shadow-panel); }
+.bf-palettes { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.bf-palette { display: grid; gap: 12px; padding: 12px; border-radius: 14px; border: 1px solid var(--border); background: var(--card); text-align: left; cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .15s; }
+.bf-palette:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+.bf-palette[aria-checked=true] { border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary) 45%, transparent); }
+.bf-palette:disabled { opacity: .6; cursor: progress; }
+.bf-palette-preview { display: grid; gap: 10px; padding: 12px; border-radius: 10px; background: var(--background); border: 1px solid var(--border); }
+.bf-pp-bar { height: 6px; border-radius: 999px; }
+.bf-pp-row { display: flex; align-items: center; gap: 8px; }
+.bf-pp-btn { padding: 5px 10px; border-radius: 7px; font-size: 12px; font-weight: 700; }
+.bf-pp-chip { padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; }
+.bf-pp-swatches { display: flex; gap: 6px; }
+.bf-pp-swatches i { width: 22px; height: 22px; border-radius: 6px; box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--foreground) 12%, transparent); }
+.bf-palette-text { display: grid; gap: 3px; }
+.bf-palette-text strong { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.bf-palette-text strong svg { color: var(--primary); }
+.bf-palette-text small { font-size: 12.5px; line-height: 1.4; color: var(--muted-foreground); }
