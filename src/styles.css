@@ -848,3 +848,10 @@ body { font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; 
 .bf-opt { color: var(--muted-foreground); background: var(--muted); font-weight: 600; }
 .bf-form-step .bf-field { font-weight: 600; }
 .bf-req, .bf-opt { justify-self: start; width: fit-content; }
+
+/* No sideways jump when a page gains/loses its scrollbar: always reserve the scrollbar's space. */
+html { scrollbar-gutter: stable; }
+/* Menus and dialogs lock page scroll; the space is already reserved, so cancel the library's extra compensation. */
+html body[data-scroll-locked] { margin-right: 0 !important; padding-right: 0 !important; }
+/* Same for scrolling areas inside the page (dialogs, lists, tables), e.g. when Bug history expands. */
+[role=dialog], .bf-ov-scroll, .bf-people ul, .bf-sticky-table, .bf-sidebar { scrollbar-gutter: stable; }
