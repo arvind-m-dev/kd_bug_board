@@ -43,3 +43,24 @@ describe('minimal bug reports',()=>{
  it('preserves supplied details',()=>{const r=reportSchema.parse({...report,title:'Custom title',actual:'Network error',expected:'Saved'});expect([r.title,r.actual,r.expected]).toEqual(['Custom title','Network error','Saved']);});
  it('uses the reported description as actual result but never invents context',()=>{const r=reportSchema.parse(report);expect(r.actual).toBe(report.description);expect([r.module,r.expected,r.environment,r.browserDevice]).toEqual(['','','','']);});
 });
+
+import { severityLevel, DEFAULT_SEVERITIES, bugChangeSchema } from '@/lib/bug-workflow';
+describe('configurable severities', () => {
+  it('colours the default four from most to least severe', () => {
+    expect(DEFAULT_SEVERITIES.map(s => severityLevel(s))).toEqual([1, 2, 3, 4]);
+  });
+  it('spreads longer lists across five colours and treats unknown values as lowest', () => {
+    const list = ['Blocker', 'Critical', 'High', 'Medium', 'Low', 'Cosmetic'];
+    expect(severityLevel('Blocker', list)).toBe(1);
+    expect(severityLevel('Cosmetic', list)).toBe(5);
+    expect(severityLevel('Removed', list)).toBe(5);
+  });
+  it('keeps saved options that predate severities and defaults the list', () => {
+    const o = cleanOptions({ modules: ['Login'], environments: [], devices: [] });
+    expect(o.modules).toEqual(['Login']);
+    expect(o.severities).toEqual(DEFAULT_SEVERITIES);
+  });
+  it('accepts a severity change request', () => {
+    expect(bugChangeSchema.safeParse({ requestId: crypto.randomUUID(), id: '9', version: 'v', action: 'severity', severity: 'Blocker' }).success).toBe(true);
+  });
+});

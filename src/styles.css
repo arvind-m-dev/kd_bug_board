@@ -377,3 +377,40 @@ body { font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; 
 .bf-access-mark { background: linear-gradient(135deg, color-mix(in oklab, var(--primary) 22%, transparent), color-mix(in oklab, var(--brand-2) 22%, transparent)); }
 .bf-login .bf-access { margin: 0 auto; }
 .bf-login .bf-access h1, .bf-login .bf-access h2 { font-weight: 800; letter-spacing: -.01em; margin-top: 14px; }
+
+/* ───────────── Severity & priority: two distinct, premium colour scales ───────────── */
+:root {
+  --sev-1: oklch(.55 .21 20); --sev-2: oklch(.6 .17 45); --sev-3: oklch(.62 .14 75); --sev-4: oklch(.55 .1 190); --sev-5: oklch(.55 .03 260);
+  --pri-P0: oklch(.53 .22 10); --pri-P1: oklch(.58 .19 35); --pri-P2: oklch(.62 .15 65); --pri-P3: oklch(.53 .18 292); --pri-P4: oklch(.55 .13 235); --pri-P5: oklch(.55 .03 260);
+}
+.dark {
+  --sev-1: oklch(.72 .19 20); --sev-2: oklch(.77 .16 48); --sev-3: oklch(.85 .14 85); --sev-4: oklch(.8 .11 190); --sev-5: oklch(.75 .025 260);
+  --pri-P0: oklch(.7 .21 10); --pri-P1: oklch(.74 .17 35); --pri-P2: oklch(.82 .14 70); --pri-P3: oklch(.76 .15 292); --pri-P4: oklch(.78 .12 235); --pri-P5: oklch(.75 .025 260);
+}
+[data-sev="1"] { --c: var(--sev-1); } [data-sev="2"] { --c: var(--sev-2); } [data-sev="3"] { --c: var(--sev-3); } [data-sev="4"] { --c: var(--sev-4); } [data-sev="5"] { --c: var(--sev-5); }
+[data-pri="P0"] { --c: var(--pri-P0); } [data-pri="P1"] { --c: var(--pri-P1); } [data-pri="P2"] { --c: var(--pri-P2); } [data-pri="P3"] { --c: var(--pri-P3); } [data-pri="P4"] { --c: var(--pri-P4); } [data-pri="P5"] { --c: var(--pri-P5); }
+
+/* Severity: rounded pill with signal bars (more bars lit = more severe) */
+.bf-sev { display: inline-flex; align-items: center; gap: 7px; padding: 3px 10px 3px 8px; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--c); background: color-mix(in oklab, var(--c) 13%, transparent); border: 1px solid color-mix(in oklab, var(--c) 32%, transparent); white-space: nowrap; }
+.bf-sev-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 11px; }
+.bf-sev-bars i { width: 3px; border-radius: 1px; background: currentColor; opacity: .28; }
+.bf-sev-bars i:nth-child(1) { height: 5px; } .bf-sev-bars i:nth-child(2) { height: 8px; } .bf-sev-bars i:nth-child(3) { height: 11px; }
+[data-sev="1"] .bf-sev-bars i, [data-sev="2"] .bf-sev-bars i:nth-child(-n+2), [data-sev="3"] .bf-sev-bars i:nth-child(-n+2), [data-sev="4"] .bf-sev-bars i:nth-child(1), [data-sev="5"] .bf-sev-bars i:nth-child(1) { opacity: 1; }
+
+/* Priority: squared, solid-tinted badge in a mono face */
+.bf-pri { display: inline-grid; place-items: center; min-width: 34px; height: 24px; padding: 0 7px; border-radius: 6px; font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--c); background: color-mix(in oklab, var(--c) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--c) 38%, transparent); }
+
+/* Inline dropdowns styled as the same badges */
+.bf-pill-select button { height: 28px !important; min-width: 0 !important; gap: 6px; padding: 0 8px 0 10px; font-size: 12.5px !important; font-weight: 600; color: var(--c) !important; background: color-mix(in oklab, var(--c) 13%, transparent) !important; border: 1px solid color-mix(in oklab, var(--c) 34%, transparent) !important; box-shadow: none !important; }
+.bf-pill-select[data-sev] button { border-radius: 999px; }
+.bf-pill-select[data-pri] button { border-radius: 7px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.bf-pill-select button:hover { background: color-mix(in oklab, var(--c) 22%, transparent) !important; }
+.bf-pill-select button svg { color: currentColor; opacity: .7; }
+
+/* Bug table: proper-case headers and a compact activity column */
+.bf-bug-table th { text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 600; color: var(--muted-foreground); }
+.bf-bug-table td:has(.bf-bug-title) .bf-bug-title, .bf-bug-title { font-size: 13.5px; font-weight: 600; }
+.bf-cell-activity { min-width: 150px; }
+.bf-activity { display: grid; gap: 2px; line-height: 1.35; }
+.bf-activity-action { font-size: 13px; font-weight: 600; color: var(--foreground); }
+.bf-activity-meta { font-size: 12px; color: var(--muted-foreground); }

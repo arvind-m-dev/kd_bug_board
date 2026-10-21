@@ -2,16 +2,19 @@ import { z } from 'zod';
 import { STATUSES, canTransition, type Status, type Role } from './bugflow';
 export const PRIORITIES = ['P0','P1','P2','P3','P4','P5'] as const;
 export const priorityNames: Record<string,string> = {P0:'Highest',P1:'Very high',P2:'High',P3:'Medium',P4:'Low',P5:'Lowest'};
+export const DEFAULT_SEVERITIES = ['Critical','High','Medium','Low'];
+/** Colour level 1 (most severe) to 5 for a severity, by its position in the configured list (most severe first). */
+export function severityLevel(severity:string,list:readonly string[]=DEFAULT_SEVERITIES){const i=list.indexOf(severity);if(i<0)return 5;if(list.length<=1)return 1;return 1+Math.round(i*(Math.min(list.length,5)-1)/(list.length-1));}
 export const priorityTone=(p:string)=>p==='P0'||p==='P1'?'danger':p==='P2'?'warning':p==='P3'?'info':p==='P4'?'success':'neutral';
 export const accessSchema = z.union([z.object({kind:z.literal('admin')}).strict(), z.object({kind:z.literal('portal'),token:z.string().regex(/^[a-f0-9]{64}$/),type:z.enum(['reporter','qa','developer','member'])}).strict()]);
 export type BugAccess = z.infer<typeof accessSchema>;
 export const evidenceUrlSchema = z.string().trim().url().max(2000).refine(value=>{try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password&&(url.hostname==='drive.google.com'||url.hostname==='docs.google.com');}catch{return false;}},'Use an HTTPS Google Drive or Google Docs link.');
-const reportFields = z.object({requestId:z.string().uuid(),projectId:z.string().uuid(),title:z.string().trim().max(180).default(''),module:z.string().trim().max(100).default(''),priority:z.enum(PRIORITIES).default('P3'),severity:z.enum(['Critical','High','Medium','Low']).default('Medium'),description:z.string().trim().min(1,'Enter the bug description.').max(8000),steps:z.array(z.string().trim().min(1).max(2000)).min(1,'Add at least one step to replicate.').max(30),expected:z.string().trim().max(4000).default(''),actual:z.string().trim().max(4000).default(''),browserDevice:z.string().trim().max(200).default(''),environment:z.string().trim().max(80).default(''),evidenceUrls:z.array(evidenceUrlSchema).max(10).default([])}).strict();
+const reportFields = z.object({requestId:z.string().uuid(),projectId:z.string().uuid(),title:z.string().trim().max(180).default(''),module:z.string().trim().max(100).default(''),priority:z.enum(PRIORITIES).default('P3'),severity:z.string().trim().min(1).max(40).default('Medium'),description:z.string().trim().min(1,'Enter the bug description.').max(8000),steps:z.array(z.string().trim().min(1).max(2000)).min(1,'Add at least one step to replicate.').max(30),expected:z.string().trim().max(4000).default(''),actual:z.string().trim().max(4000).default(''),browserDevice:z.string().trim().max(200).default(''),environment:z.string().trim().max(80).default(''),evidenceUrls:z.array(evidenceUrlSchema).max(10).default([])}).strict();
 function completeReport<T extends {title:string;description:string;actual:string}>(report:T):T {
  return {...report,title:report.title||report.description.split('\n')[0]?.slice(0,180)||report.description.slice(0,180),actual:report.actual||report.description.slice(0,4000)};
 }
 export const reportSchema = reportFields.transform(completeReport);
-export const bugChangeSchema = z.object({requestId:z.string().uuid(),id:z.string().regex(/^\d+$/),version:z.string().min(1).max(60),action:z.enum(['status','priority','assign','comment','verify']),status:z.enum(STATUSES).optional(),priority:z.enum(PRIORITIES).optional(),assigneeId:z.string().uuid().optional(),assigneeIds:z.array(z.string().uuid()).max(20).optional(),notes:z.string().trim().max(4000).default(''),noteTo:z.string().trim().max(120).default(''),passed:z.boolean().optional()}).strict();
+export const bugChangeSchema = z.object({requestId:z.string().uuid(),id:z.string().regex(/^\d+$/),version:z.string().min(1).max(60),action:z.enum(['status','priority','severity','assign','comment','verify']),status:z.enum(STATUSES).optional(),priority:z.enum(PRIORITIES).optional(),severity:z.string().trim().min(1).max(40).optional(),assigneeId:z.string().uuid().optional(),assigneeIds:z.array(z.string().uuid()).max(20).optional(),notes:z.string().trim().max(4000).default(''),noteTo:z.string().trim().max(120).default(''),passed:z.boolean().optional()}).strict();
 export type BugChange = z.infer<typeof bugChangeSchema>;
 export const editSchema = reportFields.omit({requestId:true,projectId:true}).extend({id:z.string().regex(/^\d+$/),version:z.string().min(1).max(60)}).strict().transform(completeReport);
 export type BugEdit = z.infer<typeof editSchema>;
@@ -23,10 +26,10 @@ export function mayEditBug(actor:{userId:string;role:string;permissions:string[]
   return actor.role==='developer'&&bug.assigneeId===actor.userId;
 }
 const optionList=z.array(z.string().trim().min(1).max(80)).max(50);
-export const optionsSchema=z.object({modules:optionList,environments:optionList,devices:optionList}).strict();
+export const optionsSchema=z.object({modules:optionList,environments:optionList,devices:optionList,severities:z.array(z.string().trim().min(1).max(40)).max(12).default(DEFAULT_SEVERITIES)}).strict();
 export type DropdownOptions=z.infer<typeof optionsSchema>;
-export const DEFAULT_OPTIONS:DropdownOptions={modules:[],environments:['Development','Staging','Production'],devices:[]};
-export function cleanOptions(v:unknown):DropdownOptions{const r=optionsSchema.safeParse(v);if(!r.success)return DEFAULT_OPTIONS;const u=(a:string[])=>[...new Set(a)];return {modules:u(r.data.modules),environments:u(r.data.environments),devices:u(r.data.devices)};}
+export const DEFAULT_OPTIONS:DropdownOptions={modules:[],environments:['Development','Staging','Production'],devices:[],severities:DEFAULT_SEVERITIES};
+export function cleanOptions(v:unknown):DropdownOptions{const r=optionsSchema.safeParse(v);if(!r.success)return DEFAULT_OPTIONS;const u=(a:string[])=>[...new Set(a)];const severities=u(r.data.severities);return {modules:u(r.data.modules),environments:u(r.data.environments),devices:u(r.data.devices),severities:severities.length?severities:DEFAULT_SEVERITIES};}
 export type BugActor = {userId:string;portalId:string;name:string;role:Role;permissions:string[]};
 export type LiveBug = {id:string;code:string;title:string;projectId:string;project:string;reporterId:string;reporter:string;assigneeId:string|null;assignee:string;assignees?:{id:string;name:string}[];status:Status;priority:string;severity:string;description:string;expected:string;actual:string;browserDevice:string;environment:string;fixNotes:string;createdAt:string;updatedAt:string;version:string;steps:string[];evidenceUrls:string[];module:string;lastChange:LastChange};
 export type BugEvent = {id:string;bugId:string;actor:string;action:string;detail:Record<string,string>;createdAt:string};
