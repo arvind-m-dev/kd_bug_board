@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipProps } from 'recharts';
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipProps } from 'recharts';
 import { Activity, ArrowDown, ArrowRightLeft, ArrowUp, Bug, Check, ClipboardCheck, Flag, MessageSquare, Pencil, Search, Trash2, Trophy, UserPlus, UsersRound, X, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,10 +80,9 @@ export function ActivityView() {
     </div>
 
     <div className="bf-activity-grid">
-      <section className="bf-panel bf-chart-panel" aria-labelledby="activity-trend">
-        <div className="bf-panel-heading"><div><h2 id="activity-trend">Activity over time</h2><p className="bf-panel-sub">Changes per day · {ins ? `last ${ins.windowDays} days` : '…'}</p></div>
-          <ul className="bf-legend-row" aria-label="Legend">{ACTIVITY_SERIES.map((s, i) => <li key={s.key}><span className="bf-swatch" style={{ background: `var(--viz-${i + 1})` }} />{s.label}</li>)}</ul></div>
-        <div className="bf-chart-body">{ins ? <TrendChart data={ins.daily} /> : <div className="bf-chart-skeleton" />}</div>
+      <section className="bf-panel" aria-labelledby="activity-share">
+        <div className="bf-panel-heading"><div><h2 id="activity-share">Activity mix</h2><p className="bf-panel-sub">Share of changes · {periodLabel}</p></div></div>
+        {ins ? <MixDonut series={ins.series} /> : <div className="bf-donut-skeleton" />}
       </section>
       <section className="bf-panel" aria-labelledby="activity-mix">
         <div className="bf-panel-heading"><div><h2 id="activity-mix">What changed</h2><p className="bf-panel-sub">Click a row to filter</p></div></div>
@@ -112,25 +111,32 @@ function Tile({ label, value, foot }: { label: string; value: number | string | 
   return <div className="bf-kpi bf-kpi-static"><span className="bf-kpi-label">{label}</span><span className="bf-kpi-value">{value ?? '…'}</span><span className="bf-kpi-foot">{foot}</span></div>;
 }
 
-function TrendChart({ data }: { data: ActivityInsights['daily'] }) {
-  const every = data.length > 45 ? 14 : data.length > 14 ? 7 : 1;
-  return <ResponsiveContainer width="100%" height="100%" minHeight={260}>
-    <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -18 }} barCategoryGap={data.length > 45 ? 1 : '22%'}>
-      <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="0" />
-      <XAxis dataKey="day" tickFormatter={shortDay} interval={every - 1} tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }} axisLine={false} tickLine={false} />
-      <YAxis allowDecimals={false} tickCount={5} tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }} axisLine={false} tickLine={false} width={44} />
-      <Tooltip cursor={{ fill: 'color-mix(in oklab, var(--foreground) 6%, transparent)' }} content={<TrendTooltip />} />
-      {ACTIVITY_SERIES.map((s, i) => <Bar key={s.key} dataKey={s.key} name={s.label} stackId="a" fill={`var(--viz-${i + 1})`} stroke="var(--card)" strokeWidth={1} radius={i === ACTIVITY_SERIES.length - 1 ? [4, 4, 0, 0] : 0} isAnimationActive={false} />)}
-    </BarChart>
-  </ResponsiveContainer>;
+/** Part-to-whole donut of the four activity kinds, total in the centre, legend with counts and shares. */
+function MixDonut({ series }: { series: ActivityInsights['series'] }) {
+  const data = ACTIVITY_SERIES.map((s, i) => ({ key: s.key, name: s.label, value: series[s.key] ?? 0, color: `var(--viz-${i + 1})` }));
+  const total = data.reduce((n, d) => n + d.value, 0);
+  const pct = (v: number) => (total ? `${Math.round((v / total) * 100)}%` : '0%');
+  if (!total) return <p className="px-5 py-10 text-center text-sm text-muted-foreground">No changes in this period</p>;
+  return <div className="bf-mix">
+    <div className="bf-mix-chart">
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie data={data.filter(d => d.value > 0)} dataKey="value" nameKey="name" innerRadius="68%" outerRadius="100%" startAngle={90} endAngle={-270} paddingAngle={data.filter(d => d.value > 0).length > 1 ? 2 : 0} cornerRadius={4} stroke="var(--card)" strokeWidth={2} isAnimationActive={false}>
+            {data.filter(d => d.value > 0).map(d => <Cell key={d.key} fill={d.color} />)}
+          </Pie>
+          <Tooltip content={<MixTooltip total={total} />} />
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="bf-mix-center" aria-hidden="true"><strong>{total}</strong><span>changes</span></div>
+    </div>
+    <ul className="bf-mix-legend">{data.map(d => <li key={d.key}><span className="bf-swatch" style={{ background: d.color }} /><span className="truncate">{d.name}</span><b>{d.value}</b><small>{pct(d.value)}</small></li>)}</ul>
+  </div>;
 }
 
-function TrendTooltip({ active, payload, label }: TooltipProps<number, string>) {
-  if (!active || !payload?.length) return null;
-  const total = payload.reduce((n, p) => n + Number(p.value ?? 0), 0);
-  return <div className="bf-tooltip"><strong>{new Date(`${label}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</strong>
-    <ul>{[...payload].reverse().map(p => <li key={String(p.dataKey)}><span className="bf-swatch" style={{ background: String(p.color) }} />{p.name}<b>{p.value}</b></li>)}</ul>
-    <div className="bf-tooltip-total">Total<b>{total}</b></div></div>;
+function MixTooltip({ active, payload, total }: TooltipProps<number, string> & { total: number }) {
+  const p = payload?.[0]; if (!active || !p) return null;
+  const v = Number(p.value ?? 0);
+  return <div className="bf-tooltip"><ul><li><span className="bf-swatch" style={{ background: String(p.payload?.color) }} />{p.name}<b>{v}</b></li></ul><div className="bf-tooltip-total">Share<b>{total ? Math.round((v / total) * 100) : 0}%</b></div></div>;
 }
 
 function BarList({ items, onPick, empty }: { items: { id: string; label: string; count: number; icon?: LucideIcon | undefined; tone?: string | undefined; avatar?: string; active: boolean }[]; onPick: (id: string) => void; empty: string }) {

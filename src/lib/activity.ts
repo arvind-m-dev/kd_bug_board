@@ -41,10 +41,9 @@ export const ACTIVITY_SERIES = [
 export type ActivitySeriesKey = typeof ACTIVITY_SERIES[number]['key'];
 export type ActivityInsights = {
   totals: { events: number; bugs: number; people: number; reopened: number; resolved: number };
-  daily: ({ day: string } & Record<ActivitySeriesKey, number>)[];
+  series: Record<ActivitySeriesKey, number>;
   categories: { key: string; count: number }[];
   people: { id: string; name: string; count: number }[];
-  windowDays: number;
 };
 
 export const activityQuerySchema = z.object({

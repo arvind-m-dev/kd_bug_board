@@ -80,7 +80,6 @@ export async function activityStream(cursor: string | undefined, f: ActivityFilt
 /** Aggregates for the activity infographics, using the same filters as the stream. */
 export async function activityInsights(f: ActivityFilters): Promise<ActivityInsights> {
   await requireAdmin();
-  const windowDays = f.days > 0 ? f.days : 30;
   const base = (opts?: { skipType?: boolean }) => {
     const params: unknown[] = []; const conds = filterSql(f, params, opts);
     return { params, where: conds.length ? `where ${conds.join(' and ')}` : '' };
@@ -93,15 +92,9 @@ export async function activityInsights(f: ActivityFilters): Promise<ActivityInsi
       count(*) filter (where a.detail->>'status'='RESOLVED' and coalesce(a.detail->>'previousStatus','')<>'RESOLVED')::int as resolved
     ${from} ${t.where}`, t.params);
 
-  // Daily series is always windowed (all time → last 30 days) and zero-filled in the viewer's time zone.
-  const d = base(); d.params.push(f.tz); const tz = `$${d.params.length}`; d.params.push(windowDays); const win = `$${d.params.length}`;
-  const dailyWhere = `${d.where ? `${d.where} and` : 'where'} a.created_at>=now()-(${win}::int||' days')::interval`;
-  const daily = await neonQuery(`with days as (select generate_series((now() at time zone ${tz})::date-(${win}::int-1), (now() at time zone ${tz})::date, '1 day')::date as day),
-    ev as (select (a.created_at at time zone ${tz})::date as day, ${SERIES_SQL} as series ${from} ${dailyWhere})
-    select to_char(days.day,'YYYY-MM-DD') as day,
-      count(ev.series) filter (where ev.series='reported')::int as reported, count(ev.series) filter (where ev.series='status')::int as status,
-      count(ev.series) filter (where ev.series='assign')::int as assign, count(ev.series) filter (where ev.series='other')::int as other
-    from days left join ev on ev.day=days.day group by days.day order by days.day`, d.params);
+  // Share of activity by chart series over the whole filtered period.
+  const sr = base();
+  const series = await neonQuery(`select ${SERIES_SQL} as series, count(*)::int as n ${from} ${sr.where} group by 1`, sr.params);
 
   // Category mix ignores the type filter so it still shows the whole picture to pick from.
   const c = base({ skipType: true });
@@ -118,10 +111,9 @@ export async function activityInsights(f: ActivityFilters): Promise<ActivityInsi
   const tr = totals.rows[0] ?? {};
   return {
     totals: { events: Number(tr['events'] ?? 0), bugs: Number(tr['bugs'] ?? 0), people: Number(tr['people'] ?? 0), reopened: Number(tr['reopened'] ?? 0), resolved: Number(tr['resolved'] ?? 0) },
-    daily: daily.rows.map(r => ({ day: String(r['day']), reported: Number(r['reported']), status: Number(r['status']), assign: Number(r['assign']), other: Number(r['other']) })),
+    series: { reported: 0, status: 0, assign: 0, other: 0, ...Object.fromEntries(series.rows.map(r => [String(r['series']), Number(r['n'])])) },
     categories: [...byKey].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count),
     people: people.rows.map(r => ({ id: String(r['id']), name: String(r['name']), count: Number(r['n']) })),
-    windowDays,
   };
 }
 
