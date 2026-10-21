@@ -84,7 +84,7 @@ export function DashboardSummary() {
   return <>
     {/* 1 · Headline numbers */}
     <div className="bf-kpi-grid">
-      <Kpi to="/portals" tone="teal" icon={Link2} label="Online now" value={n(online, members.isPending)} of={active} share={active ? online / active : 0} foot="Active in the last 2 minutes" />
+      <Kpi to="/admin/users" tone="teal" icon={Link2} label="Online now" value={n(online, members.isPending)} of={active} share={active ? online / active : 0} foot="Active in the last 2 minutes" />
       <Kpi to="/admin/users" tone="info" icon={UsersRound} label="Team members" value={n(list.length, members.isPending)} share={list.length ? active / list.length : 0} foot={`${active} active · ${roles.filter(x => x.n > 0).map(x => `${x.n} ${x.r === 'qa' ? 'QA' : x.r === 'other' ? 'other' : x.r + (x.n === 1 ? '' : 's')}`).join(' · ') || 'No roles assigned yet'}`} />
       <Kpi to="/admin/bugs" search={{ filter: 'unassigned' }} tone="warning" icon={CircleAlert} label="Unassigned bugs" value={n(d?.unassigned ?? 0, loading)} of={total} share={total ? (d?.unassigned ?? 0) / total : 0} foot="Waiting for an owner" />
       <Kpi to="/admin/bugs" search={{ filter: 'open' }} tone="danger" icon={Bell} label="Needs attention" value={n(attention.length, loading)} of={total} share={total ? attention.length / total : 0} foot="New, reopened, retest or info" />
