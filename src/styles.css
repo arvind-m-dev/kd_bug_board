@@ -931,3 +931,12 @@ html body[data-scroll-locked] { margin-right: 0 !important; padding-right: 0 !im
 .bf-replace-btn[data-armed] { color: var(--destructive); border-color: color-mix(in oklab, var(--destructive) 50%, var(--border)); background: color-mix(in oklab, var(--destructive) 10%, transparent); }
 .bf-armed-hint { position: absolute; bottom: calc(100% + 6px); left: 50%; z-index: 20; transform: translateX(-50%); padding: 4px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; white-space: nowrap; pointer-events: none; color: var(--card); background: var(--foreground); box-shadow: var(--shadow-lift); animation: bf-rise .15s ease both; }
 @keyframes bf-pulse-red { 0%, 100% { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--destructive) 45%, transparent); } 50% { box-shadow: inset 0 0 0 1px var(--destructive), 0 0 0 3px color-mix(in oklab, var(--destructive) 20%, transparent); } }
+
+/* Overview: period toolbar and combined priority & severity */
+.bf-ov-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: -4px 0 16px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.bf-ov-toolbar > div:first-child { display: flex; align-items: baseline; gap: 8px; font-size: 13.5px; }
+.bf-ov-toolbar > div:first-child span { color: var(--muted-foreground); }
+.bf-ov-row-ps { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.bf-ov-ps { padding: 16px 20px 18px; }
+.bf-ov-ps .bf-rbars { gap: 12px; }
+@media (max-width: 1100px) { .bf-ov-row-ps { grid-template-columns: 1fr; } }
