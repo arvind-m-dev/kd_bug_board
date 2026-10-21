@@ -552,24 +552,6 @@ body { font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; 
 .bf-role { font-weight: 500; color: var(--muted-foreground); }
 
 /* ───────────── Team reports ───────────── */
-.bf-person-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-.bf-person-card { display: flex; flex-direction: column; gap: 14px; padding: 18px; text-align: left; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--foreground); box-shadow: var(--shadow-panel); cursor: pointer; transition: border-color .15s, box-shadow .15s; }
-.bf-person-card:hover { border-color: color-mix(in oklab, var(--primary) 45%, var(--border)); box-shadow: var(--shadow-lift); }
-.bf-person-head { display: flex; align-items: center; gap: 12px; }
-.bf-person-head strong { font-size: 15px; }
-.bf-person-head small { font-size: 12.5px; color: var(--muted-foreground); }
-.bf-person-go { margin-left: auto; flex-shrink: 0; color: var(--muted-foreground); opacity: 0; transition: opacity .15s; }
-.bf-person-card:hover .bf-person-go { opacity: 1; color: var(--primary); }
-.bf-person-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-.bf-person-stats > span { display: flex; flex-direction: column; gap: 2px; padding: 10px 8px; text-align: center; }
-.bf-person-stats > span + span { border-left: 1px solid var(--border); }
-.bf-person-stats b { font-family: var(--font-heading); font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.bf-person-stats small { font-size: 11.5px; color: var(--muted-foreground); }
-.bf-person-strip-label { font-size: 12px; color: var(--muted-foreground); margin-bottom: -8px; }
-.bf-pstrip { display: flex; gap: 2px; height: 22px; border-radius: 6px; overflow: hidden; }
-.bf-pstrip i { display: grid; place-items: center; min-width: 34px; font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; font-style: normal; color: var(--c); background: color-mix(in oklab, var(--c) 22%, transparent); white-space: nowrap; overflow: hidden; }
-.bf-pstrip-empty { align-items: center; padding: 0 10px; font-size: 12px; color: var(--muted-foreground); background: var(--muted); }
-
 .bf-person-hero { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 20px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: 14px; background: linear-gradient(135deg, color-mix(in oklab, var(--primary) 8%, var(--card)), var(--card) 60%); box-shadow: var(--shadow-panel); }
 .bf-person-hero h2 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
 .bf-person-hero p { margin: 3px 0 0; font-size: 13px; color: var(--muted-foreground); }
@@ -615,3 +597,31 @@ body { font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; 
 .bf-recent-meta { grid-column: 2; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .bf-recent-status { font-size: 12px; color: var(--muted-foreground); }
 @media (max-width: 900px) { .bf-report-grid-wide { grid-template-columns: 1fr; } .bf-person-hero-stats { margin-left: 0; width: 100%; justify-content: space-between; } .bf-person-hero-stats span { align-items: flex-start; } }
+
+/* Team reports: people list beside the selected person's report */
+.bf-reports { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 20px; align-items: start; }
+.bf-people { position: sticky; top: 81px; max-height: calc(100vh - 100px); display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-panel); overflow: hidden; }
+.bf-people-count { margin: 0; padding: 12px 16px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-foreground); border-bottom: 1px solid var(--border); }
+.bf-people ul { list-style: none; margin: 0; padding: 6px; overflow-y: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.bf-person-item { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 10px 10px 12px; border-radius: 9px; text-align: left; color: var(--foreground); cursor: pointer; transition: background .12s; }
+.bf-person-item:hover { background: var(--muted); }
+.bf-person-item strong { font-size: 13.5px; font-weight: 600; }
+.bf-person-item small { margin-top: 1px; font-size: 12px; color: var(--muted-foreground); }
+.bf-person-item[aria-selected=true] { background: color-mix(in oklab, var(--primary) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primary) 35%, transparent); }
+.bf-person-item[aria-selected=true]::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--primary); }
+.bf-person-item[aria-selected=true] strong { color: var(--primary); }
+.bf-person-item[aria-selected=true] .bf-avatar { background: var(--primary); color: var(--primary-foreground); }
+.bf-ministrip { display: flex; gap: 1px; height: 4px; margin-top: 7px; border-radius: 999px; overflow: hidden; }
+.bf-ministrip i { display: block; min-width: 4px; background: var(--c); }
+.bf-reports-detail { min-width: 0; }
+.bf-reports-detail .bf-person-hero { margin-top: 0; animation: bf-rise .3s cubic-bezier(.2,.7,.2,1) both; }
+.bf-report-loading { display: grid; gap: 16px; }
+.bf-report-loading span { display: block; height: 120px; border-radius: 12px; background: var(--muted); animation: bf-fade 1.2s ease-in-out infinite alternate; }
+.bf-report-loading span:first-child { height: 90px; }
+@keyframes bf-fade { from { opacity: .5; } to { opacity: 1; } }
+@media (max-width: 900px) {
+  .bf-reports { grid-template-columns: 1fr; }
+  .bf-people { position: static; max-height: none; }
+  .bf-people ul { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(200px, 72%); overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; }
+  .bf-people li { scroll-snap-align: start; }
+}

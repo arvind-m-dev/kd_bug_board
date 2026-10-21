@@ -1,16 +1,15 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipProps } from 'recharts';
-import { ArrowLeft, ArrowUpRight, Search, UsersRound } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Search, UsersRound } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { getPersonDetail, getPersonOverview } from '@/lib/person-reports.functions';
 import { getBugWorkspace } from '@/lib/bug-workflow.functions';
 import { OUTCOMES, acceptanceRate, outcomeCounts, passRate, reportFocus, type Counts, type PersonMetrics, type PersonRecentBug } from '@/lib/person-reports';
 import { ACTIVITY_PERIODS, durationText, roleName, statusText } from '@/lib/activity';
-import { DEFAULT_SEVERITIES, PRIORITIES, priorityNames, severityLevel, type BugAccess } from '@/lib/bug-workflow';
+import { DEFAULT_SEVERITIES, PRIORITIES, severityLevel, type BugAccess } from '@/lib/bug-workflow';
 import { PriorityBadge, SeverityBadge } from './bug-workspace';
 import { ThemedSelect } from './themed-select';
 import { ErrorNotice, actionError } from './action-feedback';
@@ -43,20 +42,21 @@ function useSeverities() {
 
 export function TeamReports() {
   const search = useSearch({ from: '/admin_/reports' }); const navigate = useNavigate();
-  const [days, setDays] = useState<Days>(0);
-  const open = (person?: string) => void navigate({ to: '/admin/reports', search: person ? { person } : {} });
-  return search.person
-    ? <PersonDetailView person={search.person} days={days} setDays={setDays} onBack={() => open()} />
-    : <Overview days={days} setDays={setDays} onOpen={open} />;
-}
-
-/* ───────────── Overview: one card per person ───────────── */
-
-function Overview({ days, setDays, onOpen }: { days: Days; setDays: (d: Days) => void; onOpen: (id: string) => void }) {
   const fetch = useServerFn(getPersonOverview);
+  const [days, setDays] = useState<Days>(0); const [role, setRole] = useState('all'); const [text, setText] = useState('');
   const q = useQuery({ queryKey: ['person-overview', days], queryFn: () => fetch({ data: { days } }), retry: 1, staleTime: 30000, refetchInterval: 60000 });
-  const [role, setRole] = useState('all'); const [text, setText] = useState('');
   const people = useMemo(() => (q.data ?? []).filter(m => (role === 'all' || reportFocus(m) === role) && m.name.toLowerCase().includes(text.trim().toLowerCase())), [q.data, role, text]);
+  // Selected person: from the URL when they're in the list, otherwise the first person shown.
+  const selected = people.find(m => m.id === search.person) ?? people[0];
+  const select = (id: string) => void navigate({ to: '/admin/reports', search: { person: id }, replace: true });
+  // Keep the highlighted name visible (the list scrolls sideways on phones).
+  useEffect(() => { if (selected) document.getElementById(`person-${selected.id}`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [selected?.id]);
+  function onKey(e: KeyboardEvent<HTMLUListElement>) {
+    if (!selected || !['ArrowDown', 'ArrowUp'].includes(e.key)) return;
+    e.preventDefault();
+    const i = people.findIndex(m => m.id === selected.id); const next = people[Math.min(people.length - 1, Math.max(0, i + (e.key === 'ArrowDown' ? 1 : -1)))];
+    if (next) { select(next.id); requestAnimationFrame(() => document.getElementById(`person-${next.id}`)?.focus()); }
+  }
   return <>
     <div className="bf-toolbar">
       <div className="bf-search"><Search /><Input aria-label="Search people" placeholder="Search people…" value={text} onChange={e => setText(e.target.value)} /></div>
@@ -65,53 +65,50 @@ function Overview({ days, setDays, onOpen }: { days: Days; setDays: (d: Days) =>
     </div>
     {q.isError && <ErrorNotice message={actionError(q.error, 'Team reports could not load.')} onRetry={() => q.refetch()} retrying={q.isFetching} />}
     {q.isPending ? <p className="text-sm text-muted-foreground">Loading team reports…</p>
-      : people.length === 0 ? <div className="bf-panel bf-empty"><span className="bf-empty-icon"><UsersRound size={22} /></span><h3>No one matches</h3><p>Try another role or a longer period.</p></div>
-      : <div className="bf-person-grid">{people.map(m => <PersonCard key={m.id} m={m} onOpen={() => onOpen(m.id)} />)}</div>}
+      : people.length === 0 ? <div className="bf-panel bf-empty"><span className="bf-empty-icon"><UsersRound size={22} /></span><h3>No one matches</h3><p>Try another role or clear the search.</p></div>
+      : <div className="bf-reports">
+        <aside className="bf-people" aria-label="Team members">
+          <p className="bf-people-count">{plural(people.length, 'person').replace('persons', 'people')}</p>
+          <ul role="listbox" aria-label="Choose a person" aria-activedescendant={selected ? `person-${selected.id}` : undefined} onKeyDown={onKey}>
+            {people.map(m => { const on = m.id === selected?.id; const focus = reportFocus(m); return <li key={m.id}>
+              <button type="button" id={`person-${m.id}`} role="option" aria-selected={on} tabIndex={on ? 0 : -1} className="bf-person-item" onClick={() => select(m.id)}>
+                <span className="bf-avatar !size-9 !text-[12px]">{initials(m.name)}</span>
+                <span className="min-w-0 flex-1"><strong className="block truncate">{m.name}</strong><small className="block truncate">{roleName(m.role) || FOCUS_LABEL[focus]}{!m.current && ' · former'} · {keyMetric(m)}</small>
+                  <MiniStrip counts={focus === 'developer' ? m.ownedByPriority : m.raisedByPriority} /></span>
+              </button></li>; })}
+          </ul>
+        </aside>
+        <div className="bf-reports-detail" aria-live="polite">{selected && <PersonDetailView key={selected.id} person={selected.id} days={days} />}</div>
+      </div>}
   </>;
 }
 
-function PersonCard({ m, onOpen }: { m: PersonMetrics; onOpen: () => void }) {
-  const focus = reportFocus(m); const o = outcomeCounts(m.raisedByStatus);
-  const stats: [string, ReactNode][] =
-    focus === 'developer' ? [['Assigned', m.owned], ['Fixed', m.fixed], ['Reopened', m.ownedReopened], ['Avg. fix', durationText(m.avgFixDays)]]
-    : focus === 'qa' ? [['Validated', m.validated], ['Rejected', m.rejected], ['Retests', `${m.qaPassed}✓ ${m.qaFailed}✗`], ['Pass rate', pct(passRate(m))]]
-    : focus === 'admin' ? [['Raised', m.raised], ['Validated', m.validated], ['Rejected', m.rejected], ['Revalidated', m.revalidated]]
-    : [['Raised', m.raised], ['Fixed', o.fixed], ['Not a bug', o.notabug], ['Accepted', pct(acceptanceRate(m))]];
-  const strip = focus === 'developer' ? m.ownedByPriority : m.raisedByPriority;
-  return <button type="button" className="bf-person-card" onClick={onOpen}>
-    <span className="bf-person-head"><span className="bf-avatar !size-10 !text-[13px]">{initials(m.name)}</span>
-      <span className="min-w-0"><strong className="block truncate">{m.name}</strong><small>{roleName(m.role) || FOCUS_LABEL[focus]}{!m.current && ' · former member'}</small></span>
-      <ArrowUpRight size={16} className="bf-person-go" /></span>
-    <span className="bf-person-stats">{stats.map(([k, v]) => <span key={k}><b>{v}</b><small>{k}</small></span>)}</span>
-    <span className="bf-person-strip-label">{focus === 'developer' ? 'Assigned bugs by priority' : 'Raised bugs by priority'}</span>
-    <PriorityStrip counts={strip} />
-  </button>;
+/** Short summary for the people list. */
+function keyMetric(m: PersonMetrics) {
+  switch (reportFocus(m)) {
+    case 'developer': return `${m.fixed} fixed · ${m.owned} assigned`;
+    case 'qa': return `${m.validated} validated · ${m.qaPassed + m.qaFailed} retests`;
+    case 'admin': return `${m.raised} raised · ${m.validated} validated`;
+    default: return `${m.raised} raised · ${outcomeCounts(m.raisedByStatus).fixed} fixed`;
+  }
 }
 
-/** One-line stacked bar of P0–P5 counts, coloured like the priority badges. */
-function PriorityStrip({ counts }: { counts: Counts }) {
-  const total = PRIORITIES.reduce((n, p) => n + (counts[p] ?? 0), 0);
-  if (!total) return <span className="bf-pstrip bf-pstrip-empty">No bugs yet</span>;
-  return <span className="bf-pstrip" role="img" aria-label={PRIORITIES.filter(p => counts[p]).map(p => `${p}: ${counts[p]}`).join(', ')}>
-    {PRIORITIES.filter(p => counts[p]).map(p => <i key={p} data-pri={p} style={{ flexGrow: counts[p] }} title={`${p} · ${priorityNames[p]}: ${counts[p]}`}>{p} · {counts[p]}</i>)}
-  </span>;
+/** Thin P0–P5 bar under each name in the list. */
+function MiniStrip({ counts }: { counts: Counts }) {
+  const shown = PRIORITIES.filter(p => counts[p]);
+  if (!shown.length) return null;
+  return <span className="bf-ministrip" aria-hidden="true">{shown.map(p => <i key={p} data-pri={p} style={{ flexGrow: counts[p] }} />)}</span>;
 }
 
 /* ───────────── Detail: everything about one person ───────────── */
 
-function PersonDetailView({ person, days, setDays, onBack }: { person: string; days: Days; setDays: (d: Days) => void; onBack: () => void }) {
+function PersonDetailView({ person, days }: { person: string; days: Days }) {
   const fetch = useServerFn(getPersonDetail); const severities = useSeverities();
   const q = useQuery({ queryKey: ['person-detail', person, days], queryFn: () => fetch({ data: { person, days } }), retry: 1, staleTime: 30000 });
   const d = q.data; const m = d?.metrics;
-  return <>
-    <div className="bf-toolbar">
-      <Button variant="outline" size="sm" onClick={onBack}><ArrowLeft />All people</Button>
-      <span className="flex-1" />
-      <ThemedSelect label="Period" value={String(days)} onChange={v => setDays(Number(v) as Days)} options={ACTIVITY_PERIODS} />
-    </div>
-    {q.isError && <ErrorNotice message={actionError(q.error, 'This report could not load.')} onRetry={() => q.refetch()} retrying={q.isFetching} />}
-    {!m ? (q.isPending && <p className="text-sm text-muted-foreground">Loading report…</p>) : <PersonReport m={m} trend={d.trend} recent={d.recent} severities={severities} periodLabel={days ? `last ${days} days` : 'all time'} />}
-  </>;
+  if (q.isError) return <ErrorNotice message={actionError(q.error, 'This report could not load.')} onRetry={() => q.refetch()} retrying={q.isFetching} />;
+  if (!m) return <div className="bf-report-loading" role="status"><span /><span /><span /></div>;
+  return <PersonReport m={m} trend={d.trend} recent={d.recent} severities={severities} periodLabel={days ? `last ${days} days` : 'all time'} />;
 }
 
 function PersonReport({ m, trend, recent, severities, periodLabel }: { m: PersonMetrics; trend: { week: string; raised: number; fixed: number }[]; recent: PersonRecentBug[]; severities: readonly string[]; periodLabel: string }) {

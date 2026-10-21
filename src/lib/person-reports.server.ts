@@ -62,11 +62,12 @@ export async function personMetrics(days: number, person?: string): Promise<Pers
   }));
 }
 
-/** Everyone with any recorded work in the period, busiest first. */
+/** All current members, plus former members with recorded work; current first, then busiest, then by name. */
 export async function personOverview(days: number) {
   const all = await personMetrics(days);
   const work = (m: PersonMetrics) => m.raised + m.owned + m.sentToQa + m.validated + m.rejected + m.revalidated + m.needsInfo + m.qaPassed + m.qaFailed;
-  return all.filter(m => work(m) > 0).sort((a, b) => work(b) - work(a) || a.name.localeCompare(b.name));
+  return all.filter(m => (m.current && m.role) || work(m) > 0)
+    .sort((a, b) => Number(b.current) - Number(a.current) || work(b) - work(a) || a.name.localeCompare(b.name));
 }
 
 export async function personDetail(days: number, person: string): Promise<PersonDetail> {
