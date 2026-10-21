@@ -45,6 +45,17 @@ export function mayUpdateStatus(actor:BugActor,bug:{status:Status;reporterId:str
   if(['NOT_A_BUG','DUPLICATE','WONT_FIX'].includes(to))return actor.permissions.includes('disposition')&&canTransition('developer',bug.status,to);
   return ((to==='IN_PROGRESS'&&actor.permissions.includes('progress'))||(to==='RECHECK'&&actor.permissions.includes('recheck'))||(to==='NEEDS_INFORMATION'&&actor.permissions.includes('progress')))&&canTransition('developer',bug.status,to);
 }
+/** Steps from the bug's status to the target that this actor may make, e.g. NEW→VALIDATING→VALIDATED→READY_FOR_ASSIGNMENT. */
+export function statusPath(actor:BugActor,bug:{status:Status;reporterId:string;assigneeId:string|null},to:Status):[string,string][]|null{
+ if(bug.status===to)return null;
+ const queue:{at:Status;path:[string,string][]}[]=[{at:bug.status,path:[]}];const seen=new Set<string>([bug.status]);
+ while(queue.length){const {at,path}=queue.shift()!;if(path.length>=4)continue;
+  for(const next of STATUSES){if(seen.has(next)||!mayUpdateStatus(actor,{...bug,status:at},next))continue;const p:[string,string][]=[...path,[at,next]];if(next===to)return p;
+   // Only pass through triage steps; never jump across development or closing statuses implicitly.
+   if(['VALIDATING','VALIDATED','READY_FOR_ASSIGNMENT'].includes(next)){seen.add(next);queue.push({at:next,path:p});}}}
+ return null;
+}
+
 export function allowedStatuses(actor:BugActor,bug:{status:Status;reporterId:string;assigneeId:string|null}) {return STATUSES.filter(to=>mayUpdateStatus(actor,bug,to));}
 export function mayVerify(actor:BugActor,bug:{status:Status;assigneeId:string|null}) {return actor.role==='qa'&&actor.permissions.includes('verify')&&bug.status==='RECHECK'&&bug.assigneeId!==actor.userId;}
 export function formatBugCode(id:string) {return `BF-${id.padStart(6,'0')}`;}export type LastChange = {by:string;via:string;action:string;at:string}|null;

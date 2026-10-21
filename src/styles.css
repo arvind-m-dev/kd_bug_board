@@ -729,3 +729,28 @@ body { font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; 
 @media (max-width: 720px) { .bf-ov-row-main, .bf-ov-row-three { grid-template-columns: 1fr; } .bf-ov-recent .bf-status-pill { display: none; } }
 /* Team list fills its panel (row height comes from Recent activity) and scrolls inside it. */
 .bf-ov-panel > .bf-ov-team { max-height: none; flex: 1 1 0; min-height: 240px; overflow-y: auto; }
+
+/* ───────────── Bug rows: one-click status steps and assignment ───────────── */
+.bf-rowstatus { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.bf-status-trigger { cursor: pointer; transition: filter .12s, box-shadow .12s; }
+.bf-status-trigger:hover:not(:disabled) { filter: brightness(1.15); box-shadow: 0 0 0 2px color-mix(in oklab, currentColor 25%, transparent); }
+.bf-status-trigger:disabled { cursor: default; }
+.bf-status-trigger svg { opacity: .75; }
+.bf-quick { display: flex; flex-wrap: wrap; gap: 4px; }
+.bf-quick-btn { --q: var(--muted-foreground); display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 9px; border-radius: 7px; font-size: 12px; font-weight: 600; color: var(--q); background: color-mix(in oklab, var(--q) 10%, transparent); border: 1px solid color-mix(in oklab, var(--q) 28%, transparent); cursor: pointer; transition: background .12s; white-space: nowrap; }
+.bf-quick-btn:hover:not(:disabled) { background: color-mix(in oklab, var(--q) 20%, transparent); }
+.bf-quick-btn:disabled { opacity: .5; cursor: progress; }
+.bf-quick-btn[data-tone=success] { --q: var(--success); } .bf-quick-btn[data-tone=danger] { --q: var(--destructive); } .bf-quick-btn[data-tone=primary] { --q: var(--primary); }
+.bf-note-chip { padding: 3px 9px; border-radius: 999px; font-size: 12px; color: var(--foreground); background: var(--muted); border: 1px solid transparent; cursor: pointer; }
+.bf-note-chip:hover, .bf-note-chip[data-active] { border-color: var(--primary); color: var(--primary); }
+.bf-note-input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--foreground); font: 13px var(--font-sans); resize: vertical; }
+.bf-note-input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.bf-assign-trigger { display: inline-flex; align-items: center; gap: 7px; max-width: 190px; height: 30px; padding: 0 10px 0 6px; border-radius: 8px; font-size: 13px; color: var(--foreground); background: var(--card); border: 1px solid var(--border); cursor: pointer; transition: border-color .12s, background .12s; }
+.bf-assign-trigger:hover { border-color: color-mix(in oklab, var(--primary) 55%, var(--border)); }
+.bf-assign-trigger[data-empty] { padding-left: 9px; color: var(--primary); border-style: dashed; border-color: color-mix(in oklab, var(--primary) 45%, var(--border)); background: color-mix(in oklab, var(--primary) 6%, transparent); }
+.bf-assign-trigger svg:last-child { flex-shrink: 0; opacity: .6; }
+.bf-owner { font-size: 13px; }
+.bf-dot[data-tone] { color: var(--t); } .bf-dot[data-tone=danger] { --t: var(--destructive); }
+.bf-cell-status { min-width: 190px; }
+.bf-inline-note { display: grid; gap: 6px; width: 260px; padding: 10px; border-radius: 10px; background: var(--card); border: 1px solid color-mix(in oklab, var(--primary) 40%, var(--border)); box-shadow: var(--shadow-lift); animation: bf-rise .18s ease both; white-space: normal; }
+.bf-inline-note strong { font-size: 12.5px; } .bf-inline-note strong span { font-weight: 400; color: var(--muted-foreground); }

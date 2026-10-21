@@ -100,3 +100,20 @@ describe('names with roles', () => {
     expect(nameWithRole('Sam', '')).toBe('Sam');
   });
 });
+
+import { statusPath } from '@/lib/bug-workflow';
+describe('one-click triage paths', () => {
+  const admin = { role: 'admin' as const, permissions: ['view', 'report', 'comment', 'evidence', 'validate', 'assign'], userId: 'a', portalId: 'p', name: 'A' };
+  const dev = { role: 'developer' as const, permissions: ['view', 'progress', 'recheck'], userId: 'd', portalId: 'p', name: 'D' };
+  const bug = (status: string) => ({ status: status as never, reporterId: 'r', assigneeId: 'd' });
+  it('validates a new bug in one go, recording every step', () => {
+    expect(statusPath(admin, bug('NEW'), 'READY_FOR_ASSIGNMENT')).toEqual([['NEW', 'VALIDATING'], ['VALIDATING', 'VALIDATED'], ['VALIDATED', 'READY_FOR_ASSIGNMENT']]);
+  });
+  it('uses the direct move when there is one', () => {
+    expect(statusPath(admin, bug('NEW'), 'VALIDATING')).toEqual([['NEW', 'VALIDATING']]);
+  });
+  it('never lets people skip steps they are not allowed to make', () => {
+    expect(statusPath(dev, bug('NEW'), 'READY_FOR_ASSIGNMENT')).toBeNull();
+    expect(statusPath(admin, bug('NEW'), 'RESOLVED')).toBeNull();
+  });
+});
