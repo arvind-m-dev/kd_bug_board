@@ -18,6 +18,7 @@ import { Route as AdminAssignmentsRouteImport } from './routes/admin_.assignment
 import { Route as AdminBugsRouteImport } from './routes/admin_.bugs'
 import { Route as AdminNotificationsRouteImport } from './routes/admin_.notifications'
 import { Route as AdminProjectsRouteImport } from './routes/admin_.projects'
+import { Route as AdminReportsRouteImport } from './routes/admin_.reports'
 import { Route as AdminSettingsRouteImport } from './routes/admin_.settings'
 import { Route as AdminUsersRouteImport } from './routes/admin_.users'
 import { Route as DeveloperPortalTokenRouteImport } from './routes/developer.$portalToken'
@@ -70,6 +71,11 @@ const AdminProjectsRoute = AdminProjectsRouteImport.update({
   path: '/admin/projects',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/admin_/reports',
+  path: '/admin/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
   id: '/admin_/settings',
   path: '/admin/settings',
@@ -111,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/admin/bugs': typeof AdminBugsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/projects': typeof AdminProjectsRoute
+  '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/developer/$portalToken': typeof DeveloperPortalTokenRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByTo {
   '/admin/bugs': typeof AdminBugsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/projects': typeof AdminProjectsRoute
+  '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/developer/$portalToken': typeof DeveloperPortalTokenRoute
@@ -146,6 +154,7 @@ export interface FileRoutesById {
   '/admin_/bugs': typeof AdminBugsRoute
   '/admin_/notifications': typeof AdminNotificationsRoute
   '/admin_/projects': typeof AdminProjectsRoute
+  '/admin_/reports': typeof AdminReportsRoute
   '/admin_/settings': typeof AdminSettingsRoute
   '/admin_/users': typeof AdminUsersRoute
   '/developer/$portalToken': typeof DeveloperPortalTokenRoute
@@ -165,6 +174,7 @@ export interface FileRouteTypes {
     | '/admin/bugs'
     | '/admin/notifications'
     | '/admin/projects'
+    | '/admin/reports'
     | '/admin/settings'
     | '/admin/users'
     | '/developer/$portalToken'
@@ -182,6 +192,7 @@ export interface FileRouteTypes {
     | '/admin/bugs'
     | '/admin/notifications'
     | '/admin/projects'
+    | '/admin/reports'
     | '/admin/settings'
     | '/admin/users'
     | '/developer/$portalToken'
@@ -199,6 +210,7 @@ export interface FileRouteTypes {
     | '/admin_/bugs'
     | '/admin_/notifications'
     | '/admin_/projects'
+    | '/admin_/reports'
     | '/admin_/settings'
     | '/admin_/users'
     | '/developer/$portalToken'
@@ -217,6 +229,7 @@ export interface RootRouteChildren {
   AdminBugsRoute: typeof AdminBugsRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminProjectsRoute: typeof AdminProjectsRoute
+  AdminReportsRoute: typeof AdminReportsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   DeveloperPortalTokenRoute: typeof DeveloperPortalTokenRoute
@@ -290,6 +303,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminProjectsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/reports': {
+      id: '/admin_/reports'
+      path: '/admin/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin_/settings': {
       id: '/admin_/settings'
       path: '/admin/settings'
@@ -345,6 +365,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminBugsRoute: AdminBugsRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminProjectsRoute: AdminProjectsRoute,
+  AdminReportsRoute: AdminReportsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminUsersRoute: AdminUsersRoute,
   DeveloperPortalTokenRoute: DeveloperPortalTokenRoute,

@@ -2,7 +2,7 @@ import { Link, useRouterState } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { useState } from 'react';
-import { Bug, LayoutDashboard, UsersRound, ListChecks, FolderKanban, Activity, Settings2, ChevronDown, ChevronRight, ChevronsUpDown, Search, Bell, Menu, X, ArrowUpRight, ShieldCheck, Database, CircleHelp, Code2, ClipboardCheck, MessageSquare, Link2, Plus, ExternalLink, Copy, FileDown, SlidersHorizontal, Clock3, CircleAlert, Check, RefreshCw, Upload, LockKeyhole, Mail, ArrowLeft, Layers3, CalendarDays } from 'lucide-react';
+import { Bug, ChartPie, LayoutDashboard, UsersRound, ListChecks, FolderKanban, Activity, Settings2, ChevronDown, ChevronRight, ChevronsUpDown, Search, Bell, Menu, X, ArrowUpRight, ShieldCheck, Database, CircleHelp, Code2, ClipboardCheck, MessageSquare, Link2, Plus, ExternalLink, Copy, FileDown, SlidersHorizontal, Clock3, CircleAlert, Check, RefreshCw, Upload, LockKeyhole, Mail, ArrowLeft, Layers3, CalendarDays } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,18 +20,19 @@ import { ThemeToggle } from './theme-toggle';
 import { ThemedSelect } from './themed-select';
 import { ErrorNotice, actionError } from './action-feedback';
 import { ActivityView } from './activity-view';
+import { TeamReports } from './team-reports';
 import { notificationLabel } from '@/lib/notifications';
 import { SignOutButton } from './sign-out';
 import { getBugWorkspace } from '@/lib/bug-workflow.functions';
 import { getMembers } from '@/lib/portal-access.functions';
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 
-type View = 'overview'|'bugs'|'users'|'assignments'|'projects'|'activity'|'settings'|'portals'|'notifications';
-const navigation: {to:'/admin'|'/admin/bugs'|'/admin/users'|'/admin/assignments'|'/admin/projects'|'/admin/activity'|'/admin/settings'|'/portals';label:string;icon:LucideIcon;count?:boolean}[] = [
- {to:'/admin',label:'Overview',icon:LayoutDashboard}, {to:'/admin/bugs',label:'All bugs',icon:Bug,count:true}, {to:'/admin/assignments',label:'Assignments',icon:ListChecks,count:true}, {to:'/admin/projects',label:'Projects & modules',icon:FolderKanban}, {to:'/admin/users',label:'Team & access',icon:UsersRound,count:true}, {to:'/admin/activity',label:'Activity & reports',icon:Activity}, {to:'/admin/settings',label:'Settings',icon:Settings2}
+type View = 'overview'|'bugs'|'users'|'assignments'|'projects'|'activity'|'reports'|'settings'|'portals'|'notifications';
+const navigation: {to:'/admin'|'/admin/bugs'|'/admin/users'|'/admin/assignments'|'/admin/projects'|'/admin/activity'|'/admin/reports'|'/admin/settings'|'/portals';label:string;icon:LucideIcon;count?:boolean}[] = [
+ {to:'/admin',label:'Overview',icon:LayoutDashboard}, {to:'/admin/bugs',label:'All bugs',icon:Bug,count:true}, {to:'/admin/assignments',label:'Assignments',icon:ListChecks,count:true}, {to:'/admin/projects',label:'Projects & modules',icon:FolderKanban}, {to:'/admin/users',label:'Team & access',icon:UsersRound,count:true}, {to:'/admin/activity',label:'Activity & reports',icon:Activity}, {to:'/admin/reports',label:'Team reports',icon:ChartPie}, {to:'/admin/settings',label:'Settings',icon:Settings2}
 ];
-const titles: Record<View,string> = {overview:'Overview',bugs:'All bugs',users:'Team & access',assignments:'Assignments',projects:'Projects & modules',activity:'Activity & reports',settings:'Settings',portals:'Member portals',notifications:'Notifications'};
-const subtitles: Record<View,string> = {overview:'A clear view of your bugs, team, and everything in between.',bugs:'Track, prioritize, and manage every reported issue.',users:'Manage your team and their access to Futurist Global Bug Board.',assignments:'Keep the right bugs with the right people.',projects:'Organize testing across your applications and modules.',activity:'Every change, with the complete story behind it.',settings:'Workspace preferences, security, and connected services.',portals:'Your members and their private portal access.',notifications:'Every bug update from the last 10 days.'};
+const titles: Record<View,string> = {overview:'Overview',bugs:'All bugs',users:'Team & access',assignments:'Assignments',projects:'Projects & modules',activity:'Activity & reports',reports:'Team reports',settings:'Settings',portals:'Member portals',notifications:'Notifications'};
+const subtitles: Record<View,string> = {overview:'A clear view of your bugs, team, and everything in between.',bugs:'Track, prioritize, and manage every reported issue.',users:'Manage your team and their access to Futurist Global Bug Board.',assignments:'Keep the right bugs with the right people.',projects:'Organize testing across your applications and modules.',reports:'How each person is doing — what they raised, fixed, rejected and how fast.',activity:'Every change, with the complete story behind it.',settings:'Workspace preferences, security, and connected services.',portals:'Your members and their private portal access.',notifications:'Every bug update from the last 10 days.'};
 const portalTypes: {name:string;role:string;icon:LucideIcon;tone:string;desc:string}[] = [
  {name:'Reporter portal',role:'reporter',icon:MessageSquare,tone:'teal',desc:'Report bugs & follow progress'},
  {name:'QA portal',role:'qa',icon:ClipboardCheck,tone:'info',desc:'Validate, assign & verify fixes'},
@@ -53,7 +54,7 @@ export function Workspace({view='overview'}:{view?:View}) {
    
    <nav className="bf-nav">{navigation.slice(0,3).map(n=><Link key={n.to} to={n.to} activeOptions={{exact:true}} className="bf-nav-link" data-status={n.to==='/admin'&&pathname==='/'?'active':undefined} onClick={()=>setMenu(false)}><n.icon/>{n.label}{n.count&&<span className="bf-nav-count">{navCounts[n.to]??'—'}</span>}</Link>)}</nav>
    <div className="bf-nav-label mt-7">Management</div>
-   <nav className="bf-nav">{navigation.slice(4,6).map(n=><Link key={n.to} to={n.to} activeOptions={{exact:true}} className="bf-nav-link" onClick={()=>setMenu(false)}><n.icon/>{n.label}{n.count&&<span className="bf-nav-count">{navCounts[n.to]??'—'}</span>}</Link>)}</nav>
+   <nav className="bf-nav">{navigation.slice(4,7).map(n=><Link key={n.to} to={n.to} activeOptions={{exact:true}} className="bf-nav-link" onClick={()=>setMenu(false)}><n.icon/>{n.label}{n.count&&<span className="bf-nav-count">{navCounts[n.to]??'—'}</span>}</Link>)}</nav>
    <div className="bf-nav-label mt-7">Portals</div><nav className="bf-nav"><Link to="/portals" className="bf-nav-link" onClick={()=>setMenu(false)}><Link2/>Member portals</Link></nav>
    <div className="bf-sidebar-bottom"><Link to="/admin/settings" activeOptions={{exact:true}} className="bf-nav-link mb-2" onClick={()=>setMenu(false)}><Settings2/>Settings</Link>
    <Button variant="ghost" className="mb-3 w-full justify-start text-xs text-muted-foreground" onClick={()=>setDialog('help')}><CircleHelp size={16}/>Help & support</Button>
@@ -62,7 +63,7 @@ export function Workspace({view='overview'}:{view?:View}) {
   <div className="bf-body"><header className="bf-topbar"><div className="bf-topbar-left"><Button variant="ghost" size="icon" className="bf-mobile-menu" aria-label={menu?'Close navigation':'Open navigation'} onClick={()=>setMenu(!menu)}>{menu?<X/>:<Menu/>}</Button><Breadcrumb><BreadcrumbList className="text-xs"><BreadcrumbItem><BreadcrumbLink asChild><Link to="/admin">Workspace</Link></BreadcrumbLink></BreadcrumbItem><BreadcrumbSeparator/><BreadcrumbItem><BreadcrumbPage>{titles[view]}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb></div><div className="bf-topbar-right"><ThemeToggle/><Button size="icon" variant="ghost" aria-label="Search workspace" title="Search workspace" onClick={()=>setDialog('search')}><Search size={17}/></Button><NotificationMenu/><span className="h-5 border-l"/><SignOutButton/></div></header>
   <main className="bf-main"><div className="bf-page-heading"><div><h1>{titles[view]}</h1><p>{subtitles[view]}</p></div><div className="bf-page-actions">{(view==='users'||view==='portals')?<Button size="sm" onClick={()=>setDialog('user')}><Plus/>Add member</Button>:view==='projects'?<Button size="sm" onClick={()=>setDialog('project')}><Plus/>New project</Button>:view==='activity'?<Button size="sm" variant="outline" onClick={()=>setDialog('export')}><FileDown/>Export report</Button>:null}</div></div>
   <AdminAccess showAccount={false}>
-   {view==='overview'?<DashboardSummary/>:view==='bugs'?<AdminBugs/>:view==='users'?<UsersView onDialog={setDialog}/>:view==='assignments'?<AdminBugs assignmentsOnly/>:view==='projects'?<ProjectsView onDialog={setDialog}/>:view==='activity'?<ActivityView/>:view==='settings'?<SettingsView onAddMember={()=>setDialog('user')}/>:view==='notifications'?<NotificationsPage/>:<PortalsView/>}
+   {view==='overview'?<DashboardSummary/>:view==='bugs'?<AdminBugs/>:view==='users'?<UsersView onDialog={setDialog}/>:view==='assignments'?<AdminBugs assignmentsOnly/>:view==='projects'?<ProjectsView onDialog={setDialog}/>:view==='activity'?<ActivityView/>:view==='reports'?<TeamReports/>:view==='settings'?<SettingsView onAddMember={()=>setDialog('user')}/>:view==='notifications'?<NotificationsPage/>:<PortalsView/>}
   </AdminAccess><footer className="bf-footer"><span>Futurist Global Bug Board <span className="mx-1">·</span> Every bug. One place.</span><span className="flex items-center gap-2"><ShieldCheck size={12}/>Private portals · Shared records</span></footer></main></div>
   <WorkspaceDialog kind={dialog} close={()=>setDialog(null)}/>
  </div>;
