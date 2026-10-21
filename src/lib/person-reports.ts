@@ -20,7 +20,7 @@ export type PersonMetrics = {
   changes: number;
 };
 export type PersonTrendWeek = { week: string; raised: number; fixed: number };
-export type PersonRecentBug = { id: string; code: string; title: string; status: string; priority: string; severity: string; relation: 'raised' | 'assigned' | 'both'; updatedAt: string };
+export type PersonRecentBug = { id: string; code: string; title: string; status: string; priority: string; severity: string; relation: 'raised' | 'assigned' | 'both' | 'team'; updatedAt: string };
 export type PersonDetail = { metrics: PersonMetrics; trend: PersonTrendWeek[]; recent: PersonRecentBug[] };
 
 const CLOSED = ['RESOLVED', 'NOT_A_BUG', 'DUPLICATE', 'WONT_FIX'];
@@ -61,4 +61,20 @@ export function reportFocus(m: PersonMetrics): 'tester' | 'developer' | 'qa' | '
   if (m.role === 'qa') return 'qa';
   if (m.role === 'admin') return 'admin';
   return 'tester';
+}
+
+/** Whole-team totals: sums of everyone's numbers; average fix time is weighted by fixes. */
+export function teamMetrics(people: PersonMetrics[]): PersonMetrics {
+  const sum = (k: keyof PersonMetrics) => people.reduce((n, p) => n + (p[k] as number), 0);
+  const merge = (k: 'raisedByPriority' | 'raisedBySeverity' | 'raisedByStatus' | 'ownedByPriority') => people.reduce<Counts>((acc, p) => { for (const [x, n] of Object.entries(p[k])) acc[x] = (acc[x] ?? 0) + n; return acc; }, {});
+  const timed = people.filter(p => p.avgFixDays != null && p.fixed > 0);
+  const fixedTimed = timed.reduce((n, p) => n + p.fixed, 0);
+  return {
+    id: 'team', name: 'Whole team', role: 'team', current: true,
+    raised: sum('raised'), raisedByPriority: merge('raisedByPriority'), raisedBySeverity: merge('raisedBySeverity'), raisedByStatus: merge('raisedByStatus'),
+    raisedReopened: sum('raisedReopened'), raisedRevalidated: sum('raisedRevalidated'),
+    owned: sum('owned'), ownedOpen: sum('ownedOpen'), ownedByPriority: merge('ownedByPriority'), sentToQa: sum('sentToQa'), fixed: sum('fixed'),
+    avgFixDays: fixedTimed ? timed.reduce((n, p) => n + p.avgFixDays! * p.fixed, 0) / fixedTimed : null, ownedReopened: sum('ownedReopened'),
+    validated: sum('validated'), rejected: sum('rejected'), revalidated: sum('revalidated'), needsInfo: sum('needsInfo'), qaPassed: sum('qaPassed'), qaFailed: sum('qaFailed'), changes: sum('changes'),
+  };
 }

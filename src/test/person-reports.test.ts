@@ -25,3 +25,17 @@ describe('person reports', () => {
     expect(personReportQuerySchema.safeParse({ person: crypto.randomUUID(), days: 30 }).success).toBe(true);
   });
 });
+
+import { teamMetrics } from '@/lib/person-reports';
+describe('whole-team totals', () => {
+  it('sums counts and weights the average fix time by fixes', () => {
+    const a = { ...base, id: 'a', raised: 3, raisedByPriority: { P0: 1, P2: 2 }, fixed: 1, avgFixDays: 2 };
+    const b = { ...base, id: 'b', raised: 2, raisedByPriority: { P2: 1, P3: 1 }, fixed: 3, avgFixDays: 6 };
+    const t = teamMetrics([a, b]);
+    expect(t.name).toBe('Whole team');
+    expect(t.raised).toBe(5);
+    expect(t.raisedByPriority).toEqual({ P0: 1, P2: 3, P3: 1 });
+    expect(t.fixed).toBe(4);
+    expect(t.avgFixDays).toBe(5); // (2×1 + 6×3) / 4
+  });
+});

@@ -6,9 +6,9 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipProps } from 'recharts';
 import { Search, UsersRound } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { getPersonDetail, getPersonOverview } from '@/lib/person-reports.functions';
+import { getPersonDetail, getPersonOverview, getTeamDetail } from '@/lib/person-reports.functions';
 import { getBugWorkspace } from '@/lib/bug-workflow.functions';
-import { OUTCOMES, acceptanceRate, outcomeCounts, passRate, reportFocus, type Counts, type PersonMetrics, type PersonRecentBug } from '@/lib/person-reports';
+import { OUTCOMES, acceptanceRate, outcomeCounts, passRate, reportFocus, teamMetrics, type Counts, type PersonMetrics, type PersonRecentBug } from '@/lib/person-reports';
 import { durationText, roleName, statusText } from '@/lib/activity';
 import { periodLabel as describePeriod, viewerTimeZone, type Period } from '@/lib/period';
 import { PeriodPicker } from './period-picker';
@@ -27,6 +27,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 /** The four numbers that matter most for this person's role. */
 function headline(m: PersonMetrics, o: ReturnType<typeof outcomeCounts>): [string, ReactNode][] {
+  if (m.role === 'team') return [['Bugs raised', m.raised], ['Fixed & verified', o.fixed], ['Reopened', m.ownedReopened], ['Avg. fix time', durationText(m.avgFixDays)]];
   switch (reportFocus(m)) {
     case 'developer': return [['Assigned', m.owned], ['Sent to QA', m.sentToQa], ['Fixed', m.fixed], ['Reopened', m.ownedReopened]];
     case 'qa': return [['Validated', m.validated], ['Rejected', m.rejected], ['Retests', m.qaPassed + m.qaFailed], ['Pass rate', pct(passRate(m))]];
@@ -49,16 +50,19 @@ export function TeamReports() {
   const [period, setPeriod] = useState<Period>({ days: 0 }); const tz = useMemo(viewerTimeZone, []); const [role, setRole] = useState('all'); const [text, setText] = useState('');
   const q = useQuery({ queryKey: ['person-overview', period], queryFn: () => fetch({ data: { ...period, tz } }), placeholderData: keepPreviousData, retry: 1, staleTime: 30000, refetchInterval: 60000 });
   const people = useMemo(() => (q.data ?? []).filter(m => (role === 'all' || reportFocus(m) === role) && m.name.toLowerCase().includes(text.trim().toLowerCase())), [q.data, role, text]);
-  // Selected person: from the URL when they're in the list, otherwise the first person shown.
-  const selected = people.find(m => m.id === search.person) ?? people[0];
-  const select = (id: string) => void navigate({ to: '/admin/reports', search: { person: id }, replace: true });
+  // Selected person from the URL; none selected shows the whole team. Clicking the selected person again deselects.
+  const selected = people.find(m => m.id === search.person) ?? null;
+  const select = (id: string | null) => void navigate({ to: '/admin/reports', search: id ? { person: id } : {}, replace: true });
+  const toggle = (id: string) => select(selected?.id === id ? null : id);
   // Keep the highlighted name visible (the list scrolls sideways on phones).
-  useEffect(() => { if (selected) document.getElementById(`person-${selected.id}`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [selected?.id]);
+  useEffect(() => { document.getElementById(selected ? `person-${selected.id}` : 'person-team')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [selected?.id]);
   function onKey(e: KeyboardEvent<HTMLUListElement>) {
-    if (!selected || !['ArrowDown', 'ArrowUp'].includes(e.key)) return;
+    if (!['ArrowDown', 'ArrowUp'].includes(e.key)) return;
     e.preventDefault();
-    const i = people.findIndex(m => m.id === selected.id); const next = people[Math.min(people.length - 1, Math.max(0, i + (e.key === 'ArrowDown' ? 1 : -1)))];
-    if (next) { select(next.id); requestAnimationFrame(() => document.getElementById(`person-${next.id}`)?.focus()); }
+    // -1 = Whole team, then each person.
+    const i = selected ? people.findIndex(m => m.id === selected.id) : -1; const j = Math.min(people.length - 1, Math.max(-1, i + (e.key === 'ArrowDown' ? 1 : -1)));
+    const next = j < 0 ? null : people[j]!; select(next?.id ?? null);
+    requestAnimationFrame(() => document.getElementById(next ? `person-${next.id}` : 'person-team')?.focus());
   }
   return <>
     <div className="bf-toolbar">
@@ -72,16 +76,20 @@ export function TeamReports() {
       : <div className="bf-reports">
         <aside className="bf-people" aria-label="Team members">
           <p className="bf-people-count">{plural(people.length, 'person').replace('persons', 'people')}</p>
-          <ul role="listbox" aria-label="Choose a person" aria-activedescendant={selected ? `person-${selected.id}` : undefined} onKeyDown={onKey}>
+          <ul role="listbox" aria-label="Choose a person" aria-activedescendant={selected ? `person-${selected.id}` : 'person-team'} onKeyDown={onKey}>
+            <li><button type="button" id="person-team" role="option" aria-selected={!selected} tabIndex={selected ? -1 : 0} className="bf-person-item bf-person-team" onClick={() => select(null)}>
+              <span className="bf-avatar !size-9"><UsersRound size={16} /></span>
+              <span className="min-w-0 flex-1"><strong className="block truncate">Whole team</strong><small className="block truncate">Totals across {plural((q.data ?? []).length, 'person').replace('persons', 'people')}</small></span>
+            </button></li>
             {people.map(m => { const on = m.id === selected?.id; const focus = reportFocus(m); return <li key={m.id}>
-              <button type="button" id={`person-${m.id}`} role="option" aria-selected={on} tabIndex={on ? 0 : -1} className="bf-person-item" onClick={() => select(m.id)} onMouseEnter={() => prefetch(m.id)} onFocus={() => prefetch(m.id)}>
+              <button type="button" id={`person-${m.id}`} role="option" aria-selected={on} tabIndex={on ? 0 : -1} className="bf-person-item" onClick={() => toggle(m.id)} title={on ? 'Click again to show the whole team' : undefined} onMouseEnter={() => prefetch(m.id)} onFocus={() => prefetch(m.id)}>
                 <span className="bf-avatar !size-9 !text-[12px]">{initials(m.name)}</span>
                 <span className="min-w-0 flex-1"><strong className="block truncate">{m.name}</strong><small className="block truncate">{roleName(m.role) || FOCUS_LABEL[focus]}{!m.current && ' · former'} · {keyMetric(m)}</small>
                   <MiniStrip counts={focus === 'developer' ? m.ownedByPriority : m.raisedByPriority} /></span>
               </button></li>; })}
           </ul>
         </aside>
-        <div className="bf-reports-detail" aria-live="polite">{selected && <PersonDetailView person={selected.id} period={period} tz={tz} />}</div>
+        <div className="bf-reports-detail" aria-live="polite">{selected ? <PersonDetailView person={selected.id} period={period} tz={tz} /> : <TeamDetailView people={q.data ?? []} period={period} updating={q.isPlaceholderData} />}</div>
       </div>}
   </>;
 }
@@ -114,8 +122,15 @@ function PersonDetailView({ person, period, tz }: { person: string; period: Peri
   return <div data-updating={q.isPlaceholderData || undefined}><PersonReport m={m} trend={d.trend} recent={d.recent} severities={severities} periodLabel={describePeriod(period)} /></div>;
 }
 
+function TeamDetailView({ people, period, updating }: { people: PersonMetrics[]; period: Period; updating: boolean }) {
+  const fetch = useServerFn(getTeamDetail); const severities = useSeverities();
+  const q = useQuery({ queryKey: ['team-detail'], queryFn: () => fetch(), retry: 1, staleTime: 30000, refetchInterval: 60000 });
+  const m = useMemo(() => teamMetrics(people), [people]);
+  return <div data-updating={updating || undefined}><PersonReport m={m} trend={q.data?.trend ?? []} recent={q.data?.recent ?? []} severities={severities} periodLabel={`${plural(people.length, 'person').replace('persons', 'people')} · ${describePeriod(period)}`} /></div>;
+}
+
 function PersonReport({ m, trend, recent, severities, periodLabel }: { m: PersonMetrics; trend: { week: string; raised: number; fixed: number }[]; recent: PersonRecentBug[]; severities: readonly string[]; periodLabel: string }) {
-  const focus = reportFocus(m); const o = outcomeCounts(m.raisedByStatus);
+  const focus = reportFocus(m); const o = outcomeCounts(m.raisedByStatus); const team = m.role === 'team';
   const showDev = m.owned + m.sentToQa + m.fixed > 0 || focus === 'developer';
   const showTriage = m.validated + m.rejected + m.revalidated + m.needsInfo > 0 || focus === 'qa';
   const showRetests = m.qaPassed + m.qaFailed > 0 || focus === 'qa';
@@ -123,16 +138,20 @@ function PersonReport({ m, trend, recent, severities, periodLabel }: { m: Person
   const sevKeys = [...severities, ...Object.keys(m.raisedBySeverity).filter(s => !severities.includes(s))];
   return <>
     <section className="bf-person-hero">
-      <span className="bf-avatar !size-14 !text-lg">{initials(m.name)}</span>
-      <div className="min-w-0"><h2>{m.name}</h2><p>{roleName(m.role) || FOCUS_LABEL[focus]}{!m.current && ' · former member'} · {periodLabel}</p></div>
+      <span className="bf-avatar !size-14 !text-lg">{team ? <UsersRound size={24} /> : initials(m.name)}</span>
+      <div className="min-w-0"><h2>{m.name}</h2><p>{team ? periodLabel : <>{roleName(m.role) || FOCUS_LABEL[focus]}{!m.current && ' · former member'} · {periodLabel}</>}</p></div>
       <div className="bf-person-hero-stats">{headline(m, o).map(([k, v]) => <span key={k}><b>{v}</b><small>{k}</small></span>)}</div>
     </section>
 
     {showRaised && <>
       <h3 className="bf-report-heading">Bugs raised</h3>
-      <div className="bf-report-grid">
-        <Panel title="Raised by priority" sub={plural(m.raised, 'bug')}><Bars rows={PRIORITIES.map(p => ({ key: p, label: <PriorityBadge value={p} />, value: m.raisedByPriority[p] ?? 0, attr: { 'data-pri': p } }))} /></Panel>
-        <Panel title="Raised by severity" sub={plural(m.raised, 'bug')}><Bars rows={sevKeys.map(s => ({ key: s, label: <SeverityBadge value={s} list={severities} />, value: m.raisedBySeverity[s] ?? 0, attr: { 'data-sev': String(severityLevel(s, severities)) } }))} /></Panel>
+      <div className="bf-report-grid bf-report-grid-raised">
+        <Panel title="Priority & severity" sub={`${plural(m.raised, 'bug')} raised${team ? ' by the team' : ''}`}>
+          <div className="bf-ps">
+            <div><h4>Priority · how soon</h4><Bars rows={PRIORITIES.map(p => ({ key: p, label: <PriorityBadge value={p} />, value: m.raisedByPriority[p] ?? 0, attr: { 'data-pri': p } }))} /></div>
+            <div><h4>Severity · how bad</h4><Bars rows={sevKeys.map(sv => ({ key: sv, label: <SeverityBadge value={sv} list={severities} />, value: m.raisedBySeverity[sv] ?? 0, attr: { 'data-sev': String(severityLevel(sv, severities)) } }))} /></div>
+          </div>
+        </Panel>
         <Panel title="What happened to them" sub="Current outcome of each raised bug">
           <OutcomeDonut counts={o} />
           <div className="bf-report-facts"><Fact label="Accepted as real bugs" value={pct(acceptanceRate(m))} /><Fact label="Reopened after a fix" value={m.raisedReopened} /><Fact label="Revalidated after rejection" value={m.raisedRevalidated} /></div>
@@ -143,7 +162,7 @@ function PersonReport({ m, trend, recent, severities, periodLabel }: { m: Person
     {showDev && <>
       <h3 className="bf-report-heading">Fixing bugs</h3>
       <div className="bf-report-grid">
-        <Panel title="Fix work" sub="Bugs assigned to them">
+        <Panel title="Fix work" sub={team ? 'All assigned work' : 'Bugs assigned to them'}>
           <div className="bf-report-tiles"><Tile label="Assigned" value={m.owned} /><Tile label="Open now" value={m.ownedOpen} /><Tile label="Sent to QA" value={m.sentToQa} /><Tile label="Fixed & verified" value={m.fixed} tone="success" /><Tile label="Reopened" value={m.ownedReopened} tone={m.ownedReopened ? 'danger' : undefined} /><Tile label="Avg. fix time" value={durationText(m.avgFixDays)} /></div>
           <Meter label="First-time fix rate" value={m.fixed + m.ownedReopened ? Math.round((m.fixed / (m.fixed + m.ownedReopened)) * 100) : null} hint="Fixed ÷ (fixed + reopened)" />
         </Panel>
@@ -154,7 +173,7 @@ function PersonReport({ m, trend, recent, severities, periodLabel }: { m: Person
     {(showTriage || showRetests) && <>
       <h3 className="bf-report-heading">Reviews & QA decisions</h3>
       <div className="bf-report-grid">
-        {showTriage && <Panel title="Triage decisions" sub="Status changes they made">
+        {showTriage && <Panel title="Triage decisions" sub={team ? 'Status changes by the team' : 'Status changes they made'}>
           <Bars rows={[{ key: 'v', label: 'Validated', value: m.validated }, { key: 'r', label: <span title="Not a bug, duplicate or won’t fix">Rejected</span>, value: m.rejected }, { key: 'rv', label: 'Revalidated', value: m.revalidated }, { key: 'ni', label: 'Asked for more info', value: m.needsInfo }]} />
         </Panel>}
         {showRetests && <Panel title="Fix retests" sub="QA verifications">
@@ -166,10 +185,10 @@ function PersonReport({ m, trend, recent, severities, periodLabel }: { m: Person
 
     <div className="bf-report-grid bf-report-grid-wide">
       <Panel title="Weekly trend" sub="Raised vs fixed · last 12 weeks" legend={[['Raised', 'var(--viz-1)'], ['Fixed', 'var(--viz-3)']]}><TrendBars data={trend} /></Panel>
-      <Panel title="Recent bugs" sub="Raised by or assigned to them">
-        {recent.length ? <ul className="bf-recent">{recent.map(b => <li key={b.id}>
+      <Panel title="Recent bugs" sub={team ? 'Latest changes across the team' : 'Raised by or assigned to them'}>
+        {recent.length ? <ul className="bf-recent bf-recent-scroll">{recent.map(b => <li key={b.id}>
           <code>{b.code}</code><span className="truncate" title={b.title}>{b.title}</span>
-          <span className="bf-recent-meta"><PriorityBadge value={b.priority} /><span className="bf-tag">{b.relation === 'both' ? 'Raised & fixing' : b.relation === 'raised' ? 'Raised by them' : 'Assigned to them'}</span><span className="bf-recent-status">{statusText(b.status)}</span></span>
+          <span className="bf-recent-meta"><PriorityBadge value={b.priority} />{b.relation !== 'team' && <span className="bf-tag">{b.relation === 'both' ? 'Raised & fixing' : b.relation === 'raised' ? 'Raised by them' : 'Assigned to them'}</span>}<span className="bf-recent-status">{statusText(b.status)}</span></span>
         </li>)}</ul> : <p className="px-5 py-6 text-sm text-muted-foreground">No bugs yet</p>}
       </Panel>
     </div>

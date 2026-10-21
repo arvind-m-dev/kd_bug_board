@@ -16,3 +16,9 @@ export const getPersonDetail = createServerFn({ method: 'POST' })
     const a = await import('./portal-access.server');
     return a.databaseCall(() => s.personDetail(data, data.person));
   });
+
+export const getTeamDetail = createServerFn({ method: 'POST' }).handler(async () => {
+  const s = await import('./person-reports.server');
+  const a = await import('./portal-access.server');
+  return a.databaseCall(() => s.teamDetail());
+});

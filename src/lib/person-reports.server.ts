@@ -98,3 +98,22 @@ export async function personDetail(period: Period & { tz?: string }, person: str
     })),
   };
 }
+
+/** Whole-team trend (raised vs fixed per week) and the latest bugs; the team totals come from personOverview. */
+export async function teamDetail(): Promise<{ trend: PersonDetail['trend']; recent: PersonDetail['recent'] }> {
+  await requireAdmin();
+  const [trend, recent] = await Promise.all([
+    neonQuery(`with weeks as (select generate_series(date_trunc('week', now())-interval '11 weeks', date_trunc('week', now()), '1 week') as wk),
+      b as (select * from bugflow.bugs where deleted_at is null),
+      res as (select sh.bug_id, max(sh.created_at) as at from bugflow.status_history sh join b on b.id=sh.bug_id where sh.new_status='RESOLVED' and b.status='RESOLVED' group by sh.bug_id)
+      select to_char(w.wk,'YYYY-MM-DD') as week,
+        (select count(*) from b where date_trunc('week', b.created_at)=w.wk)::int as raised,
+        (select count(*) from res where date_trunc('week', res.at)=w.wk)::int as fixed
+      from weeks w order by w.wk`),
+    neonQuery(`select b.id, b.title, b.status, b.priority, b.severity, to_json(b.updated_at) as updated_at from bugflow.bugs b where b.deleted_at is null order by b.updated_at desc limit 15`),
+  ]);
+  return {
+    trend: trend.rows.map(r => ({ week: String(r['week']), raised: Number(r['raised']), fixed: Number(r['fixed']) })),
+    recent: recent.rows.map(r => ({ id: String(r['id']), code: formatBugCode(String(r['id'])), title: String(r['title']), status: String(r['status']), priority: String(r['priority']), severity: String(r['severity']), relation: 'team' as const, updatedAt: String(r['updated_at']) })),
+  };
+}
