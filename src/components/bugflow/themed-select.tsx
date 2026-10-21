@@ -35,19 +35,19 @@ export function ThemedMultiSelect({ values, onChange, options, label, placeholde
       <PopoverTrigger asChild disabled={disabled ?? false}>
         <button type="button" aria-label={label} className={cn('flex min-h-9 items-center justify-between gap-2 px-3 py-1 text-left border', trigger, className)}>
           <span className="flex flex-wrap gap-1">
-            {chosen.length === 0 ? <span className="text-muted-foreground">{placeholder ?? label}</span> : chosen.map(o => <span key={o.value} className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[11px] text-foreground">{o.label}</span>)}
+            {chosen.length === 0 ? <span className="text-muted-foreground">{placeholder ?? label}</span> : chosen.map(o => <span key={o.value} className="rounded-md bg-primary/15 px-1.5 py-0.5 text-xs text-foreground">{o.label}</span>)}
           </span>
           <ChevronDown className="size-4 shrink-0 opacity-60" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className={cn(panel, 'w-72')}>
-        <div className="flex items-center justify-between px-2 py-1.5 text-[11px] text-muted-foreground"><span>{values.length} selected</span>{values.length > 0 && <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => onChange([])}><X className="size-3" />Clear</button>}</div>
+        <div className="flex items-center justify-between px-2 py-1.5 text-xs text-muted-foreground"><span>{values.length} selected</span>{values.length > 0 && <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => onChange([])}><X className="size-3" />Clear</button>}</div>
         <div role="listbox" aria-multiselectable="true" aria-label={label} className="max-h-64 overflow-y-auto">
           {options.length === 0 && <p className="px-2 py-3 text-xs text-muted-foreground">No members available.</p>}
           {options.map(o => { const on = values.includes(o.value); return (
             <button key={o.value} type="button" role="option" aria-selected={on} onClick={() => toggle(o.value)} className={cn('flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-primary/10', on && 'bg-primary/15')}>
               <span className={cn('flex size-4 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-border')}>{on && <Check className="size-3" />}</span>
-              <span className="flex-1">{o.label}</span>{o.hint && <span className="text-[10px] uppercase text-muted-foreground">{o.hint}</span>}
+              <span className="flex-1">{o.label}</span>{o.hint && <span className="text-[11.5px] uppercase text-muted-foreground">{o.hint}</span>}
             </button>); })}
         </div>
       </PopoverContent>

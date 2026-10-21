@@ -34,7 +34,7 @@ function Item({ n, onClick }: { n: NotificationItem; onClick?: () => void }) {
     <span className="min-w-0 flex-1">
       <span className="flex items-center gap-2"><strong className="text-sm">{notificationLabel(n.action)}</strong>{n.unread && <span className="bf-notice-dot" data-tone={notificationTone(n.action, n.status)} aria-label="Unread" />}{n.status && <span className="bf-notice-tag ml-auto">{status(n.status)}</span>}</span>
       <span className="block truncate text-xs text-muted-foreground">{n.title || (n.action.startsWith('bug.') ? 'Bug update' : 'Team & access')} · by {n.actor}</span>
-      <span className="block text-[11px] text-muted-foreground">{when(n.at)}</span>
+      <span className="block text-xs text-muted-foreground">{when(n.at)}</span>
     </span>
   </Link>;
 }
