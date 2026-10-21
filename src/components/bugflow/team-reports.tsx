@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipProps } from 'recharts';
@@ -42,9 +42,10 @@ function useSeverities() {
 
 export function TeamReports() {
   const search = useSearch({ from: '/admin_/reports' }); const navigate = useNavigate();
-  const fetch = useServerFn(getPersonOverview);
+  const fetch = useServerFn(getPersonOverview); const fetchDetail = useServerFn(getPersonDetail); const client = useQueryClient();
+  const prefetch = (person: string) => void client.prefetchQuery({ queryKey: ['person-detail', person, days], queryFn: () => fetchDetail({ data: { person, days } }), staleTime: 30000 });
   const [days, setDays] = useState<Days>(0); const [role, setRole] = useState('all'); const [text, setText] = useState('');
-  const q = useQuery({ queryKey: ['person-overview', days], queryFn: () => fetch({ data: { days } }), retry: 1, staleTime: 30000, refetchInterval: 60000 });
+  const q = useQuery({ queryKey: ['person-overview', days], queryFn: () => fetch({ data: { days } }), placeholderData: keepPreviousData, retry: 1, staleTime: 30000, refetchInterval: 60000 });
   const people = useMemo(() => (q.data ?? []).filter(m => (role === 'all' || reportFocus(m) === role) && m.name.toLowerCase().includes(text.trim().toLowerCase())), [q.data, role, text]);
   // Selected person: from the URL when they're in the list, otherwise the first person shown.
   const selected = people.find(m => m.id === search.person) ?? people[0];
@@ -71,14 +72,14 @@ export function TeamReports() {
           <p className="bf-people-count">{plural(people.length, 'person').replace('persons', 'people')}</p>
           <ul role="listbox" aria-label="Choose a person" aria-activedescendant={selected ? `person-${selected.id}` : undefined} onKeyDown={onKey}>
             {people.map(m => { const on = m.id === selected?.id; const focus = reportFocus(m); return <li key={m.id}>
-              <button type="button" id={`person-${m.id}`} role="option" aria-selected={on} tabIndex={on ? 0 : -1} className="bf-person-item" onClick={() => select(m.id)}>
+              <button type="button" id={`person-${m.id}`} role="option" aria-selected={on} tabIndex={on ? 0 : -1} className="bf-person-item" onClick={() => select(m.id)} onMouseEnter={() => prefetch(m.id)} onFocus={() => prefetch(m.id)}>
                 <span className="bf-avatar !size-9 !text-[12px]">{initials(m.name)}</span>
                 <span className="min-w-0 flex-1"><strong className="block truncate">{m.name}</strong><small className="block truncate">{roleName(m.role) || FOCUS_LABEL[focus]}{!m.current && ' · former'} · {keyMetric(m)}</small>
                   <MiniStrip counts={focus === 'developer' ? m.ownedByPriority : m.raisedByPriority} /></span>
               </button></li>; })}
           </ul>
         </aside>
-        <div className="bf-reports-detail" aria-live="polite">{selected && <PersonDetailView key={selected.id} person={selected.id} days={days} />}</div>
+        <div className="bf-reports-detail" aria-live="polite">{selected && <PersonDetailView person={selected.id} days={days} />}</div>
       </div>}
   </>;
 }
@@ -104,11 +105,11 @@ function MiniStrip({ counts }: { counts: Counts }) {
 
 function PersonDetailView({ person, days }: { person: string; days: Days }) {
   const fetch = useServerFn(getPersonDetail); const severities = useSeverities();
-  const q = useQuery({ queryKey: ['person-detail', person, days], queryFn: () => fetch({ data: { person, days } }), retry: 1, staleTime: 30000 });
+  const q = useQuery({ queryKey: ['person-detail', person, days], queryFn: () => fetch({ data: { person, days } }), placeholderData: keepPreviousData, retry: 1, staleTime: 30000 });
   const d = q.data; const m = d?.metrics;
   if (q.isError) return <ErrorNotice message={actionError(q.error, 'This report could not load.')} onRetry={() => q.refetch()} retrying={q.isFetching} />;
   if (!m) return <div className="bf-report-loading" role="status"><span /><span /><span /></div>;
-  return <PersonReport m={m} trend={d.trend} recent={d.recent} severities={severities} periodLabel={days ? `last ${days} days` : 'all time'} />;
+  return <div data-updating={q.isPlaceholderData || undefined}><PersonReport m={m} trend={d.trend} recent={d.recent} severities={severities} periodLabel={days ? `last ${days} days` : 'all time'} /></div>;
 }
 
 function PersonReport({ m, trend, recent, severities, periodLabel }: { m: PersonMetrics; trend: { week: string; raised: number; fixed: number }[]; recent: PersonRecentBug[]; severities: readonly string[]; periodLabel: string }) {

@@ -633,3 +633,11 @@ body { font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; 
 .bf-barlist button[data-active] .bf-barlist-label { color: var(--primary); font-weight: 600; }
 .bf-barlist button[data-active] .bf-avatar { background: var(--primary); color: var(--primary-foreground); }
 .bf-barlist button[data-zero]:not([data-active]) { opacity: .62; }
+
+/* While new data loads, keep the old numbers visible but quietly dimmed. */
+/* Dim the children: the containers themselves keep the page entrance animation's opacity. */
+[data-updating] > * { opacity: .55; transition: opacity .15s ease; }
+[data-updating] { cursor: progress; }
+.bf-updating { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted-foreground); }
+.bf-updating::before { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 2px solid color-mix(in oklab, var(--primary) 30%, transparent); border-top-color: var(--primary); animation: bf-spin .7s linear infinite; }
+@keyframes bf-spin { to { transform: rotate(360deg); } }

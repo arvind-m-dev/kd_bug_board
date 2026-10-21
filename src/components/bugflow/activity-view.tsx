@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipProps } from 'recharts';
 import { Activity, ArrowDown, ArrowRightLeft, ArrowUp, Bug, Check, ClipboardCheck, Flag, MessageSquare, Pencil, Search, Trash2, Trophy, UserPlus, UsersRound, X, type LucideIcon } from 'lucide-react';
@@ -46,8 +46,8 @@ export function ActivityView() {
   useEffect(() => { const t = setTimeout(() => { setQuery(searchText.trim()); setPages([undefined]); setPage(0); }, 350); return () => clearTimeout(t); }, [searchText]);
   const filters: ActivityFilters = { type, days, query, tz, ...(actor ? { actor } : {}), ...(via !== 'all' ? { via: via as NonNullable<ActivityFilters['via']> } : {}) };
   const cursor = pages[page];
-  const rows = useQuery({ queryKey: ['activity', filters, cursor ?? ''], queryFn: () => fetchRows({ data: { ...filters, ...(cursor ? { cursor } : {}) } }), retry: 1, staleTime: 15000, refetchInterval: 30000 });
-  const insights = useQuery({ queryKey: ['activity-insights', filters], queryFn: () => fetchInsights({ data: filters }), retry: 1, staleTime: 15000, refetchInterval: 60000 });
+  const rows = useQuery({ queryKey: ['activity', filters, cursor ?? ''], queryFn: () => fetchRows({ data: { ...filters, ...(cursor ? { cursor } : {}) } }), placeholderData: keepPreviousData, retry: 1, staleTime: 15000, refetchInterval: 30000 });
+  const insights = useQuery({ queryKey: ['activity-insights', filters], queryFn: () => fetchInsights({ data: filters }), placeholderData: keepPreviousData, retry: 1, staleTime: 15000, refetchInterval: 60000 });
   const people = useQuery({ queryKey: ['activity-people'], queryFn: () => fetchPeople(), staleTime: 60000 });
   const reset = () => { setPages([undefined]); setPage(0); };
   const set = <T,>(fn: (v: T) => void) => (v: T) => { fn(v); reset(); };
@@ -72,14 +72,14 @@ export function ActivityView() {
     {chips.length > 0 && <div className="bf-chips"><span>Filtered by</span>{chips.map(c => <button key={c.label} type="button" className="bf-chip" onClick={c.clear} aria-label={`Remove filter ${c.label}`}>{c.label}<X size={12} /></button>)}<Button size="sm" variant="ghost" onClick={() => { setType('all'); setActor(''); setVia('all'); setSearchText(''); reset(); }}>Clear all</Button></div>}
 
     {insights.isError && <ErrorNotice message={actionError(insights.error, 'Activity insights could not load.')} onRetry={() => insights.refetch()} retrying={insights.isFetching} />}
-    <div className="bf-kpi-grid">
+    <div className="bf-kpi-grid" data-updating={insights.isPlaceholderData || undefined}>
       <Tile label="Changes" value={ins?.totals.events} foot={`Recorded in the ${periodLabel}`} />
       <Tile label="Bugs touched" value={ins?.totals.bugs} foot="Distinct bugs with any change" />
       <Tile label="People active" value={ins?.totals.people} foot="Made at least one change" />
       <Tile label="Resolved · reopened" value={ins ? `${ins.totals.resolved} · ${ins.totals.reopened}` : undefined} foot="Fixes passed vs sent back" />
     </div>
 
-    <div className="bf-activity-grid">
+    <div className="bf-activity-grid" data-updating={insights.isPlaceholderData || undefined}>
       <section className="bf-panel" aria-labelledby="activity-people">
         <div className="bf-panel-heading"><div><h2 id="activity-people">Most active</h2><p className="bf-panel-sub">{ins ? `${ins.people.length} people · ` : ''}Click a person to filter</p></div></div>
         <BarList scroll empty="No one yet" items={(ins?.people ?? []).map(p => ({ id: p.id, label: <PersonName name={p.name} role={p.role} />, title: nameWithRole(p.name, p.role), count: p.count, avatar: initials(p.name), active: actor === p.id }))} onPick={id => set(setActor)(actor === id ? '' : id)} />
@@ -98,10 +98,10 @@ export function ActivityView() {
 
     {rows.isError && <ErrorNotice message={actionError(rows.error, 'Activity could not load. Try again.')} onRetry={() => rows.refetch()} retrying={rows.isFetching} />}
     <section className="bf-panel" aria-labelledby="activity-log">
-      <div className="bf-panel-heading"><div><h2 id="activity-log">Activity log</h2><p className="bf-panel-sub">Every change, newest first</p></div>{rows.isFetching && <span className="bf-tag">Updating…</span>}</div>
+      <div className="bf-panel-heading"><div><h2 id="activity-log">Activity log</h2><p className="bf-panel-sub">Every change, newest first</p></div>{(rows.isPlaceholderData || insights.isPlaceholderData) && <span className="bf-updating">Updating…</span>}</div>
       {rows.isLoading ? <p className="p-5 text-sm text-muted-foreground">Loading activity…</p> : list.length === 0 && !rows.isError
         ? <div className="bf-empty"><span className="bf-empty-icon"><Activity size={22} /></span><h3>No activity matches these filters</h3><p>Try a longer period or remove a filter.</p></div>
-        : <Timeline rows={list.slice(0, 50)} />}
+        : <div data-updating={rows.isPlaceholderData || undefined}><Timeline rows={list.slice(0, 50)} /></div>}
       {list.length > 0 && <div className="bf-table-footer"><span>Page {page + 1} · {Math.min(list.length, 50)} changes</span><div className="flex items-center gap-2"><Button variant="outline" size="sm" disabled={page === 0 || rows.isFetching} onClick={() => setPage(p => p - 1)}>Newer</Button><Button variant="outline" size="sm" disabled={!nextCursor || rows.isFetching} onClick={() => { const next = [...pages]; next[page + 1] = nextCursor; setPages(next); setPage(page + 1); }}>Older</Button></div></div>}
     </section>
   </>;
@@ -187,7 +187,7 @@ const PERF_COLUMNS: { key: SortKey; label: string; hint: string }[] = [
 /** Who raised, who fixed, and how fast — per person and overall. */
 function TeamPerformanceSection({ days, periodLabel, onPerson }: { days: ActivityFilters['days']; periodLabel: string; onPerson: (id: string) => void }) {
   const fetchPerf = useServerFn(getTeamPerformance);
-  const q = useQuery({ queryKey: ['team-performance', days], queryFn: () => fetchPerf({ data: { days } }), retry: 1, staleTime: 30000, refetchInterval: 60000 });
+  const q = useQuery({ queryKey: ['team-performance', days], queryFn: () => fetchPerf({ data: { days } }), placeholderData: keepPreviousData, retry: 1, staleTime: 30000, refetchInterval: 60000 });
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'fixed', dir: -1 });
   const t = q.data?.totals; const list = q.data?.people ?? [];
   const value = (p: PersonPerformance, k: SortKey) => k === 'name' ? p.name : k === 'qa' ? p.qaPassed + p.qaFailed : k === 'avgFixDays' ? (p.avgFixDays ?? Number.POSITIVE_INFINITY) : p[k];
@@ -196,7 +196,7 @@ function TeamPerformanceSection({ days, periodLabel, onPerson }: { days: Activit
   const maxBar = Math.max(1, ...list.map(p => Math.max(p.raised, p.fixed)));
   const head = (key: SortKey, label: string, hint?: string) => <th aria-sort={sort.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}><button type="button" title={hint} onClick={() => setSort(s => ({ key, dir: s.key === key ? (s.dir === 1 ? -1 : 1) : key === 'name' || key === 'avgFixDays' ? 1 : -1 }))}>{label}{sort.key === key && (sort.dir === 1 ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}</button></th>;
 
-  return <section className="bf-panel mb-6" aria-labelledby="team-perf">
+  return <section className="bf-panel mb-6" aria-labelledby="team-perf" data-updating={q.isPlaceholderData || undefined}>
     <div className="bf-panel-heading"><div><h2 id="team-perf">Team performance</h2><p className="bf-panel-sub">Who raised bugs, who fixed them, and how fast · {periodLabel}</p></div>{fastest && <span className="bf-perf-badge"><Trophy size={13} />Fastest fixer · {fastest.name} · {durationText(fastest.avgFixDays)}</span>}</div>
     {q.isError ? <div className="p-4"><ErrorNotice message={actionError(q.error, 'Team performance could not load.')} onRetry={() => q.refetch()} retrying={q.isFetching} /></div> : <>
       <div className="bf-perf-stats">

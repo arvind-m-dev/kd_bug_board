@@ -71,22 +71,24 @@ export async function personOverview(days: number) {
 }
 
 export async function personDetail(days: number, person: string): Promise<PersonDetail> {
-  const [metrics] = await personMetrics(days, person);
-  if (!metrics) throw new Error('This person could not be found.');
+  await requireAdmin();
+  // Metrics, weekly trend and recent bugs are independent: fetch them in parallel.
+  const [[metrics], trend, recent] = await Promise.all([personMetrics(days, person),
   // Weekly raised vs fixed for the last 12 weeks (Monday-start weeks).
-  const trend = await neonQuery(`with weeks as (select generate_series(date_trunc('week', now())-interval '11 weeks', date_trunc('week', now()), '1 week') as wk),
+  neonQuery(`with weeks as (select generate_series(date_trunc('week', now())-interval '11 weeks', date_trunc('week', now()), '1 week') as wk),
     b as (select * from bugflow.bugs where deleted_at is null),
     own as (select bug_id from bugflow.bug_assignees where user_id=$1::uuid union select id from b where assignee_id=$1::uuid),
     res as (select sh.bug_id, max(sh.created_at) as at from bugflow.status_history sh join b on b.id=sh.bug_id where sh.new_status='RESOLVED' and b.status='RESOLVED' group by sh.bug_id)
     select to_char(w.wk,'YYYY-MM-DD') as week,
       (select count(*) from b where b.reporter_id=$1::uuid and date_trunc('week', b.created_at)=w.wk)::int as raised,
       (select count(*) from res join own on own.bug_id=res.bug_id where date_trunc('week', res.at)=w.wk)::int as fixed
-    from weeks w order by w.wk`, [person]);
-  const recent = await neonQuery(`select b.id, b.title, b.status, b.priority, b.severity, to_json(b.updated_at) as updated_at,
+    from weeks w order by w.wk`, [person]),
+  neonQuery(`select b.id, b.title, b.status, b.priority, b.severity, to_json(b.updated_at) as updated_at,
       (b.reporter_id=$1::uuid) as raised,
       (b.assignee_id=$1::uuid or exists(select 1 from bugflow.bug_assignees x where x.bug_id=b.id and x.user_id=$1::uuid)) as assigned
     from bugflow.bugs b where b.deleted_at is null and (b.reporter_id=$1::uuid or b.assignee_id=$1::uuid or exists(select 1 from bugflow.bug_assignees x where x.bug_id=b.id and x.user_id=$1::uuid))
-    order by b.updated_at desc limit 12`, [person]);
+    order by b.updated_at desc limit 12`, [person])]);
+  if (!metrics) throw new Error('This person could not be found.');
   return {
     metrics,
     trend: trend.rows.map(r => ({ week: String(r['week']), raised: Number(r['raised']), fixed: Number(r['fixed']) })),
