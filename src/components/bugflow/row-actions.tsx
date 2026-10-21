@@ -77,7 +77,7 @@ export function RowStatus({ bug, access, workspace }: { bug: LiveBug; access: Bu
 
   const quick = canValidate || rejectTo.length > 0 || verify;
   const locked = !reachable.length && !quick;
-  const lockReason = bug.status === 'RECHECK' ? 'Waiting for QA — only QA can pass or fail this retest.'
+  const lockReason = bug.status === 'RECHECK' ? 'Waiting for QA — only QA or Admin can pass or fail this retest.'
     : ['RESOLVED', 'NOT_A_BUG', 'DUPLICATE', 'WONT_FIX'].includes(bug.status) ? 'Closed — only Admin or QA can reopen it.'
     : 'You can’t change this status.';
 

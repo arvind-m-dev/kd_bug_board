@@ -59,7 +59,8 @@ export function statusPath(actor:BugActor,bug:{status:Status;reporterId:string;a
 }
 
 export function allowedStatuses(actor:BugActor,bug:{status:Status;reporterId:string;assigneeId:string|null}) {return STATUSES.filter(to=>mayUpdateStatus(actor,bug,to));}
-export function mayVerify(actor:BugActor,bug:{status:Status;assigneeId:string|null}) {return actor.role==='qa'&&actor.permissions.includes('verify')&&bug.status==='RECHECK'&&bug.assigneeId!==actor.userId;}
+/** Pass/fail a QA retest: authorized QA or Admin, never the person who made the fix. */
+export function mayVerify(actor:BugActor,bug:{status:Status;assigneeId:string|null}) {return (actor.role==='admin'||(actor.role==='qa'&&actor.permissions.includes('verify')))&&bug.status==='RECHECK'&&bug.assigneeId!==actor.userId;}
 export function formatBugCode(id:string) {return `BF-${id.padStart(6,'0')}`;}export type LastChange = {by:string;via:string;action:string;at:string}|null;
 export type StatusCount = {status:string;assigned:boolean;count:number};
 /** Dashboard groups: every status belongs to exactly one group so card counts add up to the total. */

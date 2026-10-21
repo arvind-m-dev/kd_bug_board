@@ -117,3 +117,12 @@ describe('one-click triage paths', () => {
     expect(statusPath(admin, bug('NEW'), 'RESOLVED')).toBeNull();
   });
 });
+
+describe('admin QA retest', () => {
+  const admin = { role: 'admin' as const, permissions: ['view', 'validate', 'assign'], userId: 'admin', portalId: 'p', name: 'A' };
+  it('lets Admin pass or fail a retest, but not on a fix they made themselves', () => {
+    expect(mayVerify(admin, { status: 'RECHECK', assigneeId: 'dev' })).toBe(true);
+    expect(mayVerify(admin, { status: 'RECHECK', assigneeId: 'admin' })).toBe(false);
+    expect(mayVerify(admin, { status: 'IN_PROGRESS', assigneeId: 'dev' })).toBe(false);
+  });
+});

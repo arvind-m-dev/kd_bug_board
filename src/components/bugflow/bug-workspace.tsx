@@ -2,7 +2,7 @@ import { Fragment, useState } from 'react';
 import { SkeletonRows } from './loading';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { Bug, Search, Plus, ArrowUpRight, RefreshCw, CheckCircle2, Clock3, Pencil, Trash2, Copy, CopyCheck, ListChecks, X, ChevronDown, ChevronRight, MessageSquareWarning } from 'lucide-react';
+import { Bug, Search, Plus, ArrowUpRight, RefreshCw, CheckCircle2, Clock3, Pencil, Trash2, Copy, CopyCheck, ListChecks, X, ChevronDown, ChevronRight, MessageSquareWarning, MessageSquare, UserRound, CalendarClock, History, Server, Monitor, ArrowRightLeft, ClipboardCheck, Flag, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -75,16 +75,38 @@ function BugDetails({id,access,workspace,onDeleted=()=>{},startEditing=false}:{s
  const b=detail.data.bug;const actor=workspace.actor;const options=allowedStatuses(actor,b);
  if(editing)return <div className="grid gap-3"><div className="flex items-center justify-between"><strong className="text-sm">Edit {b.code}</strong><Button size="sm" variant="ghost" onClick={()=>setEditing(false)}>Cancel</Button></div><BugReportForm access={access} projects={workspace.projects} options={workspace.options} initial={b} onSaved={()=>setEditing(false)}/></div>;
  async function commit(change:Partial<BugChange>){await mutation.mutateAsync({data:{access,change:{requestId,id,version:b.version,action:change.action??'comment',notes,noteTo:notes.trim()?(noteTo==='Other'?`Other · ${noteToName.trim()}`:noteTo):'',...change}}});}
- return <><div className="flex flex-wrap items-start justify-between gap-3"><div><span className="text-xs text-primary">{b.code}{b.module&&` · ${b.module}`}</span><h2 className="bf-detail-title">{b.title}</h2></div><span className="flex items-center gap-2">{mayEditBug(actor,b)&&<Button size="sm" variant="outline" onClick={()=>setEditing(true)}><Pencil/>Edit bug</Button>}{actor.role==='admin'&&<Button size="sm" variant="outline" className="text-destructive" onClick={()=>setRemoving(true)}><Trash2/>Delete</Button>}<ConfirmAction open={removing} onOpenChange={setRemoving} destructive title={`Delete ${b.code}?`} description="The bug disappears from every list, count and portal. The deletion is recorded with your name, date and time." confirmLabel="Delete bug" onConfirm={async()=>{await remove({data:{id:b.id,reason:''}});await client.invalidateQueries({queryKey:['bug-workspace']});toast.success(`${b.code} deleted`);onDeleted();}}/><span className="bf-tag">{b.priority} · {statusLabel(b.status)}</span></span></div><div className="grid gap-3 border-y py-4 text-xs text-muted-foreground sm:grid-cols-2"><span>Reported by {b.reporter} · {dateLabel(b.createdAt)}</span><span>Updated {dateLabel(b.updatedAt)}</span><span>Assigned to: {b.assignees?.length?b.assignees.map(a=>a.name).join(', '):b.assignee}</span><span>{b.environment} · {b.browserDevice||'Device not specified'} · {b.severity}</span></div>
- <StatusNoteBox bug={b}/><BugReportContent bug={b} showEvidence={actor.permissions.includes('evidence')}/>
- <section className="grid gap-3 border-t pt-4"><h3 className="text-sm font-semibold">Update bug</h3><label className="bf-field">Notes / comment<textarea maxLength={4000} value={notes} onChange={e=>setNotes(e.target.value)}/></label>{notes.trim()&&<div className="flex flex-wrap items-center gap-2"><ThemedSelect label="Send note to" placeholder="Send note to…" value={noteTo} onChange={setNoteTo} options={[`Developer · ${b.assignee}`,`Reporter · ${b.reporter}`,'Product manager','Client','Other'].map(v=>({value:v,label:v}))}/>{noteTo==='Other'&&<Input className="h-9 w-48" placeholder="Name (specify)" value={noteToName} maxLength={60} onChange={e=>setNoteToName(e.target.value)}/>}</div>}
- <div className="flex flex-wrap gap-2">{actor.permissions.includes('comment')&&<Button size="sm" variant="outline" disabled={!notes.trim()||mutation.isPending} onClick={()=>setPending({action:'comment'})}>Add comment</Button>}{options.length>0&&<><ThemedSelect label="New bug status" placeholder="Choose status" value={status} onChange={setStatus} options={options.map(s=>({value:s,label:statusLabel(s)}))}/><Button size="sm" disabled={!status||mutation.isPending} onClick={()=>setPending({action:'status',status:status as BugChange['status']})}>Update status</Button></>}</div>
- {actor.role==='admin'&&<div className="flex gap-2"><ThemedSelect label="New bug priority" placeholder="Change priority" value={priority} onChange={setPriority} options={[...PRIORITIES]}/><Button size="sm" variant="outline" disabled={!priority||mutation.isPending} onClick={()=>setPending({action:'priority',priority:priority as BugChange['priority']})}>Save priority</Button></div>}
- {actor.permissions.includes('assign')&&<div className="grid gap-2"><span className="text-xs font-medium">Assign to</span><div className="flex flex-wrap items-start gap-2"><ThemedMultiSelect className="min-w-[260px]" label="Assign to" placeholder="Choose one or more members" values={assignees} onChange={setAssignees} options={workspace.developers.filter(d=>d.projectIds.includes(b.projectId)).map(d=>({value:d.id,label:d.name,hint:d.role??''}))}/><Button size="sm" variant="outline" disabled={!assignees.length||mutation.isPending} onClick={()=>setPending({action:'assign',assigneeIds:assignees})}>Assign</Button></div><p className="text-xs text-muted-foreground">Click a name to select, click again to unselect. The first person selected is the lead.</p></div>}
- {mayVerify(actor,b)&&<p className="text-xs text-muted-foreground">QA verification confirms the developer’s fix: pass resolves the bug, fail reopens it for the developer. Developers can’t verify their own fixes.</p>}{mayVerify(actor,b)&&<div className="flex gap-2"><Button disabled={mutation.isPending} onClick={()=>setPending({action:'verify',passed:true})}><CheckCircle2/>Pass verification</Button><Button variant="destructive" disabled={mutation.isPending} onClick={()=>setPending({action:'verify',passed:false})}>Fail & reopen</Button></div>}
- </section><section className="border-t pt-4"><h3 className="mb-4 text-sm font-semibold">{access.kind==='admin'?'Activity history':'Bug lifecycle (summary)'}</h3>{access.kind!=='admin'&&<p className="-mt-2 mb-3 text-xs text-muted-foreground">Latest steps, with the reason for each status change.</p>}<ol className="space-y-4">{detail.data.events.map(e=><li key={e.id} className="border-l-2 border-primary/20 pl-4"><div className="flex flex-wrap justify-between gap-2 text-xs"><strong>{e.actor} · {statusLabel(e.action.replace('bug.',''))}</strong><time className="text-muted-foreground">{dateLabel(e.createdAt)}</time></div><p className="mt-1 text-xs text-muted-foreground">{e.detail['previousStatus']!==e.detail['status']&&e.detail['status']?`${statusLabel(String(e.detail['previousStatus']))} → ${statusLabel(String(e.detail['status']))}`:''}{e.action==='bug.priority'?` · ${e.detail['previousPriority']} → ${e.detail['priority']}`:''}</p>{typeof e.detail['noteTo']==='string'&&e.detail['noteTo']!==''&&<p className="mt-1 text-xs text-primary">Note to {e.detail['noteTo']}</p>}{typeof e.detail['notes']==='string'&&<p className="mt-2 whitespace-pre-wrap break-words text-sm">{e.detail['notes']}</p>}</li>)}</ol></section>
- <ConfirmAction open={pending!==null} onOpenChange={open=>{if(!open)setPending(null);}} title="Confirm bug update?" description={pending?.action==='verify'?pending.passed?'QA verification will resolve this bug.':'Failed verification will reopen this bug.':'This change will be saved with your name, date and time.'} confirmLabel="Confirm update" onConfirm={async()=>{if(pending)await commit(pending);}}/>
- </>;
+ const busy=mutation.isPending;
+ const addComment=async()=>{if(!notes.trim())return;await commit({action:'comment'});};
+ const people=b.assignees?.length?b.assignees:b.assigneeId?[{id:b.assigneeId,name:b.assignee}]:[];
+ return <div className="bf-bd">
+  <header className="bf-bd-hero" data-pri={b.priority}>
+   <div className="bf-bd-hero-top"><span className="bf-bd-code">{b.code}</span>{b.module&&<span className="bf-bd-chip">{b.module}</span>}{b.project&&<span className="bf-bd-chip">{b.project}</span>}
+    <span className="ml-auto flex items-center gap-2">{mayEditBug(actor,b)&&<Button size="sm" variant="outline" onClick={()=>setEditing(true)}><Pencil/>Edit</Button>}{actor.role==='admin'&&<Button size="sm" variant="outline" className="text-destructive" onClick={()=>setRemoving(true)}><Trash2/>Delete</Button>}</span></div>
+   <h2 className="bf-detail-title">{b.title}</h2>
+   <div className="bf-bd-controls">
+    <span className="bf-bd-control"><small>Priority · severity</small><RowRating bug={b} access={access} workspace={workspace} editable={actor.role==='admin'}/></span>
+    <span className="bf-bd-control"><small>Status</small><RowStatus bug={b} access={access} workspace={workspace}/></span>
+    <span className="bf-bd-control"><small>Assignee</small>{actor.permissions.includes('assign')?<RowAssign bug={b} access={access} workspace={workspace}/>:<span className="bf-owner">{people.map(p=>p.name).join(', ')||'Unassigned'}</span>}</span>
+   </div>
+   <dl className="bf-bd-meta">
+    <div><dt><UserRound size={13}/>Reported by</dt><dd><span className="bf-avatar !size-5 !text-[9.5px]">{b.reporter.slice(0,2).toUpperCase()}</span>{b.reporter}</dd></div>
+    <div><dt><CalendarClock size={13}/>Reported</dt><dd>{dateLabel(b.createdAt)}</dd></div>
+    <div><dt><History size={13}/>Updated</dt><dd>{dateLabel(b.updatedAt)}</dd></div>
+    <div><dt><Server size={13}/>Environment</dt><dd>{b.environment||'Not specified'}</dd></div>
+    <div><dt><Monitor size={13}/>Browser / device</dt><dd>{b.browserDevice||'Not specified'}</dd></div>
+   </dl>
+   <ConfirmAction open={removing} onOpenChange={setRemoving} destructive title={`Delete ${b.code}?`} description="The bug disappears from every list, count and portal. The deletion is recorded with your name, date and time." confirmLabel="Delete bug" onConfirm={async()=>{await remove({data:{id:b.id,reason:''}});await client.invalidateQueries({queryKey:['bug-workspace']});toast.success(`${b.code} deleted`);onDeleted();}}/>
+  </header>
+  <StatusNoteBox bug={b}/>
+  <BugReportContent bug={b} showEvidence={actor.permissions.includes('evidence')}/>
+  {actor.permissions.includes('comment')&&<section className="bf-rc-card" data-tone="info"><h3 className="bf-section-title"><span className="bf-rc-icon"><MessageSquare size={15}/></span>Add a comment</h3>
+   <textarea className="bf-note-input" rows={3} maxLength={4000} placeholder="Share an update, ask a question or add context…" value={notes} onChange={e=>setNotes(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();void addComment();}}}/>
+   <div className="flex flex-wrap items-center gap-2">{notes.trim()&&<><ThemedSelect label="Send note to" placeholder="Send to… (optional)" value={noteTo} onChange={setNoteTo} options={[`Developer · ${b.assignee}`,`Reporter · ${b.reporter}`,'Product manager','Client','Other'].map(v=>({value:v,label:v}))}/>{noteTo==='Other'&&<Input className="h-9 w-48" placeholder="Name (specify)" value={noteToName} maxLength={60} onChange={e=>setNoteToName(e.target.value)}/>}</>}
+    <Button size="sm" className="ml-auto" disabled={!notes.trim()||busy} onClick={()=>void addComment()}>{busy?<RefreshCw className="animate-spin"/>:<MessageSquare/>}Post comment</Button></div>
+   <p className="text-[11.5px] text-muted-foreground">Ctrl/⌘ + Enter to post · status, priority and assignee are changed from the chips above.</p>
+  </section>}
+  <BugHistory events={detail.data.events} admin={access.kind==='admin'}/>
+ </div>;
 }
 
 function InlineReport({id,access}:{id:string;access:BugAccess}){
@@ -113,4 +135,26 @@ function StatusNoteBox({bug}:{bug:LiveBug}){
   <MessageSquareWarning size={18} aria-hidden="true"/>
   <div className="min-w-0"><strong>{NOTE_HEADINGS[bug.status]}</strong><p>{bug.statusNote.notes}</p><small>{bug.statusNote.by} · {dateLabel(bug.statusNote.at)}</small></div>
  </div>;
+}
+
+/** Collapsible, colour-coded change history for one bug. */
+const HISTORY_KIND:Record<string,{icon:typeof Bug;tone:string;label:string}>={'bug.created':{icon:Bug,tone:'info',label:'Reported'},'bug.sample_created':{icon:Bug,tone:'info',label:'Sample added'},'bug.status':{icon:ArrowRightLeft,tone:'teal',label:'Status changed'},'bug.verify':{icon:ClipboardCheck,tone:'success',label:'QA retest'},'bug.priority':{icon:Flag,tone:'warning',label:'Priority changed'},'bug.severity':{icon:Flag,tone:'warning',label:'Severity changed'},'bug.assign':{icon:UserPlus,tone:'violet',label:'Assigned'},'bug.comment':{icon:MessageSquare,tone:'neutral',label:'Comment'},'bug.edited':{icon:Pencil,tone:'neutral',label:'Details edited'}};
+function BugHistory({events,admin}:{events:{id:string;actor:string;action:string;detail:Record<string,string>;createdAt:string}[];admin:boolean}){
+ const [open,setOpen]=useState(false);
+ return <section className="bf-bd-history" data-open={open||undefined}>
+  <button type="button" className="bf-bd-history-toggle" aria-expanded={open} onClick={()=>setOpen(o=>!o)}>
+   <ChevronRight size={16} className="bf-bd-chevron"/><span className="bf-section-title">{admin?'Bug history':'Bug lifecycle'}</span><span className="bf-bd-count">{events.length}</span>
+   <span className="ml-auto text-xs font-normal text-muted-foreground">{open?'Hide':'Show'} {admin?'every change':'latest steps'}</span>
+  </button>
+  {open&&<ol className="bf-bd-timeline">{events.map(e=>{const k=HISTORY_KIND[e.action]??{icon:History,tone:'neutral',label:statusLabel(e.action.replace(/^[a-z]+\./,''))};const Icon=k.icon;const moved=!!e.detail['status']&&!!e.detail['previousStatus']&&e.detail['previousStatus']!==e.detail['status'];
+   const failed=e.action==='bug.verify'&&e.detail['status']==='REOPENED';
+   return <li key={e.id}><span className="bf-kind" data-tone={failed?'danger':k.tone}><Icon size={14}/></span>
+    <div className="min-w-0 flex-1"><div className="flex flex-wrap items-baseline justify-between gap-x-3"><span className="text-sm"><strong>{e.actor}</strong> <span className="text-muted-foreground">{failed?'failed the QA retest':e.action==='bug.verify'?'passed the QA retest':k.label.toLowerCase()}</span></span><time className="text-xs text-muted-foreground">{dateLabel(e.createdAt)}</time></div>
+     {moved&&<div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs"><span className="bf-status-pill" data-tone={statusTone(String(e.detail['previousStatus']))}>{statusLabel(String(e.detail['previousStatus']||'NEW'))}</span>→<span className="bf-status-pill" data-tone={statusTone(String(e.detail['status']))}>{statusLabel(String(e.detail['status']))}</span></div>}
+     {e.action==='bug.priority'&&<div className="mt-1 flex items-center gap-1.5 text-xs"><PriorityBadge value={String(e.detail['previousPriority'])}/>→<PriorityBadge value={String(e.detail['priority'])}/></div>}
+     {e.action==='bug.severity'&&e.detail['severity']&&<p className="mt-1 text-xs text-muted-foreground">{e.detail['previousSeverity']} → {e.detail['severity']}</p>}
+     {e.detail['noteTo']&&<p className="mt-1 text-xs text-primary">Note to {e.detail['noteTo']}</p>}
+     {e.detail['notes']&&<p className="bf-bd-note">{e.detail['notes']}</p>}
+    </div></li>;})}</ol>}
+ </section>;
 }
