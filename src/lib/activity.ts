@@ -59,6 +59,18 @@ export const activityQuerySchema = z.object({
 export type ActivityFilters = Omit<ActivityQuery, 'cursor'>;
 export type ActivityQuery = z.infer<typeof activityQuerySchema>;
 
+export type PersonPerformance = { id: string; name: string; role: string; current: boolean; raised: number; openNow: number; submitted: number; fixed: number; avgFixDays: number | null; reopened: number; qaPassed: number; qaFailed: number };
+export type TeamPerformance = { totals: { raised: number; fixed: number; openNow: number; avgFixDays: number | null; avgResolveDays: number | null; avgAssignDays: number | null }; people: PersonPerformance[] };
+
+/** Human duration from a number of days: "3.4 days", "6 h", "25 min", or "—". */
+export function durationText(days: number | null | undefined) {
+  if (days == null || !Number.isFinite(days)) return '—';
+  if (days >= 1) return `${days >= 10 ? Math.round(days) : Math.round(days * 10) / 10} day${days >= 1 && days < 1.05 ? '' : 's'}`;
+  const hours = days * 24;
+  if (hours >= 1) return `${Math.round(hours)} h`;
+  return `${Math.max(1, Math.round(hours * 60))} min`;
+}
+
 export const VIA_LABELS: Record<string, string> = {
   admin: 'Admin', reporter: 'Reporter', qa: 'QA', developer: 'Developer', member: 'Member',
 };

@@ -1,7 +1,7 @@
 import { neonQuery } from './neon.server';
 import { requireAdmin } from './portal-access.server';
 import { formatBugCode } from './bug-workflow';
-import type { ActivityFilters, ActivityInsights, ActivityRow } from './activity';
+import type { ActivityFilters, ActivityInsights, ActivityRow, TeamPerformance } from './activity';
 
 /** Server-only activity stream. Admin-only read over the shared audit trail. */
 
@@ -130,4 +130,51 @@ export async function activityPeople(): Promise<{ id: string; name: string }[]> 
   await requireAdmin();
   const { rows } = await neonQuery(`select distinct u.id, u.name from bugflow.activity a join bugflow.users u on u.id=a.actor_id order by u.name limit 200`);
   return rows.map(r => ({ id: String(r['id']), name: String(r['name']) }));
+}
+
+/**
+ * Team performance for a period (0 = all time).
+ * Raised = bugs reported in the period. Fix submitted = moves to RECHECK by that person.
+ * Fixed = bugs they own that are currently RESOLVED, resolved in the period.
+ * Fix time = first assignment (or report, if never assigned) → resolution.
+ */
+export async function teamPerformance(days: number): Promise<TeamPerformance> {
+  await requireAdmin();
+  const win = (col: string) => (days > 0 ? `${col}>=now()-($1::int||' days')::interval` : 'true');
+  const params = days > 0 ? [days] : [];
+  const cte = `with b as (select * from bugflow.bugs where deleted_at is null),
+    resolved as (select h.bug_id, max(h.created_at) as at from bugflow.status_history h join b on b.id=h.bug_id where h.new_status='RESOLVED' and b.status='RESOLVED' group by h.bug_id),
+    first_assigned as (select bug_id, min(created_at) as at from bugflow.assignments group by bug_id),
+    owners as (select bug_id, user_id from bugflow.bug_assignees union select id, assignee_id from b where assignee_id is not null),
+    fixes as (select r.bug_id, r.at, extract(epoch from r.at-coalesce(fa.at,b.created_at))/86400.0 as fix_days, extract(epoch from r.at-b.created_at)/86400.0 as resolve_days
+      from resolved r join b on b.id=r.bug_id left join first_assigned fa on fa.bug_id=r.bug_id where ${win('r.at')})`;
+  const people = await neonQuery(`${cte},
+    reopened as (select distinct h.bug_id from bugflow.status_history h where h.new_status='REOPENED' and ${win('h.created_at')})
+    select u.id, u.name, (u.active and u.deleted_at is null) as current,
+      coalesce((select px.type from bugflow.portals px where px.user_id=u.id order by px.created_at desc limit 1),'') as role,
+      (select count(*) from b where b.reporter_id=u.id and ${win('b.created_at')})::int as raised,
+      (select count(*) from owners o join b on b.id=o.bug_id where o.user_id=u.id and b.status not in ('RESOLVED','DUPLICATE','NOT_A_BUG','WONT_FIX'))::int as open_now,
+      (select count(*) from bugflow.status_history h where h.actor_id=u.id and h.new_status='RECHECK' and ${win('h.created_at')})::int as submitted,
+      (select count(distinct f.bug_id) from fixes f join owners o on o.bug_id=f.bug_id where o.user_id=u.id)::int as fixed,
+      (select avg(f.fix_days) from fixes f join owners o on o.bug_id=f.bug_id where o.user_id=u.id) as avg_fix_days,
+      (select count(distinct r.bug_id) from reopened r join owners o on o.bug_id=r.bug_id where o.user_id=u.id)::int as reopened,
+      (select count(*) from bugflow.verifications v where v.actor_id=u.id and v.passed and ${win('v.created_at')})::int as qa_passed,
+      (select count(*) from bugflow.verifications v where v.actor_id=u.id and not v.passed and ${win('v.created_at')})::int as qa_failed
+    from bugflow.users u`, params); // inactive/removed members keep their history; rows with no work are dropped below
+  const totals = await neonQuery(`${cte}
+    select (select count(*) from b where ${win('b.created_at')})::int as raised,
+      (select count(*) from fixes)::int as fixed,
+      (select avg(fix_days) from fixes) as avg_fix_days,
+      (select avg(resolve_days) from fixes) as avg_resolve_days,
+      (select avg(extract(epoch from fa.at-b.created_at)/86400.0) from first_assigned fa join b on b.id=fa.bug_id where ${win('fa.at')}) as avg_assign_days,
+      (select count(*) from b where b.status not in ('RESOLVED','DUPLICATE','NOT_A_BUG','WONT_FIX'))::int as open_now`, params);
+  const num = (v: unknown) => (v == null ? null : Number(v));
+  const t = totals.rows[0] ?? {};
+  return {
+    totals: { raised: Number(t['raised'] ?? 0), fixed: Number(t['fixed'] ?? 0), openNow: Number(t['open_now'] ?? 0), avgFixDays: num(t['avg_fix_days']), avgResolveDays: num(t['avg_resolve_days']), avgAssignDays: num(t['avg_assign_days']) },
+    people: people.rows
+      .map(r => ({ id: String(r['id']), name: String(r['name']), role: String(r['role']), current: r['current'] === true, raised: Number(r['raised']), openNow: Number(r['open_now']), submitted: Number(r['submitted']), fixed: Number(r['fixed']), avgFixDays: num(r['avg_fix_days']), reopened: Number(r['reopened']), qaPassed: Number(r['qa_passed']), qaFailed: Number(r['qa_failed']) }))
+      .filter(p => p.raised + p.openNow + p.submitted + p.fixed + p.reopened + p.qaPassed + p.qaFailed > 0)
+      .sort((a, b) => b.fixed - a.fixed || b.raised - a.raised || a.name.localeCompare(b.name)),
+  };
 }

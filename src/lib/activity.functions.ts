@@ -23,3 +23,11 @@ export const getActivityPeople = createServerFn({ method: 'GET' }).handler(async
   const a = await import('./portal-access.server');
   return a.databaseCall(() => s.activityPeople());
 });
+
+export const getTeamPerformance = createServerFn({ method: 'POST' })
+  .inputValidator((v: unknown) => activityQuerySchema.pick({ days: true }).parse(v))
+  .handler(async ({ data }) => {
+    const s = await import('./activity.server');
+    const a = await import('./portal-access.server');
+    return a.databaseCall(() => s.teamPerformance(data.days));
+  });

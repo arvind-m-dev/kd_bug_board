@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipProps } from 'recharts';
-import { Activity, ArrowRightLeft, Bug, ClipboardCheck, Flag, MessageSquare, Pencil, Search, Trash2, UserPlus, UsersRound, X, type LucideIcon } from 'lucide-react';
+import { Activity, ArrowDown, ArrowRightLeft, ArrowUp, Bug, Check, ClipboardCheck, Flag, MessageSquare, Pencil, Search, Trash2, Trophy, UserPlus, UsersRound, X, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { getActivity, getActivityInsights, getActivityPeople } from '@/lib/activity.functions';
-import { ACTIVITY_CATEGORIES, ACTIVITY_PERIODS, ACTIVITY_SERIES, ACTIVITY_SOURCES, changeText, formatWhen, viaLabel, type ActivityFilters, type ActivityInsights, type ActivityRow } from '@/lib/activity';
+import { getActivity, getActivityInsights, getActivityPeople, getTeamPerformance } from '@/lib/activity.functions';
+import { ACTIVITY_CATEGORIES, ACTIVITY_PERIODS, ACTIVITY_SERIES, ACTIVITY_SOURCES, changeText, durationText, formatWhen, viaLabel, type PersonPerformance, type ActivityFilters, type ActivityInsights, type ActivityRow } from '@/lib/activity';
 import { notificationLabel } from '@/lib/notifications';
 import { ThemedSelect } from './themed-select';
 import { ErrorNotice, actionError } from './action-feedback';
@@ -95,6 +95,8 @@ export function ActivityView() {
       </section>
     </div>
 
+    <TeamPerformanceSection days={days} periodLabel={periodLabel} onPerson={id => set(setActor)(id)} />
+
     {rows.isError && <ErrorNotice message={actionError(rows.error, 'Activity could not load. Try again.')} onRetry={() => rows.refetch()} retrying={rows.isFetching} />}
     <section className="bf-panel" aria-labelledby="activity-log">
       <div className="bf-panel-heading"><div><h2 id="activity-log">Activity log</h2><p className="bf-panel-sub">Every change, newest first</p></div>{rows.isFetching && <span className="bf-tag">Updating…</span>}</div>
@@ -154,4 +156,64 @@ function Timeline({ rows }: { rows: ActivityRow[] }) {
       <div className="bf-timeline-meta"><span className="bf-timeline-actor"><span className="bf-avatar !size-6 !text-[10.5px]">{initials(r.actor)}</span>{r.actor || '—'}</span><span className="bf-tag">{viaLabel(r.via)}</span><time dateTime={r.at} title={formatWhen(r.at)}>{time(r.at)}</time></div>
     </li>; })}</ol>
   </div>)}</div>;
+}
+
+type SortKey = 'name' | 'raised' | 'openNow' | 'submitted' | 'fixed' | 'avgFixDays' | 'reopened' | 'qa';
+const PERF_COLUMNS: { key: SortKey; label: string; hint: string }[] = [
+  { key: 'raised', label: 'Raised', hint: 'Bugs reported in the period' },
+  { key: 'openNow', label: 'Open now', hint: 'Open bugs currently assigned to them' },
+  { key: 'submitted', label: 'Sent to QA', hint: 'Fixes moved to “Ready for QA retest”' },
+  { key: 'fixed', label: 'Fixed', hint: 'Their bugs verified and resolved in the period' },
+  { key: 'avgFixDays', label: 'Avg. fix time', hint: 'First assignment → resolved' },
+  { key: 'reopened', label: 'Reopened', hint: 'Their bugs sent back after a failed check' },
+  { key: 'qa', label: 'QA checks', hint: 'Verifications passed / failed' },
+];
+const roleLabel = (r: string) => (r === 'qa' ? 'QA' : r ? r[0]!.toUpperCase() + r.slice(1) : 'Member');
+
+/** Who raised, who fixed, and how fast — per person and overall. */
+function TeamPerformanceSection({ days, periodLabel, onPerson }: { days: ActivityFilters['days']; periodLabel: string; onPerson: (id: string) => void }) {
+  const fetchPerf = useServerFn(getTeamPerformance);
+  const q = useQuery({ queryKey: ['team-performance', days], queryFn: () => fetchPerf({ data: { days } }), retry: 1, staleTime: 30000, refetchInterval: 60000 });
+  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'fixed', dir: -1 });
+  const t = q.data?.totals; const list = q.data?.people ?? [];
+  const value = (p: PersonPerformance, k: SortKey) => k === 'name' ? p.name : k === 'qa' ? p.qaPassed + p.qaFailed : k === 'avgFixDays' ? (p.avgFixDays ?? Number.POSITIVE_INFINITY) : p[k];
+  const sorted = [...list].sort((a, b) => { const x = value(a, sort.key), y = value(b, sort.key); return (typeof x === 'string' ? x.localeCompare(String(y)) : (x as number) - (y as number)) * sort.dir || a.name.localeCompare(b.name); });
+  const fastest = list.filter(p => p.avgFixDays != null).sort((a, b) => a.avgFixDays! - b.avgFixDays!)[0];
+  const maxBar = Math.max(1, ...list.map(p => Math.max(p.raised, p.fixed)));
+  const head = (key: SortKey, label: string, hint?: string) => <th aria-sort={sort.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}><button type="button" title={hint} onClick={() => setSort(s => ({ key, dir: s.key === key ? (s.dir === 1 ? -1 : 1) : key === 'name' || key === 'avgFixDays' ? 1 : -1 }))}>{label}{sort.key === key && (sort.dir === 1 ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}</button></th>;
+
+  return <section className="bf-panel mb-6" aria-labelledby="team-perf">
+    <div className="bf-panel-heading"><div><h2 id="team-perf">Team performance</h2><p className="bf-panel-sub">Who raised bugs, who fixed them, and how fast · {periodLabel}</p></div>{fastest && <span className="bf-perf-badge"><Trophy size={13} />Fastest fixer · {fastest.name} · {durationText(fastest.avgFixDays)}</span>}</div>
+    {q.isError ? <div className="p-4"><ErrorNotice message={actionError(q.error, 'Team performance could not load.')} onRetry={() => q.refetch()} retrying={q.isFetching} /></div> : <>
+      <div className="bf-perf-stats">
+        <PerfStat label="Bugs raised" value={t ? String(t.raised) : '…'} sub={t ? `${t.openNow} still open` : ''} />
+        <PerfStat label="Fixed & verified" value={t ? String(t.fixed) : '…'} sub="Resolved after QA retest" />
+        <PerfStat label="Avg. time to fix" value={t ? durationText(t.avgFixDays) : '…'} sub="Assigned → resolved" />
+        <PerfStat label="Avg. time to resolve" value={t ? durationText(t.avgResolveDays) : '…'} sub="Reported → resolved" />
+        <PerfStat label="Avg. time to assign" value={t ? durationText(t.avgAssignDays) : '…'} sub="Reported → first owner" />
+      </div>
+      {q.isPending ? <p className="px-5 pb-5 text-sm text-muted-foreground">Loading team performance…</p> : list.length === 0 ? <div className="bf-empty"><span className="bf-empty-icon"><UsersRound size={22} /></span><h3>No bug work in this period</h3><p>Try a longer period. Numbers appear once bugs are raised, assigned and fixed.</p></div> : <div className="bf-perf-body">
+        <div className="bf-perf-compare" aria-label="Raised vs fixed by person">
+          <div className="bf-perf-compare-head"><h3>Raised vs fixed</h3><ul className="bf-legend-row"><li><span className="bf-swatch" style={{ background: 'var(--viz-1)' }} />Raised</li><li><span className="bf-swatch" style={{ background: 'var(--viz-3)' }} />Fixed</li></ul></div>
+          <ul>{list.filter(p => p.raised + p.fixed > 0).sort((a, b) => b.raised + b.fixed - (a.raised + a.fixed)).slice(0, 8).map(p => <li key={p.id} title={`${p.name}: ${p.raised} raised · ${p.fixed} fixed`}>
+            <span className="bf-perf-name"><span className="bf-avatar !size-6 !text-[10.5px]">{initials(p.name)}</span><span className="truncate">{p.name}</span></span>
+            <span className="bf-perf-bars"><span><i style={{ width: `${(p.raised / maxBar) * 100}%`, background: 'var(--viz-1)' }} /><b>{p.raised}</b></span><span><i style={{ width: `${(p.fixed / maxBar) * 100}%`, background: 'var(--viz-3)' }} /><b>{p.fixed}</b></span></span>
+          </li>)}</ul>
+        </div>
+        <div className="bf-table-wrap"><table className="bf-table bf-perf-table"><thead><tr>{head('name', 'Person')}{PERF_COLUMNS.map(c => <Fragment key={c.key}>{head(c.key, c.label, c.hint)}</Fragment>)}</tr></thead>
+          <tbody>{sorted.map(p => <tr key={p.id}>
+            <td><button type="button" className="bf-perf-person" onClick={() => onPerson(p.id)} title="Show this person’s activity"><span className="bf-avatar !size-7 !text-[11px]">{initials(p.name)}</span><span className="min-w-0"><strong className="block truncate">{p.name}</strong><small>{roleLabel(p.role)}{!p.current && ' · former'}</small></span></button></td>
+            <td>{p.raised || <Dim />}</td><td>{p.openNow || <Dim />}</td><td>{p.submitted || <Dim />}</td>
+            <td>{p.fixed ? <span className="bf-perf-fixed"><Check size={13} />{p.fixed}</span> : <Dim />}</td>
+            <td>{p.avgFixDays == null ? <Dim /> : <span className="bf-perf-speed" data-speed={p.avgFixDays <= 2 ? 'fast' : p.avgFixDays <= 7 ? 'ok' : 'slow'}>{durationText(p.avgFixDays)}</span>}</td>
+            <td>{p.reopened ? <span className="text-destructive">{p.reopened}</span> : <Dim />}</td>
+            <td>{p.qaPassed + p.qaFailed ? <span className="bf-perf-qa"><span className="text-success">{p.qaPassed} ✓</span><span className="text-destructive">{p.qaFailed} ✗</span></span> : <Dim />}</td>
+          </tr>)}</tbody></table></div>
+      </div>}
+    </>}
+  </section>;
+}
+const Dim = () => <span className="text-muted-foreground">—</span>;
+function PerfStat({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return <div className="bf-perf-stat"><span>{label}</span><strong>{value}</strong><small>{sub}</small></div>;
 }

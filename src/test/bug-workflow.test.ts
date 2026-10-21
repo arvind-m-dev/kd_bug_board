@@ -79,3 +79,15 @@ describe('activity filters and wording', () => {
     expect(changeText(row({ previousSeverity: 'High', severity: 'Critical' }))).toBe('Severity High → Critical');
   });
 });
+
+import { durationText } from '@/lib/activity';
+describe('fix-time formatting', () => {
+  it('shows days, hours or minutes', () => {
+    expect(durationText(null)).toBe('—');
+    expect(durationText(3.44)).toBe('3.4 days');
+    expect(durationText(1)).toBe('1 day');
+    expect(durationText(14.6)).toBe('15 days');
+    expect(durationText(0.25)).toBe('6 h');
+    expect(durationText(0.029)).toBe('42 min');
+  });
+});
