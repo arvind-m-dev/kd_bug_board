@@ -26,14 +26,34 @@ const OUTCOME_COLORS: Record<string, string> = { fixed: 'var(--success)', open: 
 const pct = (v: number | null) => (v == null ? '—' : `${v}%`);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-/** The four numbers that matter most for this person's role. */
-function headline(m: PersonMetrics, o: ReturnType<typeof outcomeCounts>): [string, ReactNode][] {
-  if (m.role === 'team') return [['Bugs raised', m.raised], ['Fixed & verified', o.fixed], ['Reopened', m.ownedReopened], ['Avg. fix time', durationText(m.avgFixDays)]];
+/** The four numbers that matter most for this person's role, each with a short explanation. */
+function headline(m: PersonMetrics, o: ReturnType<typeof outcomeCounts>): [string, ReactNode, string][] {
+  const H = {
+    raised: ['Raised', m.raised, 'Bugs they reported'],
+    fixed: ['Fixed', o.fixed, 'Their reported bugs now resolved'],
+    notabug: ['Not a bug', o.notabug, 'Their reports rejected'],
+    accepted: ['Accepted', pct(acceptanceRate(m)), 'Their reports that were real bugs'],
+    assigned: ['Assigned', m.owned, 'Bugs given to them to fix'],
+    sent: ['Sent to QA', m.sentToQa, 'Fixes they handed to QA'],
+    devFixed: ['Fixed', m.fixed, 'Their fixes that passed QA'],
+    reopened: ['Reopened', m.ownedReopened, 'Their fixes that failed QA'],
+    validated: ['Validated', m.validated, 'Anyone’s bugs they confirmed as real'],
+    rejected: ['Rejected', m.rejected, 'Anyone’s bugs they closed as not a bug, duplicate or won’t fix'],
+    revalidated: ['Revalidated', m.revalidated, 'Closed bugs they sent back for review'],
+    retests: ['Retests', m.qaPassed + m.qaFailed, 'Fixes they checked as QA'],
+    passRate: ['Pass rate', pct(passRate(m)), 'Retests that passed'],
+    changes: ['Total changes', m.changes, 'Every action they took'],
+    teamRaised: ['Bugs raised', m.raised, 'Reported by the team'],
+    teamFixed: ['Fixed & verified', o.fixed, 'Resolved after QA retest'],
+    teamReopened: ['Reopened', m.ownedReopened, 'Fixes that failed QA'],
+    teamFix: ['Avg. fix time', durationText(m.avgFixDays), 'Assigned → resolved'],
+  } satisfies Record<string, [string, ReactNode, string]>;
+  if (m.role === 'team') return [H.teamRaised, H.teamFixed, H.teamReopened, H.teamFix];
   switch (reportFocus(m)) {
-    case 'developer': return [['Assigned', m.owned], ['Sent to QA', m.sentToQa], ['Fixed', m.fixed], ['Reopened', m.ownedReopened]];
-    case 'qa': return [['Validated', m.validated], ['Rejected', m.rejected], ['Retests', m.qaPassed + m.qaFailed], ['Pass rate', pct(passRate(m))]];
-    case 'admin': return [['Raised', m.raised], ['Validated', m.validated], ['Revalidated', m.revalidated], ['Total changes', m.changes]];
-    default: return [['Raised', m.raised], ['Fixed', o.fixed], ['Not a bug', o.notabug], ['Accepted', pct(acceptanceRate(m))]];
+    case 'developer': return [H.assigned, H.sent, H.devFixed, H.reopened];
+    case 'qa': return [H.validated, H.rejected, H.retests, H.passRate];
+    case 'admin': return [H.raised, H.validated, H.revalidated, H.changes];
+    default: return [H.raised, H.fixed, H.notabug, H.accepted];
   }
 }
 
@@ -147,7 +167,7 @@ function PersonReport({ m, trend, recent, severities, periodLabel }: { m: Person
     <section className="bf-person-hero">
       <span className="bf-avatar !size-14 !text-lg">{team ? <UsersRound size={24} /> : initials(m.name)}</span>
       <div className="min-w-0"><h2>{m.name}</h2><p>{team ? periodLabel : <>{roleName(m.role) || FOCUS_LABEL[focus]}{!m.current && ' · former member'} · {periodLabel}</>}</p></div>
-      <div className="bf-person-hero-stats">{headline(m, o).map(([k, v]) => <span key={k}><b>{v}</b><small>{k}</small></span>)}</div>
+      <div className="bf-person-hero-stats">{headline(m, o).map(([k, v, hint]) => <span key={k} title={hint}><b>{v}</b><small>{k}</small><em>{hint}</em></span>)}</div>
     </section>
 
     {showRaised && <>
