@@ -1,13 +1,3 @@
-<!-- LOVABLE:BEGIN -->
-> [!IMPORTANT]
-> This project is connected to [Lovable](https://lovable.dev). Avoid rewriting
-> published git history — force pushing, or rebasing/amending/squashing commits
-> that are already pushed — as it rewrites history on Lovable's side and the
-> user will likely lose their project history.
->
-> Commits you push to the connected branch sync back to Lovable and show up in
-> the editor, so keep the branch in a working state.
-<!-- LOVABLE:END -->
 
 ## BugFlow architecture
 - Use shared frontend confirmation and error feedback for sign-out and portal access changes; keep failed confirmations open and offer retry for failed reads so actions remain recoverable without altering server authorization.
@@ -16,8 +6,8 @@
 - Preserve TanStack Start file-based routes and shadcn controls; all content routes carry their own metadata for reliable navigation and previews.
 - Keep pure domain rules in `src/lib/bugflow.ts` and `src/lib/bug-workflow.ts`, presentation in `src/components/bugflow`, and server-only integrations behind server functions; this separates permission/count rules from UI.
 - Unconfigured views display unavailable data, never fabricated records or success; live features require approved development connections.
-- Keep proposed Neon schema changes in versioned SQL files under `database/` and apply them only through the approved Neon connector; this makes database changes reviewable and keeps credentials out of app code.
-- AI onboarding uses a server-only Responses SDK helper and verifies a live Neon Admin session before spending credits; only an authorized atomic member save grants selected role-limited permissions and actual project scope, never generated guidance.
+- Keep proposed Neon schema changes in versioned SQL files under `database/` and apply them to the Neon database referenced by DATABASE_URL; this makes database changes reviewable and keeps credentials out of app code.
+- AI onboarding uses a server-only call to an OpenAI-compatible API (AI_API_KEY) and verifies a live Neon Admin session before spending credits; only an authorized atomic member save grants selected role-limited permissions and actual project scope, never generated guidance.
 - Admin sign-in verifies configured email and password only on the server and maps the verified owner to expiring hashed sessions in Neon; member links use hash-only validation plus server-encrypted recovery for Admin copying, and are validated for role, active user, expiry and revocation on every read.
 
 - Bug reports and changes use shared scoped server functions for Admin and member panels, validate active access and explicit permissions, and atomically write immutable actor history; optimistic versions and request IDs protect retries and concurrent edits.

@@ -1,29 +1,36 @@
-# Welcome to your Lovable project
+# Futurist Global Bug Board
 
-This project was built with [Lovable](https://lovable.dev).
+Bug reporting, assignment and QA verification for Futurist Global teams. Admins manage projects and members; reporters, QA and developers work through private portal links.
 
-## Build with Lovable
+## Stack
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+TanStack Start (React 19), Tailwind CSS + shadcn/ui, Neon Postgres, deployed on Vercel.
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+## Local development
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
+npm install
+cp .env.example .env.local   # then fill in the values
+npm run dev                  # http://localhost:8080
 ```
 
-## Built with
+## Environment variables
 
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
+| Name | Required | Purpose |
+| --- | --- | --- |
+| `DATABASE_URL` | yes | Neon connection string (Neon console → Connect) |
+| `BUGFLOW_ADMIN_EMAIL` | yes | Admin sign-in email |
+| `BUGFLOW_ADMIN_PASSWORD` | yes | Admin sign-in password |
+| `BUGFLOW_PORTAL_ENCRYPTION_KEY` | yes | Encrypts saved member portal links (`openssl rand -hex 32`) |
+| `AI_API_KEY` | no | Enables AI welcome drafts. Defaults to Google Gemini; free key at https://aistudio.google.com/apikey |
+| `AI_BASE_URL` / `AI_MODEL` | no | Use another OpenAI-compatible provider, e.g. `https://api.openai.com/v1` + `gpt-5-mini` |
+
+## Database
+
+Schema changes live in versioned SQL files under [`database/`](database/), applied in order (`001` … `010`).
+
+## Scripts
+
+- `npm run dev` – dev server (loads `.env.local`)
+- `npm run build` – production build
+- `npm test` – unit tests
