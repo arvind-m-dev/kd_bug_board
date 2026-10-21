@@ -1,7 +1,7 @@
 import { useEffect,useState } from 'react';
 import { useQuery,useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { Search,Copy,UserRound,RefreshCw,ExternalLink,Power,PowerOff,Trash2 } from 'lucide-react';
+import { Search,Copy,UserRound,RefreshCw,ExternalLink,Power,PowerOff,Trash2,Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription } from '@/components/ui/dialog';
@@ -49,8 +49,8 @@ function ReplaceLinkButton({id,name,label=false}:{id:string;name:string;label?:b
   }catch(e){toast.error(actionError(e,'The link could not be replaced.'));}
   finally{setBusy(false);}
  }
- if(armed)return <Button variant="outline" size="sm" className="h-7 border-destructive/50 text-xs text-destructive" onClick={()=>void run()} onBlur={()=>setArmed(false)} autoFocus aria-label={`Confirm replacing the portal link for ${name}`}><RefreshCw size={13}/>Replace?</Button>;
- return label
-  ?<Button variant="outline" size="sm" className="h-7 text-xs" disabled={busy} onClick={()=>setArmed(true)} title="Create a new link (the old one stops working)"><RefreshCw size={13} className={busy?'animate-spin':''}/>Replace link</Button>
-  :<Button variant="ghost" size="icon" disabled={busy} title="Replace link — new link is copied, old one stops working" aria-label={`Replace portal link for ${name}`} onClick={()=>setArmed(true)}><RefreshCw size={16} className={busy?'animate-spin text-primary':'text-primary'}/></Button>;
+ // Same footprint in both states, so nothing around it moves; the hint floats above without taking space.
+ const confirmHint=armed&&<span className="bf-armed-hint" role="status">Click again to replace</span>;
+ if(label)return <span className="relative inline-flex">{confirmHint}<Button variant="outline" size="sm" className="bf-replace-btn h-7 text-xs" data-armed={armed||undefined} disabled={busy} onClick={()=>armed?void run():setArmed(true)} onBlur={()=>setArmed(false)} title="Create a new link (the old one stops working)" aria-label={armed?`Confirm replacing the portal link for ${name}`:`Replace portal link for ${name}`}><RefreshCw size={13} className={busy?'animate-spin':''}/>{armed?'Confirm?':'Replace link'}</Button></span>;
+ return <span className="relative inline-flex">{confirmHint}<Button variant="ghost" size="icon" className="bf-replace-icon" data-armed={armed||undefined} disabled={busy} title={armed?'Click again to replace':'Replace link — new link is copied, old one stops working'} aria-label={armed?`Confirm replacing the portal link for ${name}`:`Replace portal link for ${name}`} onClick={()=>armed?void run():setArmed(true)} onBlur={()=>setArmed(false)}>{armed?<Check size={16}/>:<RefreshCw size={16} className={busy?'animate-spin text-primary':'text-primary'}/>}</Button></span>;
 }
