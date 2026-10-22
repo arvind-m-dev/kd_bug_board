@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MEDIA_MAX_BYTES, formatBytes, mayDeleteMedia, mayUploadMedia, mediaKey, prepareMediaSchema, providerName, rejectReason, resolveContentType, safeFileName } from '@/lib/bug-media';
+import { MEDIA_MAX_BYTES, clock, downloadName, formatBytes, mayDeleteMedia, mayUploadMedia, mediaKey, mediaLinkPath, prepareMediaSchema, providerName, rejectReason, renameMediaSchema, resolveContentType, safeFileName } from '@/lib/bug-media';
 
 const admin = { userId: 'a', role: 'admin', permissions: [] as string[] };
 const reporter = { userId: 'r', role: 'reporter', permissions: ['view', 'report', 'evidence'] };
@@ -49,5 +49,27 @@ describe('prepareMediaSchema bug ids', () => {
     expect(prepareMediaSchema.safeParse({ ...base, bugId: '12' }).success).toBe(true);
     expect(prepareMediaSchema.safeParse({ ...base, bugId: '00012' }).success).toBe(false);
     expect(prepareMediaSchema.safeParse({ ...base, bugId: '0' }).success).toBe(false);
+  });
+});
+
+describe('media names and links', () => {
+  it('download names always carry the right extension', () => {
+    expect(downloadName('login screen', 'image/png')).toBe('login screen.png');
+    expect(downloadName('shot.PNG', 'image/png')).toBe('shot.PNG');
+    expect(downloadName('photo.jpeg', 'image/jpeg')).toBe('photo.jpeg');
+    expect(downloadName('clip at 0:42', 'video/mp4')).toBe('clip at 0:42.mp4');
+  });
+  it('formats recording positions as m:ss and builds in-app links', () => {
+    expect(clock(0)).toBe('0:00'); expect(clock(61.4)).toBe('1:01'); expect(clock(3599)).toBe('59:59');
+    expect(mediaLinkPath('12')).toBe('/media/12'); expect(mediaLinkPath('12', 'abc')).toBe('/media/12?m=abc');
+  });
+  it('accepts lineage on prepare and bounds rename', () => {
+    const base = { bugId: '12', id: '6f1e2d3c-4b5a-4c6d-8e7f-9a0b1c2d3e4f', name: 'frame', contentType: 'image/png', size: 10 };
+    expect(prepareMediaSchema.parse(base)).toMatchObject({ derivedFrom: null, atSeconds: null });
+    expect(prepareMediaSchema.safeParse({ ...base, derivedFrom: '7f1e2d3c-4b5a-4c6d-8e7f-9a0b1c2d3e4f', atSeconds: 42.5 }).success).toBe(true);
+    expect(prepareMediaSchema.safeParse({ ...base, derivedFrom: 'nope' }).success).toBe(false);
+    expect(renameMediaSchema.safeParse({ id: base.id, name: '  ' }).success).toBe(false);
+    expect(renameMediaSchema.safeParse({ id: base.id, name: 'x'.repeat(121) }).success).toBe(false);
+    expect(renameMediaSchema.parse({ id: base.id, name: ' Login error ' }).name).toBe('Login error');
   });
 });

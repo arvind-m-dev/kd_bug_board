@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { Check, Eye, LockKeyhole, Moon, Palette as PaletteIcon, RotateCcw, Save, Sun, Undo2, Wand2 } from 'lucide-react';
+import { Check, Eye, LockKeyhole, Moon, Palette as PaletteIcon, RotateCcw, Save, Sun, Undo2, Users, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -11,7 +11,7 @@ import { cssOklchToHex } from '@/lib/color';
 import { saveAppearance } from '@/lib/appearance.functions';
 import { savePortalAppearance } from '@/lib/member-management.functions';
 import { useTheme } from './theme-toggle';
-import { actionError } from './action-feedback';
+import { ConfirmAction, actionError } from './action-feedback';
 
 type PortalType = 'reporter' | 'qa' | 'developer' | 'member';
 type Scope = { scope: 'workspace' } | { scope: 'portal'; token: string; type: PortalType };
@@ -37,6 +37,7 @@ export function ThemeStudio(props: Scope) {
   // Where this editor starts: the workspace theme, or the member's own choices on top of it.
   const base = useMemo<Appearance>(() => forWorkspace ? workspace : { ...workspace, ...(personal ?? {}), membersMayCustomize: workspace.membersMayCustomize }, [forWorkspace, workspace, personal]);
   const [draft, setDraft] = useState<Appearance>(base);
+  const [confirmAll, setConfirmAll] = useState(false);
   const dirty = !same(draft, base);
   // Follow a refreshed base (another tab saved, a refetch) while nothing is being edited here.
   const lastBase = useRef(base);
@@ -53,15 +54,20 @@ export function ThemeStudio(props: Scope) {
 
   const saveWorkspace = useServerFn(saveAppearance); const savePortal = useServerFn(savePortalAppearance);
   const save = useMutation({
-    mutationFn: async (next: Appearance | null) => {
-      if (forWorkspace) return { kind: 'workspace' as const, value: await saveWorkspace({ data: next ?? draft }) };
+    mutationFn: async (arg: Appearance | null | { all: true }) => {
+      const next = arg && 'all' in arg ? draft : arg;
+      if (forWorkspace) { const r = await saveWorkspace({ data: { appearance: next ?? draft, forAllPortals: !!(arg && 'all' in arg) } }); return { kind: 'workspace' as const, value: r.appearance, reset: r.portalsReset, all: !!(arg && 'all' in arg) }; }
       const p = props as Extract<Scope, { scope: 'portal' }>; const value = next ? portalAppearanceSchema.parse(omitSwitch(next)) : null;
       await savePortal({ data: { token: p.token, type: p.type, appearance: value } });
       return { kind: 'portal' as const, value };
     },
     onSuccess: r => {
       preview(null);
-      if (r.kind === 'workspace') { setWorkspace(r.value); setDraft(r.value); toast.success('Theme saved', { description: 'Applied to the workspace and every member portal.' }); return; }
+      if (r.kind === 'workspace') {
+        setWorkspace(r.value); setDraft(r.value); setConfirmAll(false);
+        toast.success(r.all ? 'Theme saved for all portals' : 'Theme saved for the main panel', { description: r.all ? (r.reset ? `${r.reset} personal ${r.reset === 1 ? 'theme was' : 'themes were'} cleared, so every portal now shows this theme.` : 'Every portal now shows this theme.') : 'The workspace and every portal without a personal theme use it; members keep their own choices.' });
+        return;
+      }
       setPersonal(r.value); setDraft(r.value ? { ...workspace, ...r.value, membersMayCustomize: workspace.membersMayCustomize } : workspace);
       void client.invalidateQueries({ queryKey: ['personal-portal'] });
       toast.success(r.value ? 'Your theme is saved' : 'Back to the workspace theme', { description: r.value ? 'It follows you on every device you open your portal on.' : undefined });
@@ -136,9 +142,11 @@ export function ThemeStudio(props: Scope) {
       <span className="ml-auto flex flex-wrap gap-2">
         {!forWorkspace && personal && <Button type="button" variant="ghost" size="sm" disabled={save.isPending} onClick={() => save.mutate(null)}><RotateCcw />Use workspace theme</Button>}
         {dirty && <Button type="button" variant="outline" size="sm" disabled={save.isPending} onClick={() => setDraft(base)}><Undo2 />Discard</Button>}
-        {dirty && <Button type="button" size="sm" disabled={save.isPending} onClick={() => save.mutate(draft)}><Save />{forWorkspace ? 'Save for everyone' : 'Save my theme'}</Button>}
+        {dirty && forWorkspace && <Button type="button" variant="outline" size="sm" disabled={save.isPending} onClick={() => setConfirmAll(true)}><Users />Save for all portals</Button>}
+        {dirty && <Button type="button" size="sm" disabled={save.isPending} onClick={() => save.mutate(draft)}><Save />{forWorkspace ? 'Save for main panel' : 'Save my theme'}</Button>}
       </span>
     </div>}
+    <ConfirmAction open={confirmAll} onOpenChange={setConfirmAll} title="Save this theme for all portals?" description="Every member portal switches to this theme and any personal theme a member has chosen is cleared. Members can pick their own again afterwards if you leave that allowed." confirmLabel="Save for all portals" onConfirm={() => save.mutateAsync({ all: true }).then(() => undefined)} />
   </section>;
 }
 

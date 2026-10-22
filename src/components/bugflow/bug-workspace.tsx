@@ -65,7 +65,7 @@ export function BugWorkspace({access,initialFilter='all',initialFilterLabel,init
  <Dialog open={id!==null} onOpenChange={open=>{if(!open){setId(null);setEditOnOpen(false);}}}><DialogContent className="max-w-3xl max-h-[88vh] overflow-y-auto"><DialogHeader><DialogTitle>Bug details</DialogTitle><DialogDescription>Report, ownership and change history</DialogDescription></DialogHeader>{id&&<BugDetails startEditing={editOnOpen} onDeleted={()=>setId(null)} key={id} id={id} access={access} workspace={d}/>}</DialogContent></Dialog>
  </>;
 }
-export function BugDetails({id,access,workspace,onDeleted=()=>{},startEditing=false}:{startEditing?:boolean;id:string;access:BugAccess;workspace:BugWorkspaceData;onDeleted?:()=>void}){
+export function BugDetails({id,access,workspace,onDeleted=()=>{},startEditing=false,openMediaId}:{startEditing?:boolean;id:string;access:BugAccess;workspace:BugWorkspaceData;onDeleted?:()=>void;openMediaId?:string|undefined}){
  const client=useQueryClient();const fetch=useServerFn(getBugDetail);const update=useServerFn(updateBug);const detail=useQuery({queryKey:['bug-detail',access,id],queryFn:()=>fetch({data:{access,id}}),retry:false,refetchInterval:20000});
  const [notes,setNotes]=useState('');const [noteTo,setNoteTo]=useState('');const [noteToName,setNoteToName]=useState('');const [status,setStatus]=useState('');const [priority,setPriority]=useState('');const [assignees,setAssignees]=useState<string[]>([]);const [pending,setPending]=useState<Partial<BugChange>|null>(null);const [requestId,setRequestId]=useState(()=>crypto.randomUUID());const [editing,setEditing]=useState(startEditing);const [removing,setRemoving]=useState(false);const remove=useServerFn(deleteBug);
  const mutation=useMutation({mutationFn:update,onSuccess:async()=>{await Promise.all([client.invalidateQueries({queryKey:['bug-detail']}),client.invalidateQueries({queryKey:['bug-workspace']})]);setNotes('');setNoteTo('');setNoteToName('');setStatus('');setPriority('');setAssignees([]);setRequestId(crypto.randomUUID());toast.success('Bug updated');}});
@@ -98,7 +98,7 @@ export function BugDetails({id,access,workspace,onDeleted=()=>{},startEditing=fa
   </header>
   <StatusNoteBox bug={b}/>
   <BugReportContent bug={b} showEvidence={actor.permissions.includes('evidence')}/>
-  <BugMedia access={access} bug={b} actor={actor} items={detail.data.media} config={workspace.media}/>
+  <BugMedia access={access} bug={b} actor={actor} items={detail.data.media} config={workspace.media} openMediaId={openMediaId}/>
   {actor.permissions.includes('comment')&&<section className="bf-rc-card" data-tone="info"><h3 className="bf-section-title"><span className="bf-rc-icon"><MessageSquare size={15}/></span>Add a comment</h3>
    <textarea className="bf-note-input" rows={3} maxLength={4000} placeholder="Share an update, ask a question or add context…" value={notes} onChange={e=>setNotes(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();void addComment();}}}/>
    <div className="flex flex-wrap items-center gap-2">{notes.trim()&&<><ThemedSelect label="Send note to" placeholder="Send to… (optional)" value={noteTo} onChange={setNoteTo} options={[`Developer · ${b.assignee}`,`Reporter · ${b.reporter}`,'Product manager','Client','Other'].map(v=>({value:v,label:v}))}/>{noteTo==='Other'&&<Input className="h-9 w-48" placeholder="Name (specify)" value={noteToName} maxLength={60} onChange={e=>setNoteToName(e.target.value)}/>}</>}

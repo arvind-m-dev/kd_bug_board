@@ -1279,3 +1279,29 @@ html[data-skin=autumn].dark { --background: oklch(.18 .03 45); --card: oklch(.23
 html[data-skin=autumn] .bf-logo { background: linear-gradient(135deg, var(--primary), var(--brand-2)); }
 html[data-skin=autumn] .bf-page-heading h1 { letter-spacing: -.005em; }
 html[data-skin=autumn] body { background-image: radial-gradient(50% 35% at 100% 0%, color-mix(in oklab, var(--primary) 10%, transparent), transparent 70%); background-attachment: fixed; }
+
+/* ───────────── Media: names, lightbox navigation, mark-up editor, library ───────────── */
+.bf-upload-name { width: 100%; min-width: 0; padding: 3px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--foreground); font: inherit; font-size: 12.5px; font-weight: 600; }
+.bf-upload-name:focus { outline: 2px solid color-mix(in oklab, var(--primary) 50%, transparent); outline-offset: 1px; border-color: var(--primary); }
+.bf-media-lineage { display: block; color: var(--primary); font-size: 11px; font-weight: 600; }
+.bf-media-tile[data-derived] { border-color: color-mix(in oklab, var(--primary) 45%, var(--border)); }
+.bf-media-actions { flex-wrap: wrap; }
+.bf-lightbox-stage { position: relative; display: grid; place-items: center; min-height: 240px; }
+.bf-lightbox-stage iframe { width: 100%; height: 70vh; border: 0; border-radius: 8px; background: #fff; }
+.bf-lightbox-nav { position: absolute; top: 50%; translate: 0 -50%; display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgb(0 0 0 / .55); color: #fff; cursor: pointer; opacity: .85; }
+.bf-lightbox-nav:hover { opacity: 1; } .bf-lightbox-nav[data-dir=prev] { left: 8px; } .bf-lightbox-nav[data-dir=next] { right: 8px; }
+.bf-lightbox-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bf-lightbox-bar .bf-media-lineage { margin-left: auto; }
+.bf-annotate-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.bf-annotate-colors { display: flex; gap: 5px; } .bf-annotate-colors button { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--card); box-shadow: 0 0 0 1px var(--border); cursor: pointer; }
+.bf-annotate-colors button[aria-checked=true] { box-shadow: 0 0 0 2px var(--primary); transform: scale(1.12); }
+.bf-annotate-stage { position: relative; display: grid; place-items: center; max-height: 68vh; overflow: auto; border-radius: 8px; background: #111; }
+.bf-annotate-stage canvas { display: block; max-width: 100%; max-height: 68vh; object-fit: contain; touch-action: none; cursor: crosshair; }
+.bf-annotate-stage[data-tool=text] canvas { cursor: text; }
+.bf-annotate-text { position: absolute; z-index: 2; min-width: 160px; padding: 4px 8px; border: 2px solid var(--primary); border-radius: 6px; background: var(--card); color: var(--foreground); font: 600 14px system-ui, sans-serif; }
+.bf-annotate-save { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.bf-annotate-save .bf-input { width: 100%; padding: 6px 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--foreground); font: inherit; font-size: 13px; }
+.bf-library { display: grid; gap: 14px; }
+.bf-library-group { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+.bf-library-group > header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; font-size: 13px; }
+.bf-library-group > header strong { min-width: 0; max-width: 60%; }

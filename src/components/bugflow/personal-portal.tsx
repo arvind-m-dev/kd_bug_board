@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { useNavigate } from '@tanstack/react-router';
-import { Bug, ShieldCheck, LockKeyhole, Menu, X, CircleHelp, FolderKanban, CalendarDays, Hash, CircleCheck, CircleMinus, Palette, type LucideIcon } from 'lucide-react';
+import { Bug, ShieldCheck, LockKeyhole, Menu, X, CircleHelp, FolderKanban, CalendarDays, Hash, CircleCheck, CircleMinus, Palette, Images, type LucideIcon } from 'lucide-react';
+import { MediaLibrary } from './media-library';
+import { rememberPortal } from './media-link';
 import { ThemeToggle, useTheme } from './theme-toggle';
 import { ThemeStudio } from './appearance-settings';
 import { BrandMark } from './decorations';
@@ -21,9 +23,9 @@ import { initials, roleText } from '@/lib/format';
 import { useMemberFavicon } from '@/hooks/use-member-favicon';
 import { usePresence } from '@/hooks/use-presence';
 
-type Tab='bugs'|'access'|'theme'|'help';
+type Tab='bugs'|'media'|'access'|'theme'|'help';
 type Focus={filter:string;label:string};
-const TABS:{id:Tab;label:string;icon:LucideIcon}[]=[{id:'bugs',label:'My bugs',icon:Bug},{id:'access',label:'My access',icon:ShieldCheck},{id:'theme',label:'My theme',icon:Palette},{id:'help',label:'How it works',icon:CircleHelp}];
+const TABS:{id:Tab;label:string;icon:LucideIcon}[]=[{id:'bugs',label:'My bugs',icon:Bug},{id:'media',label:'My media',icon:Images},{id:'access',label:'My access',icon:ShieldCheck},{id:'theme',label:'My theme',icon:Palette},{id:'help',label:'How it works',icon:CircleHelp}];
 
 export function PersonalPortal({token,type}:{token:string;type:'reporter'|'qa'|'developer'|'member'}){
  const client=useQueryClient();const acknowledge=useServerFn(dismissWelcome);const welcome=useMutation({mutationFn:acknowledge,onSuccess:()=>client.invalidateQueries({queryKey:['personal-portal']})});const read=useServerFn(getMemberPortal);
@@ -40,6 +42,8 @@ export function PersonalPortal({token,type}:{token:string;type:'reporter'|'qa'|'
  const {setPersonal}=useTheme();const hasPortal=!!portal.data;const personalKey=JSON.stringify(portal.data?.appearance??null);
  useEffect(()=>{if(hasPortal)setPersonal(JSON.parse(personalKey) as PortalAppearance|null);},[hasPortal,personalKey,setPersonal]);
  useEffect(()=>()=>setPersonal(null),[setPersonal]);
+ // Remembered so in-app media links (/media/…) open from this browser without pasting the portal link again.
+ useEffect(()=>{if(hasPortal)rememberPortal(type,token);},[hasPortal,type,token]);
  if(portal.isPending)return <main className="bf-main"><div className="bf-access" role="status"><Bug className="mx-auto mb-4 animate-pulse text-primary" size={30}/><h1>Opening your portal…</h1><p><LiveClock/></p></div></main>;
  if(!portal.data)return <div className="min-h-screen bg-background"><header className="bf-topbar"><strong>Futurist Global Bug Board</strong></header><main className="bf-main"><div className="bf-access"><LockKeyhole className="mx-auto mb-5 text-primary" size={32}/><h1>Portal unavailable</h1><p>This link may be invalid, expired, or revoked. Ask your Admin for a new link if the problem continues.</p>{portal.isError&&<ErrorNotice message="This portal could not be verified. Please try again." onRetry={()=>{void portal.refetch();}} retrying={portal.isFetching}/>}</div></main></div>;
  const p=portal.data;const access:BugAccess={kind:'portal',token,type};const role=roleText(p.role);const first=p.name.trim().split(/\s+/)[0]||p.name;const current=TABS.find(t=>t.id===tab)!;
@@ -59,6 +63,7 @@ export function PersonalPortal({token,type}:{token:string;type:'reporter'|'qa'|'
      <dl className="bf-portal-meta"><div><dt><Hash size={12}/>Member ID</dt><dd className="font-mono">{p.memberCode}</dd></div><div><dt><CalendarDays size={12}/>Member since</dt><dd>{new Date(p.since).toLocaleDateString('en-GB',{dateStyle:'medium'})}</dd></div><div><dt><ShieldCheck size={12}/>Permissions</dt><dd>{p.permissions.length}</dd></div></dl>
     </section>
     {tab==='bugs'&&<><PortalFocus access={access} role={p.role} permissions={p.permissions} focus={focus.filter} onFocus={setFocus}/><BugWorkspace key={focus.filter} access={access} initialFilter={focus.filter} initialFilterLabel={focus.label}/></>}
+    {tab==='media'&&<MediaLibrary access={access}/>}
     {tab==='access'&&<AccessPanel role={p.role} granted={p.permissions} scope={p.scope}/>}
     {tab==='theme'&&<div className="bf-panel p-5"><ThemeStudio scope="portal" token={token} type={type}/></div>}
     {tab==='help'&&<div className="bf-panel p-5"><HelpContent audience="portal" role={p.role}/></div>}

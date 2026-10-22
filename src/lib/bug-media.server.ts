@@ -1,7 +1,8 @@
 import { neonQuery, neonExecute } from './neon.server';
 import { checkOrigin, requireAdmin } from './portal-access.server';
 import { actorFor, bugDetail } from './bug-workflow.server';
-import { MEDIA_MAX_BYTES, MEDIA_MAX_FILES, MEDIA_ON, MEDIA_OFF, MEDIA_PENDING_MINUTES, MEDIA_PUT_TTL, MEDIA_URL_TTL, isMediaType, mayDeleteMedia, mayUploadMedia, mediaKey, mediaKind, providerName, safeFileName, type MediaConfig, type MediaItem, type MediaStatus, type MediaType, type prepareMediaSchema, type finishMediaSchema } from './bug-media';
+import { MEDIA_MAX_BYTES, MEDIA_MAX_FILES, MEDIA_ON, MEDIA_OFF, MEDIA_PENDING_MINUTES, MEDIA_PUT_TTL, MEDIA_URL_TTL, isMediaType, mayDeleteMedia, mayUploadMedia, mediaKey, mediaKind, providerName, safeFileName, type LibraryItem, type MediaConfig, type MediaItem, type MediaStatus, type MediaType, type prepareMediaSchema, type finishMediaSchema, type renameMediaSchema, downloadName } from './bug-media';
+import { formatBugCode } from './bug-workflow';
 import type { BugAccess } from './bug-workflow';
 import type { z } from 'zod';
 
@@ -64,13 +65,13 @@ async function remove(cfg: Config, key: string) {
   await storageCall('delete', async () => { try { await (await s3(cfg)).send(new DeleteObjectCommand({ Bucket: cfg.bucket, Key: key })); } catch (e) { if (!isNotFound(e)) throw e; } });
 }
 
-const ITEM = `m.id,m.bug_id,m.key,m.name,m.content_type,m.kind,m.size,m.width,m.height,m.uploaded_by,u.name as uploader,to_json(m.created_at) as created_iso`;
+const ITEM = `m.id,m.bug_id,m.key,m.name,m.content_type,m.kind,m.size,m.width,m.height,m.uploaded_by,m.derived_from,m.at_seconds,u.name as uploader,to_json(m.created_at) as created_iso`;
 async function toItems(rows: Record<string, unknown>[], withUrls: boolean): Promise<MediaItem[]> {
   const { config } = mediaConfig(); const expiresAt = new Date(Date.now() + MEDIA_URL_TTL * 1000).toISOString();
   return Promise.all(rows.map(async r => {
     const contentType = String(r['content_type']) as MediaType; const name = String(r['name']);
-    const url = withUrls && config ? await signGet(config, String(r['key']), contentType, name).catch(() => null) : null;
-    return { id: String(r['id']), bugId: String(r['bug_id']), name, contentType, kind: mediaKind(contentType), size: Number(r['size']), width: r['width'] == null ? null : Number(r['width']), height: r['height'] == null ? null : Number(r['height']), uploadedById: String(r['uploaded_by']), uploadedBy: String(r['uploader']), createdAt: String(r['created_iso']), url, expiresAt: url ? expiresAt : null };
+    const url = withUrls && config ? await signGet(config, String(r['key']), contentType, downloadName(name, contentType)).catch(() => null) : null;
+    return { id: String(r['id']), bugId: String(r['bug_id']), name, contentType, kind: mediaKind(contentType), size: Number(r['size']), width: r['width'] == null ? null : Number(r['width']), height: r['height'] == null ? null : Number(r['height']), uploadedById: String(r['uploaded_by']), uploadedBy: String(r['uploader']), createdAt: String(r['created_iso']), url, expiresAt: url ? expiresAt : null, derivedFrom: r['derived_from'] == null ? null : String(r['derived_from']), atSeconds: r['at_seconds'] == null ? null : Number(r['at_seconds']) };
   }));
 }
 /** Ready files on a bug, newest last. Callers must already have proved the bug is in the actor's scope; pass withUrls only for actors holding 'evidence'. */
@@ -88,10 +89,11 @@ export async function prepareUpload(access: BugAccess, data: z.infer<typeof prep
   // One transaction: the bug row is locked so two concurrent prepares cannot both pass the per-bug cap.
   const { results } = await neonExecute<{ results: { rows: Record<string, unknown>[] }[] }>([
     { query: `select 1 from bugflow.bugs where id=$1 for update`, params: [data.bugId] },
-    { query: `insert into bugflow.bug_media(id,bug_id,key,name,content_type,size,kind,uploaded_by,uploaded_via)
-    select $1,$2,$3,$4,$5,$6,$7,$8,$9 where (select count(*) from bugflow.bug_media x where x.bug_id=$2 and x.deleted_at is null and (x.status='ready' or x.created_at>now()-interval '${MEDIA_PENDING_MINUTES} minutes'))<$10
+    { query: `insert into bugflow.bug_media(id,bug_id,key,name,content_type,size,kind,uploaded_by,uploaded_via,derived_from,at_seconds)
+    select $1,$2,$3,$4,$5,$6,$7,$8,$9,$11,$12 where (select count(*) from bugflow.bug_media x where x.bug_id=$2 and x.deleted_at is null and (x.status='ready' or x.created_at>now()-interval '${MEDIA_PENDING_MINUTES} minutes'))<$10
+      and ($11::uuid is null or exists(select 1 from bugflow.bug_media d where d.id=$11 and d.bug_id=$2 and d.status='ready' and d.deleted_at is null))
     on conflict (id) do update set name=excluded.name,size=excluded.size where bugflow.bug_media.uploaded_by=excluded.uploaded_by and bugflow.bug_media.bug_id=excluded.bug_id and bugflow.bug_media.content_type=excluded.content_type and bugflow.bug_media.status='pending' and bugflow.bug_media.deleted_at is null returning id`,
-      params: [data.id, data.bugId, key, safeFileName(data.name), data.contentType, data.size, mediaKind(data.contentType), actor.userId, actor.role, MEDIA_MAX_FILES] },
+      params: [data.id, data.bugId, key, safeFileName(data.name), data.contentType, data.size, mediaKind(data.contentType), actor.userId, actor.role, MEDIA_MAX_FILES, data.derivedFrom, data.atSeconds] },
   ]);
   if (!results[1]?.rows.length) {
     const { rows } = await neonQuery(`select 1 from bugflow.bug_media where id=$1 limit 1`, [data.id]);
@@ -123,6 +125,29 @@ export async function finishUpload(access: BugAccess, data: z.infer<typeof finis
       params: [data.id, crypto.randomUUID(), bugId, actor.userId, String(row['name']), obj.size, data.width, data.height, String(row['kind'])] },
   ]);
   return (await toItems([{ ...row, size: obj.size, width: data.width, height: data.height }], actor.permissions.includes('evidence')))[0]!;
+}
+/** Gives a file a new name (what people see everywhere); only the uploader or Admin, like removal. */
+export async function renameMedia(access: BugAccess, data: z.infer<typeof renameMediaSchema>): Promise<MediaItem> {
+  checkOrigin(); const actor = await actorFor(access);
+  const { rows } = await neonQuery(`select ${ITEM} from bugflow.bug_media m join bugflow.users u on u.id=m.uploaded_by where m.id=$1 and m.status='ready' and m.deleted_at is null limit 1`, [data.id]);
+  const row = rows[0]; if (!row) throw new Error('This file is no longer available.');
+  await bugDetail(access, String(row['bug_id']));
+  if (!mayDeleteMedia(actor, { uploadedById: String(row['uploaded_by']) })) throw new Error('Only the person who attached a file, or Admin, can rename it.');
+  const name = safeFileName(data.name); const was = String(row['name']);
+  if (name !== was) await neonExecute([
+    { query: `update bugflow.bug_media set name=$2 where id=$1`, params: [data.id, name] },
+    { query: `insert into bugflow.activity(id,bug_id,actor_id,action,detail) values($1,$2,$3,'bug.media_renamed',jsonb_build_object('media',$4::text,'from',$5::text))`, params: [crypto.randomUUID(), String(row['bug_id']), actor.userId, name, was] },
+  ]);
+  return (await toItems([{ ...row, name }], actor.permissions.includes('evidence')))[0]!;
+}
+/** Everything the actor attached (Admin: everything anyone attached), newest first, with the bug each file belongs to. */
+export async function listLibrary(access: BugAccess): Promise<LibraryItem[]> {
+  const actor = await actorFor(access); if (!actor.permissions.includes('view')) throw new Error('Bug access is not permitted.');
+  const mine = actor.role !== 'admin';
+  const { rows } = await neonQuery(`select ${ITEM},b.title as bug_title,b.status as bug_status from bugflow.bug_media m join bugflow.users u on u.id=m.uploaded_by join bugflow.bugs b on b.id=m.bug_id
+    where m.status='ready' and m.deleted_at is null and b.deleted_at is null ${mine ? 'and m.uploaded_by=$1' : ''} order by m.created_at desc,m.id limit 500`, mine ? [actor.userId] : []);
+  const items = await toItems(rows, actor.permissions.includes('evidence'));
+  return items.map((it, i) => ({ ...it, bugCode: formatBugCode(it.bugId), bugTitle: String(rows[i]!['bug_title']), bugStatus: String(rows[i]!['bug_status']) }));
 }
 /** Removes a file: hidden immediately and audited atomically; the object is deleted right after (retried by the sweep if that fails). */
 export async function deleteMedia(access: BugAccess, id: string) {

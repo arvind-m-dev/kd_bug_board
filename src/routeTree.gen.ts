@@ -22,6 +22,7 @@ import { Route as AdminReportsRouteImport } from './routes/admin_.reports'
 import { Route as AdminSettingsRouteImport } from './routes/admin_.settings'
 import { Route as AdminUsersRouteImport } from './routes/admin_.users'
 import { Route as DeveloperPortalTokenRouteImport } from './routes/developer.$portalToken'
+import { Route as MediaBugIdRouteImport } from './routes/media.$bugId'
 import { Route as MemberPortalTokenRouteImport } from './routes/member.$portalToken'
 import { Route as QaPortalTokenRouteImport } from './routes/qa.$portalToken'
 import { Route as ReporterPortalTokenRouteImport } from './routes/reporter.$portalToken'
@@ -91,6 +92,11 @@ const DeveloperPortalTokenRoute = DeveloperPortalTokenRouteImport.update({
   path: '/developer/$portalToken',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MediaBugIdRoute = MediaBugIdRouteImport.update({
+  id: '/media/$bugId',
+  path: '/media/$bugId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MemberPortalTokenRoute = MemberPortalTokenRouteImport.update({
   id: '/member/$portalToken',
   path: '/member/$portalToken',
@@ -121,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/developer/$portalToken': typeof DeveloperPortalTokenRoute
+  '/media/$bugId': typeof MediaBugIdRoute
   '/member/$portalToken': typeof MemberPortalTokenRoute
   '/qa/$portalToken': typeof QaPortalTokenRoute
   '/reporter/$portalToken': typeof ReporterPortalTokenRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/developer/$portalToken': typeof DeveloperPortalTokenRoute
+  '/media/$bugId': typeof MediaBugIdRoute
   '/member/$portalToken': typeof MemberPortalTokenRoute
   '/qa/$portalToken': typeof QaPortalTokenRoute
   '/reporter/$portalToken': typeof ReporterPortalTokenRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/admin_/settings': typeof AdminSettingsRoute
   '/admin_/users': typeof AdminUsersRoute
   '/developer/$portalToken': typeof DeveloperPortalTokenRoute
+  '/media/$bugId': typeof MediaBugIdRoute
   '/member/$portalToken': typeof MemberPortalTokenRoute
   '/qa/$portalToken': typeof QaPortalTokenRoute
   '/reporter/$portalToken': typeof ReporterPortalTokenRoute
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/users'
     | '/developer/$portalToken'
+    | '/media/$bugId'
     | '/member/$portalToken'
     | '/qa/$portalToken'
     | '/reporter/$portalToken'
@@ -196,6 +206,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/users'
     | '/developer/$portalToken'
+    | '/media/$bugId'
     | '/member/$portalToken'
     | '/qa/$portalToken'
     | '/reporter/$portalToken'
@@ -214,6 +225,7 @@ export interface FileRouteTypes {
     | '/admin_/settings'
     | '/admin_/users'
     | '/developer/$portalToken'
+    | '/media/$bugId'
     | '/member/$portalToken'
     | '/qa/$portalToken'
     | '/reporter/$portalToken'
@@ -233,6 +245,7 @@ export interface RootRouteChildren {
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   DeveloperPortalTokenRoute: typeof DeveloperPortalTokenRoute
+  MediaBugIdRoute: typeof MediaBugIdRoute
   MemberPortalTokenRoute: typeof MemberPortalTokenRoute
   QaPortalTokenRoute: typeof QaPortalTokenRoute
   ReporterPortalTokenRoute: typeof ReporterPortalTokenRoute
@@ -331,6 +344,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DeveloperPortalTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/media/$bugId': {
+      id: '/media/$bugId'
+      path: '/media/$bugId'
+      fullPath: '/media/$bugId'
+      preLoaderRoute: typeof MediaBugIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/member/$portalToken': {
       id: '/member/$portalToken'
       path: '/member/$portalToken'
@@ -369,6 +389,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminSettingsRoute: AdminSettingsRoute,
   AdminUsersRoute: AdminUsersRoute,
   DeveloperPortalTokenRoute: DeveloperPortalTokenRoute,
+  MediaBugIdRoute: MediaBugIdRoute,
   MemberPortalTokenRoute: MemberPortalTokenRoute,
   QaPortalTokenRoute: QaPortalTokenRoute,
   ReporterPortalTokenRoute: ReporterPortalTokenRoute,

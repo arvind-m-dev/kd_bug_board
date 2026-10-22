@@ -20,7 +20,16 @@ export const MEDIA_PENDING_MINUTES = 120; // an upload that never finished is fo
 export const MEDIA_MAX_EDGE = 1920; // images are resized to this longest edge in the browser
 export const MEDIA_QUALITY = 0.82;
 
-export type MediaItem = { id: string; bugId: string; name: string; contentType: MediaType; kind: MediaKind; size: number; width: number | null; height: number | null; uploadedById: string; uploadedBy: string; createdAt: string; url: string | null; expiresAt: string | null };
+export type MediaItem = { id: string; bugId: string; name: string; contentType: MediaType; kind: MediaKind; size: number; width: number | null; height: number | null; uploadedById: string; uploadedBy: string; createdAt: string; url: string | null; expiresAt: string | null; derivedFrom: string | null; atSeconds: number | null };
+/** A file in someone's media library: the item plus the bug it belongs to. */
+export type LibraryItem = MediaItem & { bugCode: string; bugTitle: string; bugStatus: string };
+export const MEDIA_NAME_MAX = 120;
+/** In-app links: they open the bug (and the file) for whoever is signed in or has their portal open; never a public URL. */
+export const mediaLinkPath = (bugId: string, mediaId?: string) => `/media/${bugId}${mediaId ? `?m=${mediaId}` : ''}`;
+/** A download file name always carries the right extension, whatever the person called the file. */
+export const downloadName = (name: string, contentType: MediaType) => { const ext = MEDIA_TYPES[contentType].ext; return name.toLowerCase().endsWith(`.${ext}`) || (ext === 'jpg' && name.toLowerCase().endsWith('.jpeg')) ? name : `${name}.${ext}`; };
+/** mm:ss for a position in a recording. */
+export const clock = (seconds: number) => { const s = Math.max(0, Math.round(seconds)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 export type MediaConfig = { enabled: boolean; maxBytes: number; maxFiles: number; accept: string[] };
 export const MEDIA_OFF: MediaConfig = { enabled: false, maxBytes: MEDIA_MAX_BYTES, maxFiles: MEDIA_MAX_FILES, accept: MEDIA_ACCEPT };
 export const MEDIA_ON: MediaConfig = { ...MEDIA_OFF, enabled: true };
@@ -77,7 +86,8 @@ export function mayUploadMedia(actor: Actor, bug: BugLike) {
 export const mayDeleteMedia = (actor: Actor, item: { uploadedById: string }) => actor.role === 'admin' || item.uploadedById === actor.userId;
 
 const id = z.string().uuid(); const bugId = z.string().regex(/^[1-9]\d*$/);
-export const prepareMediaSchema = z.object({ bugId, id, name: z.string().trim().min(1).max(255), contentType: z.enum(MEDIA_ACCEPT as [MediaType, ...MediaType[]]), size: z.number().int().min(1).max(MEDIA_MAX_BYTES) }).strict();
+export const prepareMediaSchema = z.object({ bugId, id, name: z.string().trim().min(1).max(255), contentType: z.enum(MEDIA_ACCEPT as [MediaType, ...MediaType[]]), size: z.number().int().min(1).max(MEDIA_MAX_BYTES), derivedFrom: id.nullable().default(null), atSeconds: z.number().min(0).max(360000).nullable().default(null) }).strict();
+export const renameMediaSchema = z.object({ id, name: z.string().trim().min(1).max(MEDIA_NAME_MAX) }).strict();
 export const finishMediaSchema = z.object({ id, width: z.number().int().min(1).max(20000).nullable().default(null), height: z.number().int().min(1).max(20000).nullable().default(null) }).strict();
 export const deleteMediaSchema = z.object({ id }).strict();
 export const mediaStatusSchema = z.object({ test: z.boolean().default(false) }).strict();
