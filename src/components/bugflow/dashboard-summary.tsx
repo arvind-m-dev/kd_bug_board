@@ -92,7 +92,7 @@ export function DashboardSummary() {
 
     {/* 2 · What to act on, and where work sits */}
     <div className="bf-ov-row bf-ov-row-main">
-      <section className="bf-panel bf-ov-panel" aria-labelledby="ov-attention">
+      <section className="bf-panel bf-ov-panel" aria-labelledby="ov-attention" data-ui="attention">
         <div className="bf-panel-heading"><div><h2 id="ov-attention">Needs your attention</h2><p className="bf-panel-sub">Most urgent first · priority, then oldest</p></div><Link to="/admin/bugs" search={{ filter: 'open' }}>All {attention.length}<ArrowUpRight size={12} /></Link></div>
         {loading ? <SkeletonRows rows={6} label="Loading bugs" /> : urgent.length === 0 ? <div className="bf-ov-empty"><CheckCircle2 size={22} />You’re all caught up</div> :
           <><ul className="bf-urgent bf-urgent-scroll" key={`${page}-${perPage}`}>{urgent.map(b => <li key={b.id}><Link to="/admin/bugs" search={{ filter: b.status }}>
@@ -107,7 +107,7 @@ export function DashboardSummary() {
             <span className="bf-pager-nav"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)} aria-label="Previous page"><ChevronLeft size={14} /></Button><span>{page + 1} / {pages}</span><Button variant="outline" size="sm" disabled={page >= pages - 1} onClick={() => setPage(page + 1)} aria-label="Next page"><ChevronRight size={14} /></Button></span>
           </div></>}
       </section>
-      <section className="bf-panel bf-ov-panel" aria-labelledby="ov-pipeline">
+      <section className="bf-panel bf-ov-panel" aria-labelledby="ov-pipeline" data-ui="pipeline">
         <div className="bf-panel-heading"><div><h2 id="ov-pipeline">Bug pipeline</h2><p className="bf-panel-sub">{total} bugs by stage · {periodText}</p></div><Link to="/admin/bugs">View all<ArrowUpRight size={12} /></Link></div>
         {loading ? <SkeletonRows rows={5} label="Loading pipeline" /> : <div className="bf-pipeline">
           <div className="bf-pipeline-bar" role="img" aria-label={stages.map(s => `${s.label}: ${s.count}`).join(', ')}>{stages.filter(s => s.count).map(s => <i key={s.key} data-tone={s.tone} style={{ flexGrow: s.count }} title={`${s.label}: ${s.count}`} />)}{closed > 0 && <i data-tone="neutral" style={{ flexGrow: closed }} title={`Closed without fix: ${closed}`} />}</div>

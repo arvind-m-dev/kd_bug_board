@@ -1208,3 +1208,27 @@ html[data-skin=terminal] .bf-page-heading h1::after { content: "_"; margin-left:
 @keyframes bf-blink { to { opacity: 0; } }
 html[data-skin=terminal] .bf-table th { text-transform: uppercase; letter-spacing: .1em; }
 html[data-skin=terminal] .bf-nav-link[data-status=active] { background: color-mix(in oklab, var(--primary) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primary) 40%, transparent); }
+
+/* ───────────── Attachments: gallery tiles, drop zone, upload queue, lightbox, storage guide ───────────── */
+.bf-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.bf-media-tile { position: relative; display: grid; gap: 0; margin: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--card); overflow: hidden; }
+.bf-media-thumb { position: relative; display: grid; place-items: center; width: 100%; aspect-ratio: 4 / 3; padding: 0; border: 0; background: color-mix(in oklab, var(--t) 8%, var(--muted)); color: var(--t); cursor: zoom-in; }
+.bf-media-thumb:disabled { cursor: default; opacity: .6; } .bf-media-thumb[data-kind=pdf] { cursor: pointer; }
+.bf-media-thumb img, .bf-media-thumb video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.bf-media-kind { position: absolute; top: 6px; left: 6px; padding: 2px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; background: color-mix(in oklab, var(--card) 88%, transparent); color: var(--foreground); }
+.bf-media-play { position: absolute; inset: 0; margin: auto; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; background: rgb(0 0 0 / .55); color: #fff; pointer-events: none; }
+.bf-media-cap { display: grid; gap: 2px; padding: 7px 9px 4px; font-size: 12px; } .bf-media-cap strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; } .bf-media-cap small { color: var(--muted-foreground); }
+.bf-media-actions { display: flex; align-items: center; gap: 2px; padding: 0 5px 5px; }
+.bf-upload:not([aria-disabled=true]) { cursor: pointer; border-color: color-mix(in oklab, var(--primary) 40%, var(--border)); color: var(--foreground); transition: border-color .15s, background .15s; }
+.bf-upload:not([aria-disabled=true]):hover, .bf-upload[data-active=true] { border-color: var(--primary); background: color-mix(in oklab, var(--primary) 8%, var(--card)); }
+.bf-upload:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.bf-upload-queue { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.bf-upload-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); font-size: 12.5px; }
+.bf-upload-row img, .bf-upload-ph { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; } .bf-upload-ph { display: grid; place-items: center; background: var(--muted); color: var(--muted-foreground); }
+.bf-upload-row strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .bf-upload-row small { display: block; color: var(--muted-foreground); }
+.bf-upload-row[data-status=failed] { border-color: color-mix(in oklab, var(--destructive) 40%, var(--border)); } .bf-upload-row[data-status=failed] small { color: var(--destructive); } .bf-upload-row[data-status=done] small { color: var(--success); }
+.bf-lightbox img, .bf-lightbox video { display: block; max-width: 100%; max-height: 70vh; margin: 0 auto; border-radius: 8px; background: #000; }
+.bf-media-guide { display: grid; gap: 12px; padding: 0 0 18px; font-size: 13px; } .bf-media-guide ol { display: grid; gap: 8px; margin: 4px 0 0; padding-left: 20px; line-height: 1.55; }
+.bf-media-guide code { padding: 1px 6px; border-radius: 5px; background: var(--muted); font-size: 11.5px; } .bf-media-guide pre { margin: 6px 0 0; overflow: auto; padding: 10px 12px; border-radius: 8px; background: var(--muted); font-size: 11.5px; line-height: 1.5; }
+.bf-media-missing { display: flex; flex-wrap: wrap; gap: 6px; } .bf-media-missing code { padding: 2px 8px; border-radius: 6px; background: var(--muted); font-size: 11.5px; }
+.text-success { color: var(--success); } .text-warning { color: var(--warning); }

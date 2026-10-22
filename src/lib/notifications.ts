@@ -2,7 +2,7 @@ export const NOTIFICATION_DAYS = 10;
 export type NotificationItem = { id: string; action: string; bugId: string | null; title: string; actor: string; at: string; unread: boolean; status: string };
 const words: Record<string, string> = {
   'bug.created': 'New bug reported', 'bug.sample_created': 'Sample bug added', 'bug.status': 'Status changed',
-  'bug.priority': 'Priority changed', 'bug.severity': 'Severity changed', 'bug.assign': 'Bug assigned', 'bug.comment': 'New comment', 'bug.verify': 'QA verification', 'bug.edited': 'Bug details edited', 'bug.deleted': 'Bug deleted', 'settings.dropdowns': 'Dropdown options updated', 'settings.appearance': 'Colour theme changed',
+  'bug.priority': 'Priority changed', 'bug.severity': 'Severity changed', 'bug.assign': 'Bug assigned', 'bug.comment': 'New comment', 'bug.verify': 'QA verification', 'bug.edited': 'Bug details edited', 'bug.media_added': 'File attached', 'bug.media_deleted': 'File removed', 'bug.deleted': 'Bug deleted', 'settings.dropdowns': 'Dropdown options updated', 'settings.appearance': 'Colour theme changed',
   'portal.created': 'Portal link created', 'portal.regenerated': 'Portal link replaced', 'portal.revoked': 'Portal link revoked',
   'member.updated': 'Member profile updated', 'member.deactivate': 'Member deactivated', 'member.activate': 'Member activated', 'member.delete': 'Member deleted',
   'project.created': 'Project created', 'project.archived': 'Project archived', 'project.restored': 'Project restored',

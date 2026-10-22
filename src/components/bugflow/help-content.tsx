@@ -21,13 +21,13 @@ const QA: Topic[] = [
   { icon: ClipboardCheck, title: 'Validate new reports', text: 'Move New reports to Validating while you reproduce them, then Validated and Ready for assignment — or assign a developer straight away if you have the permission.' },
   { icon: Bug, title: 'Retest fixes', text: 'Bugs marked Ready for QA retest are waiting for you. Pass marks the bug Resolved; Fail reopens it with your note. You cannot pass your own fix.' },
   { icon: Flag, title: 'Reject clearly', text: 'Close duplicates, non-bugs and won’t-fix items with a reason, so the reporter learns what to change next time.' },
-  { icon: Link2, title: 'Evidence', text: 'Screenshots and recordings are shared as Google Drive or Docs links; open them from the Evidence links section of a report.' },
+  { icon: Link2, title: 'Evidence', text: 'Attach screenshots, recordings or PDFs directly on a bug (Attachments), or share Google Drive links. Files are private: only people who can see the bug can open them.' },
 ];
 const REPORTER: Topic[] = [
   { icon: Bug, title: 'Report a bug that gets fixed', text: 'Describe what happened and list the exact steps first — the title is filled in from your description if you leave it empty. One bug per report.' },
   { icon: ListChecks, title: 'Follow progress', text: 'Each bug shows its status: New → Validating → Assigned → In progress → Ready for QA retest → Resolved. Reopened means the fix failed and went back to the developer.' },
   { icon: MessageSquare, title: 'When someone needs more', text: 'Needs information means a question is waiting for you — open the bug, read the note and reply with a comment or by editing your report.' },
-  { icon: Link2, title: 'Evidence', text: 'Attach screenshots or recordings as Google Drive or Docs links in the Evidence field. Direct uploads are not available yet.' },
+  { icon: Link2, title: 'Evidence', text: 'Drop screenshots, recordings or PDFs on a bug — images are compressed automatically — or add Google Drive links. Uploads need media storage connected in Settings.' },
 ];
 const BY_ROLE: Record<string, Topic[]> = { developer: DEVELOPER, qa: QA, tester: REPORTER, other: REPORTER };
 

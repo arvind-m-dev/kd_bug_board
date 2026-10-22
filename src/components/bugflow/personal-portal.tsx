@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { useNavigate } from '@tanstack/react-router';
-import { Bug, ShieldCheck, LockKeyhole, Menu, X, CircleHelp, FolderKanban, CalendarDays, Hash, CircleCheck, CircleMinus, type LucideIcon } from 'lucide-react';
-import { ThemeToggle } from './theme-toggle';
+import { Bug, ShieldCheck, LockKeyhole, Menu, X, CircleHelp, FolderKanban, CalendarDays, Hash, CircleCheck, CircleMinus, Palette, type LucideIcon } from 'lucide-react';
+import { ThemeToggle, useTheme } from './theme-toggle';
+import { ThemeStudio } from './appearance-settings';
+import { BrandMark } from './decorations';
+import type { PortalAppearance } from '@/lib/appearance';
 import { Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription } from '@/components/ui/dialog';
 import { dismissWelcome } from '@/lib/member-management.functions';
 import { getMemberPortal } from '@/lib/portal-access.functions';
@@ -18,9 +21,9 @@ import { initials, roleText } from '@/lib/format';
 import { useMemberFavicon } from '@/hooks/use-member-favicon';
 import { usePresence } from '@/hooks/use-presence';
 
-type Tab='bugs'|'access'|'help';
+type Tab='bugs'|'access'|'theme'|'help';
 type Focus={filter:string;label:string};
-const TABS:{id:Tab;label:string;icon:LucideIcon}[]=[{id:'bugs',label:'My bugs',icon:Bug},{id:'access',label:'My access',icon:ShieldCheck},{id:'help',label:'How it works',icon:CircleHelp}];
+const TABS:{id:Tab;label:string;icon:LucideIcon}[]=[{id:'bugs',label:'My bugs',icon:Bug},{id:'access',label:'My access',icon:ShieldCheck},{id:'theme',label:'My theme',icon:Palette},{id:'help',label:'How it works',icon:CircleHelp}];
 
 export function PersonalPortal({token,type}:{token:string;type:'reporter'|'qa'|'developer'|'member'}){
  const client=useQueryClient();const acknowledge=useServerFn(dismissWelcome);const welcome=useMutation({mutationFn:acknowledge,onSuccess:()=>client.invalidateQueries({queryKey:['personal-portal']})});const read=useServerFn(getMemberPortal);
@@ -33,19 +36,23 @@ export function PersonalPortal({token,type}:{token:string;type:'reporter'|'qa'|'
  useMemberFavicon(portal.data?{name:portal.data.name,code:portal.data.memberCode}:null);
  // Online while this portal is open; offline as soon as it's closed.
  usePresence(token,portal.data?.type??type,!!portal.data);
+ // The member's own theme (saved on their portal) applies here and only here; leaving the portal drops it again.
+ const {setPersonal}=useTheme();const hasPortal=!!portal.data;const personalKey=JSON.stringify(portal.data?.appearance??null);
+ useEffect(()=>{if(hasPortal)setPersonal(JSON.parse(personalKey) as PortalAppearance|null);},[hasPortal,personalKey,setPersonal]);
+ useEffect(()=>()=>setPersonal(null),[setPersonal]);
  if(portal.isPending)return <main className="bf-main"><div className="bf-access" role="status"><Bug className="mx-auto mb-4 animate-pulse text-primary" size={30}/><h1>Opening your portal…</h1><p><LiveClock/></p></div></main>;
  if(!portal.data)return <div className="min-h-screen bg-background"><header className="bf-topbar"><strong>Futurist Global Bug Board</strong></header><main className="bf-main"><div className="bf-access"><LockKeyhole className="mx-auto mb-5 text-primary" size={32}/><h1>Portal unavailable</h1><p>This link may be invalid, expired, or revoked. Ask your Admin for a new link if the problem continues.</p>{portal.isError&&<ErrorNotice message="This portal could not be verified. Please try again." onRetry={()=>{void portal.refetch();}} retrying={portal.isFetching}/>}</div></main></div>;
  const p=portal.data;const access:BugAccess={kind:'portal',token,type};const role=roleText(p.role);const first=p.name.trim().split(/\s+/)[0]||p.name;const current=TABS.find(t=>t.id===tab)!;
  return <div className="bf-shell">
   <aside className="bf-sidebar" data-open={menu} aria-label="Portal navigation">
-   <div className="bf-brand"><span className="bf-logo"><Bug size={23}/></span><span className="bf-brand-name">Futurist Global Bug Board<span className="text-primary">.</span></span></div>
+   <div className="bf-brand"><span className="bf-logo"><BrandMark/></span><span className="bf-brand-name">Futurist Global Bug Board<span className="text-primary">.</span></span></div>
    <div className="bf-workspace"><span className="bf-avatar">{initials(p.name)}</span><div className="min-w-0"><strong className="block truncate text-xs">{p.name}</strong><span className="text-[11.5px] text-muted-foreground">{role} · <span className="font-mono">{p.memberCode}</span></span></div></div>
    <div className="bf-nav-label">My portal</div>
-   <nav className="bf-nav">{TABS.map(t=><button type="button" key={t.id} className="bf-nav-link" data-status={tab===t.id?'active':undefined} aria-current={tab===t.id?'page':undefined} onClick={()=>{setTab(t.id);setMenu(false);}}><t.icon/>{t.label}</button>)}</nav>
+   <nav className="bf-nav">{TABS.map(t=><button type="button" key={t.id} className="bf-nav-link" data-ui={t.id==='help'?'help':undefined} data-status={tab===t.id?'active':undefined} aria-current={tab===t.id?'page':undefined} onClick={()=>{setTab(t.id);setMenu(false);}}><t.icon/>{t.label}</button>)}</nav>
    <div className="bf-sidebar-bottom"><div className="bf-connection"><span className="flex items-center gap-2 text-xs font-semibold"><FolderKanban size={15}/>My projects</span><p className="mt-2 text-xs text-muted-foreground">{p.scope||'No projects assigned yet'}</p></div><div className="flex items-center justify-between rounded-md border px-3 py-1 text-xs"><span>Theme</span><ThemeToggle/></div></div>
   </aside>
   <div className="bf-body">
-   <header className="bf-topbar"><div className="bf-topbar-left"><Button variant="ghost" size="icon" className="bf-mobile-menu" aria-label={menu?'Close navigation':'Open navigation'} onClick={()=>setMenu(!menu)}>{menu?<X/>:<Menu/>}</Button><Button variant="link" className="p-0 text-xs" onClick={()=>setTab('bugs')}>My portal</Button><span className="text-xs text-muted-foreground">/ {current.label}</span></div><div className="bf-topbar-right"><span className="hidden text-xs text-muted-foreground md:inline"><LiveClock/></span><ThemeToggle/></div></header>
+   <header className="bf-topbar"><div className="bf-topbar-left"><Button variant="ghost" size="icon" className="bf-mobile-menu" aria-label={menu?'Close navigation':'Open navigation'} onClick={()=>setMenu(!menu)}>{menu?<X/>:<Menu/>}</Button><Button variant="link" className="p-0 text-xs" onClick={()=>setTab('bugs')}>My portal</Button><span className="text-xs text-muted-foreground">/ {current.label}</span></div><div className="bf-topbar-right"><span className="hidden text-xs text-muted-foreground md:inline" data-ui="clock"><LiveClock/></span><ThemeToggle/></div></header>
    <main className="bf-main">
     <section className="bf-portal-hero" aria-label="About you">
      <div><span className="bf-portal-role">{role}{p.scope?` · ${p.scope}`:''}</span><h1>Hi {first}</h1><p>{roleGuide(p.role)}</p></div>
@@ -53,6 +60,7 @@ export function PersonalPortal({token,type}:{token:string;type:'reporter'|'qa'|'
     </section>
     {tab==='bugs'&&<><PortalFocus access={access} role={p.role} permissions={p.permissions} focus={focus.filter} onFocus={setFocus}/><BugWorkspace key={focus.filter} access={access} initialFilter={focus.filter} initialFilterLabel={focus.label}/></>}
     {tab==='access'&&<AccessPanel role={p.role} granted={p.permissions} scope={p.scope}/>}
+    {tab==='theme'&&<div className="bf-panel p-5"><ThemeStudio scope="portal" token={token} type={type}/></div>}
     {tab==='help'&&<div className="bf-panel p-5"><HelpContent audience="portal" role={p.role}/></div>}
     <footer className="bf-footer"><span>Futurist Global Bug Board · {p.name}</span><span>Private access · Shared records</span></footer>
    </main>

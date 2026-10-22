@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { STATUSES, canTransition, type Status, type Role } from './bugflow';
+import type { MediaConfig } from './bug-media';
 export const PRIORITIES = ['P0','P1','P2','P3','P4','P5'] as const;
 export const priorityNames: Record<string,string> = {P0:'Highest',P1:'Very high',P2:'High',P3:'Medium',P4:'Low',P5:'Lowest'};
 export const DEFAULT_SEVERITIES = ['Critical','High','Medium','Low'];
@@ -36,7 +37,7 @@ export type LiveBug = {id:string;code:string;title:string;projectId:string;proje
 /** The reason recorded when the bug moved into its current status (e.g. why it was reopened). */
 export type StatusNote = {by:string;at:string;notes:string}|null;
 export type BugEvent = {id:string;bugId:string;actor:string;action:string;detail:Record<string,string>;createdAt:string};
-export type BugWorkspaceData = {options:DropdownOptions;actor:BugActor;projects:{id:string;name:string}[];developers:{id:string;name:string;role?:string;projectIds:string[]}[];bugs:LiveBug[];total:number;open:number;recheck:number;resolved:number;unassigned:number;statusCounts:StatusCount[];nextCursor:string|null};
+export type BugWorkspaceData = {options:DropdownOptions;actor:BugActor;projects:{id:string;name:string}[];developers:{id:string;name:string;role?:string;projectIds:string[]}[];bugs:LiveBug[];total:number;open:number;recheck:number;resolved:number;unassigned:number;statusCounts:StatusCount[];nextCursor:string|null;media:MediaConfig};
 export function maySeeBug(actor:BugActor,bug:{reporterId:string;assigneeId:string|null}) {return actor.role==='admin'||actor.role==='qa'||actor.permissions.includes('view_all')||bug.reporterId===actor.userId||bug.assigneeId===actor.userId;}
 export function mayUpdateStatus(actor:BugActor,bug:{status:Status;reporterId:string;assigneeId:string|null},to:Status) {
   if(to==='RESOLVED'||to==='ASSIGNED'||(bug.status==='RECHECK'&&to==='REOPENED'))return false; // only the verification action may resolve

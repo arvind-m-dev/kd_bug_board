@@ -41,8 +41,8 @@ export function ThemeProvider({children}:{children:ReactNode}){
   if(!draft)write(APPEARANCE_CACHE_KEY,JSON.stringify({workspace,personal,light:resolveAppearance(effective,false),dark:resolveAppearance(effective,true)}));
  },[dark,effective,draft,workspace,personal]);
  const setDark=(v:boolean)=>{write('bugflow-theme',v?'dark':'light');setDarkState(v);};
- const setPersonal=(a:PortalAppearance|null)=>{setPersonalState(a);setDraft(null);};
- return <ThemeContext.Provider value={{dark,toggle:()=>setDark(!dark),setDark,workspace,personal,effective,setWorkspace:a=>{setWorkspace(a);setDraft(null);},setPersonal,preview:setDraft,previewing:draft!==null,ready}}>{children}</ThemeContext.Provider>;
+ const setPersonal=setPersonalState;
+ return <ThemeContext.Provider value={{dark,toggle:()=>setDark(!dark),setDark,workspace,personal,effective,setWorkspace,setPersonal,preview:setDraft,previewing:draft!==null,ready}}>{children}</ThemeContext.Provider>;
 }
 export const useTheme=()=>useContext(ThemeContext);
 export function ThemeToggle(){const {dark,toggle}=useTheme();return <Button variant="ghost" size="icon" aria-label={dark?'Switch to light theme':'Switch to dark theme'} title={dark?'Light theme':'Dark theme'} onClick={toggle}>{dark?<Sun size={18}/>:<Moon size={18}/>}</Button>;}

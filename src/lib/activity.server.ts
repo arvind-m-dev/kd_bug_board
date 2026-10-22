@@ -13,7 +13,7 @@ const CATEGORY: Record<string, string[]> = {
   assign: ['bug.assign'],
   verify: ['bug.verify'],
   comment: ['bug.comment'],
-  edited: ['bug.edited'],
+  edited: ['bug.edited', 'bug.media_added', 'bug.media_deleted'],
   deleted: ['bug.deleted'],
   team: ['member.updated', 'member.deactivate', 'member.activate', 'member.delete', 'portal.created', 'portal.regenerated', 'portal.revoked', 'project.created', 'project.archived', 'project.restored', 'settings.dropdowns', 'settings.appearance'],
 };

@@ -13,6 +13,7 @@ import { type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from '@/components/bugflow/theme-toggle';
+import { Decorations } from '@/components/bugflow/decorations';
 import { TopProgress } from '@/components/bugflow/loading';
 import { THEME_BOOT_SCRIPT } from '@/lib/appearance';
 import { Button } from "@/components/ui/button";
@@ -117,6 +118,7 @@ function RootComponent() {
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
       <Toaster />
+      <Decorations />
     </ThemeProvider></QueryClientProvider>
   );
 }

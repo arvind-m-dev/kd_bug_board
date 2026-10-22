@@ -99,6 +99,7 @@ export function changeText(row: ActivityRow) {
   if (d['priority'] && d['priority'] !== d['previousPriority']) parts.push(d['previousPriority'] ? `Priority ${d['previousPriority']} → ${d['priority']}` : `Priority ${d['priority']}`);
   if (clean(d['assignee'])) parts.push(`Assigned to ${d['assignee']}`);
   if (clean(d['noteTo'])) parts.push(`Note to ${d['noteTo']}`);
+  if (clean(d['media'])) parts.push(`${row.action === 'bug.media_deleted' ? 'Removed' : 'Attached'} ${d['media']}`);
   if (clean(d['notes'])) parts.push(d['notes']);
   if (clean(d['title'])) parts.push(d['title']);
   if (clean(d['reason'])) parts.push(d['reason']);
