@@ -28,7 +28,7 @@ export async function workspaceData(access:BugAccess,cursor?:string):Promise<Bug
  {query:`select b.status,(b.assignee_id is not null) as assigned,count(*) as n from bugflow.bugs b where ${where} group by 1,2`,params:params},
  {query:`select value from bugflow.settings where key='dropdown_options'`,params:[]}
  ],[],{'Neon-Batch-Read-Only':'true'});
- const stats=results[1]?.rows[0]??{};const rows=results[2]?.rows??[];const media=(await import('./bug-media.server')).mediaClientConfig();
+ const stats=results[1]?.rows[0]??{};const rows=results[2]?.rows??[];const media=await (await import('./bug-media.server')).mediaClientConfig();
  return {media,options:cleanOptions(results[5]?.rows[0]?.['value']),actor,projects:(results[0]?.rows??[]).map(r=>({id:String(r['id']),name:String(r['name'])})),developers:actor.permissions.includes('assign')?(results[3]?.rows??[]).map(r=>({id:String(r['id']),name:String(r['name']),role:String(r['role']??''),projectIds:Array.isArray(r['project_ids'])?r['project_ids'].map(String):[]})):[],bugs:rows.slice(0,50).map(r=>parseBug(r,actor.permissions.includes('evidence'))),total:Number(stats['total']??0),open:Number(stats['open']??0),recheck:Number(stats['recheck']??0),resolved:Number(stats['resolved']??0),unassigned:Number(stats['unassigned']??0),statusCounts:(results[4]?.rows??[]).map(r=>({status:String(r['status']),assigned:r['assigned']===true,count:Number(r['n']??0)})),nextCursor:rows.length>50?String(rows[49]?.['id']):null};
 }
 export async function reportBug(access:BugAccess,data:z.infer<typeof reportSchema>){

@@ -91,7 +91,21 @@ export const renameMediaSchema = z.object({ id, name: z.string().trim().min(1).m
 export const finishMediaSchema = z.object({ id, width: z.number().int().min(1).max(20000).nullable().default(null), height: z.number().int().min(1).max(20000).nullable().default(null) }).strict();
 export const deleteMediaSchema = z.object({ id }).strict();
 export const mediaStatusSchema = z.object({ test: z.boolean().default(false) }).strict();
-export type MediaStatus = { configured: boolean; missing: string[]; provider: string; bucket: string; endpointHost: string; files: number; bytes: number; awaitingPurge: number; pending: number; test: { ok: boolean; ms: number; message: string } | null };
+export type MediaSource = 'default' | 'custom';
+/** What the Settings card shows: never a secret. */
+export type MediaStatus = { configured: boolean; source: MediaSource | 'none'; defaultAvailable: boolean; canStoreSecrets: boolean; custom: { endpoint: string; bucket: string; region: string; forcePathStyle: boolean; accessKeyIdHint: string } | null; missing: string[]; provider: string; bucket: string; endpointHost: string; files: number; bytes: number; awaitingPurge: number; pending: number; test: { ok: boolean; ms: number; message: string } | null };
+/** Choosing where files live: the default bucket from the environment, or a bucket the Admin enters here (secret kept encrypted; blank on update keeps the saved one). */
+export const mediaStorageSchema = z.discriminatedUnion('source', [
+  z.object({ source: z.literal('default') }).strict(),
+  z.object({ source: z.literal('custom'), endpoint: z.string().trim().url().max(300).refine(u => u.startsWith('https://'), 'The endpoint must start with https://'), bucket: z.string().trim().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/, 'Bucket names are 3–63 lower-case letters, digits, dots or dashes'), region: z.string().trim().regex(/^[a-z0-9-]{0,32}$/).default(''), forcePathStyle: z.boolean().default(true), accessKeyId: z.string().trim().max(128).default(''), secretAccessKey: z.string().trim().max(256).default('') }).strict(),
+]);
+/** Provider presets for the form: endpoint shape and the right defaults. */
+export const STORAGE_PROVIDERS = [
+  { id: 'r2', name: 'Cloudflare R2', endpoint: 'https://<ACCOUNT_ID>.r2.cloudflarestorage.com', region: 'auto', forcePathStyle: true, note: 'Free 10 GB and no egress fees. Recommended.' },
+  { id: 'b2', name: 'Backblaze B2', endpoint: 'https://s3.<REGION>.backblazeb2.com', region: 'us-west-004', forcePathStyle: true, note: 'Use the S3-compatible endpoint shown on the bucket page.' },
+  { id: 's3', name: 'Amazon S3', endpoint: 'https://s3.<REGION>.amazonaws.com', region: 'us-east-1', forcePathStyle: false, note: 'Set the bucket region.' },
+  { id: 'other', name: 'Other S3-compatible', endpoint: 'https://', region: '', forcePathStyle: true, note: 'MinIO, Wasabi, DigitalOcean Spaces and similar.' },
+] as const;
 
 /** The hosting the endpoint points at, for the Settings card. */
 export function providerName(endpoint: string) {

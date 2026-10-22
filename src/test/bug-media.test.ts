@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MEDIA_MAX_BYTES, clock, downloadName, formatBytes, mayDeleteMedia, mayUploadMedia, mediaKey, mediaLinkPath, prepareMediaSchema, providerName, rejectReason, renameMediaSchema, resolveContentType, safeFileName } from '@/lib/bug-media';
+import { MEDIA_MAX_BYTES, clock, downloadName, formatBytes, mayDeleteMedia, mayUploadMedia, mediaKey, mediaLinkPath, mediaStorageSchema, prepareMediaSchema, providerName, rejectReason, renameMediaSchema, resolveContentType, safeFileName } from '@/lib/bug-media';
 
 const admin = { userId: 'a', role: 'admin', permissions: [] as string[] };
 const reporter = { userId: 'r', role: 'reporter', permissions: ['view', 'report', 'evidence'] };
@@ -71,5 +71,16 @@ describe('media names and links', () => {
     expect(renameMediaSchema.safeParse({ id: base.id, name: '  ' }).success).toBe(false);
     expect(renameMediaSchema.safeParse({ id: base.id, name: 'x'.repeat(121) }).success).toBe(false);
     expect(renameMediaSchema.parse({ id: base.id, name: ' Login error ' }).name).toBe('Login error');
+  });
+});
+
+describe('mediaStorageSchema', () => {
+  it('accepts the default choice and a well-formed own bucket; rejects http endpoints and bad bucket names', () => {
+    expect(mediaStorageSchema.safeParse({ source: 'default' }).success).toBe(true);
+    const ok = mediaStorageSchema.parse({ source: 'custom', endpoint: 'https://abc.r2.cloudflarestorage.com', bucket: 'bugboard-media', accessKeyId: 'k', secretAccessKey: 's' });
+    expect(ok).toMatchObject({ region: '', forcePathStyle: true });
+    expect(mediaStorageSchema.safeParse({ source: 'custom', endpoint: 'http://abc.example.com', bucket: 'bugboard-media' }).success).toBe(false);
+    expect(mediaStorageSchema.safeParse({ source: 'custom', endpoint: 'https://abc.example.com', bucket: 'Bad Name' }).success).toBe(false);
+    expect(mediaStorageSchema.safeParse({ source: 'custom', endpoint: 'https://abc.example.com', bucket: 'ok-bucket' }).success).toBe(true);
   });
 });
