@@ -1081,11 +1081,11 @@ html[data-hide~=help] [data-ui=help] { display: none; }
 .bf-studio-row { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
 .bf-studio-row:first-child { border-top: 0; padding-top: 0; }
 .bf-studio-row h3 { margin: 0; font-size: 13.5px; font-weight: 700; } .bf-studio-row p { margin: 4px 0 0; font-size: 12px; line-height: 1.55; color: var(--muted-foreground); }
-.bf-swatches { display: flex; flex-wrap: wrap; gap: 10px; }
-.bf-swatch { position: relative; width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--border); background: linear-gradient(135deg, var(--a) 0 55%, var(--b) 55% 100%); cursor: pointer; transition: transform .15s, box-shadow .15s; }
-.bf-swatch:hover { transform: translateY(-2px); } .bf-swatch[aria-checked=true] { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--primary); }
-.bf-swatch[data-custom] { background: conic-gradient(from 0deg, oklch(.7 .18 20), oklch(.8 .16 90), oklch(.75 .15 150), oklch(.7 .14 230), oklch(.65 .18 300), oklch(.7 .18 20)); }
-.bf-swatch svg { position: absolute; inset: 0; margin: auto; color: #fff; filter: drop-shadow(0 1px 1px rgb(0 0 0 / .5)); }
+.bf-palette-swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.bf-palette-swatch { position: relative; width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--border); background: linear-gradient(135deg, var(--a) 0 55%, var(--b) 55% 100%); cursor: pointer; transition: transform .15s, box-shadow .15s; }
+.bf-palette-swatch:hover { transform: translateY(-2px); } .bf-palette-swatch[aria-checked=true] { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--primary); }
+.bf-palette-swatch[data-custom] { background: conic-gradient(from 0deg, oklch(.7 .18 20), oklch(.8 .16 90), oklch(.75 .15 150), oklch(.7 .14 230), oklch(.65 .18 300), oklch(.7 .18 20)); }
+.bf-palette-swatch svg { position: absolute; inset: 0; margin: auto; color: #fff; filter: drop-shadow(0 1px 1px rgb(0 0 0 / .5)); }
 .bf-color { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px 6px 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); font-size: 12.5px; }
 .bf-color input[type=color] { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: none; cursor: pointer; }
 .bf-color input[type=color]::-webkit-color-swatch-wrapper { padding: 0; } .bf-color input[type=color]::-webkit-color-swatch { border: 1px solid var(--border); border-radius: 7px; }

@@ -98,9 +98,9 @@ export function ThemeStudio(props: Scope) {
   return <section className="bf-settings-section" aria-labelledby="appearance-heading">{heading}
     <div className="bf-studio">
       <Row title="Colour" hint={style.monochrome ? 'The Ink style is black and white only — pick another style to use colour.' : 'The brand colour and its partner. Status colours keep their meaning in every theme.'}>
-        <div className="bf-swatches" role="radiogroup" aria-label="Colour theme" aria-disabled={style.monochrome}>
-          {PALETTES.map(p => { const t = p[mode]; const on = draft.palette === p.id; return <button key={p.id} type="button" role="radio" aria-checked={on} title={`${p.name} — ${p.description}`} aria-label={p.name} className="bf-swatch" style={{ ['--a' as string]: t.primary, ['--b' as string]: t.brand2 }} disabled={style.monochrome} onClick={() => set({ palette: p.id })}>{on && <Check size={18} />}</button>; })}
-          <button type="button" role="radio" aria-checked={draft.palette === 'custom'} title="Custom — pick any colour" aria-label="Custom colour" className="bf-swatch" data-custom="" disabled={style.monochrome} onClick={() => set({ palette: 'custom', accent: draft.accent ?? accentHex })}>{draft.palette === 'custom' ? <Check size={18} /> : <Wand2 size={16} />}</button>
+        <div className="bf-palette-swatches" role="radiogroup" aria-label="Colour theme" aria-disabled={style.monochrome}>
+          {PALETTES.map(p => { const t = p[mode]; const on = draft.palette === p.id; return <button key={p.id} type="button" role="radio" aria-checked={on} title={`${p.name} — ${p.description}`} aria-label={p.name} className="bf-palette-swatch" style={{ ['--a' as string]: t.primary, ['--b' as string]: t.brand2 }} disabled={style.monochrome} onClick={() => set({ palette: p.id })}>{on && <Check size={18} />}</button>; })}
+          <button type="button" role="radio" aria-checked={draft.palette === 'custom'} title="Custom — pick any colour" aria-label="Custom colour" className="bf-palette-swatch" data-custom="" disabled={style.monochrome} onClick={() => set({ palette: 'custom', accent: draft.accent ?? accentHex })}>{draft.palette === 'custom' ? <Check size={18} /> : <Wand2 size={16} />}</button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">{draft.palette === 'custom' ? 'Custom colours' : `${paletteById(draft.palette).name} — ${paletteById(draft.palette).description}`}</p>
         {draft.palette === 'custom' && !style.monochrome && <div className="mt-3 flex flex-wrap items-center gap-3">
