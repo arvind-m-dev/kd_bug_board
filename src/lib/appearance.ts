@@ -109,6 +109,21 @@ export const MINIMAL_HIDE = ['subtitle', 'breadcrumb', 'footer', 'counts', 'cloc
 
 const hex = z.string().regex(/^#[0-9a-f]{6}$/i);
 const ids = <T extends { id: string }>(list: T[]) => list.map(x => x.id) as [string, ...string[]];
+/**
+ * Scene knobs for decorated styles, saved with the theme. Halloween uses all of them; snow and leaf styles use amount, speed and randomness.
+ * Placements come from a seeded generator, so a theme looks the same on every device until Shuffle picks a new seed.
+ */
+export const sceneSchema = z.object({
+  amount: z.number().min(0).max(2).default(1), bats: z.number().int().min(0).max(12).default(7), bugs: z.number().int().min(0).max(10).default(5), bugSize: z.number().min(0.5).max(2).default(1),
+  spiders: z.number().int().min(0).max(4).default(2), webs: z.number().int().min(0).max(3).default(2), pumpkins: z.number().int().min(0).max(5).default(3),
+  speed: z.number().min(0.5).max(2).default(1), randomness: z.number().min(0).max(1).default(0.5), seed: z.number().int().min(0).max(9999).default(7),
+}).strict();
+export type Scene = z.infer<typeof sceneSchema>;
+export const DEFAULT_SCENE: Scene = sceneSchema.parse({});
+/** A small seeded generator (LCG): the same seed always gives the same sequence. */
+export function seededRandom(seed: number) { let s = ((seed * 9301 + 49297) % 233280) || 1; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; }; }
+/** Position i of n: an even spread mixed with a seeded random value by the randomness knob (0 = evenly spaced, 1 = anywhere). */
+export const spread = (rand: () => number, i: number, n: number, randomness: number) => { const even = n <= 1 ? 0.5 : i / (n - 1); const r = rand(); return even * (1 - randomness) + r * randomness; };
 export const appearanceSchema = z.object({
   palette: z.enum([...ids(PALETTES), 'custom']).default(DEFAULT_PALETTE),
   accent: hex.nullable().default(null),
@@ -120,6 +135,7 @@ export const appearanceSchema = z.object({
   motion: z.enum(['off', 'subtle', 'lively']).default('subtle'),
   hide: z.array(z.enum(HIDE_KEYS)).max(20).default([]),
   membersMayCustomize: z.boolean().default(true),
+  scene: sceneSchema.default(() => sceneSchema.parse({})),
 }).strict();
 export type Appearance = z.infer<typeof appearanceSchema>;
 /** What a member may save for themselves (never the workspace-level switch). */

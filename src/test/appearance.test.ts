@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_APPEARANCE, FONTS, HIDEABLE, MINIMAL_HIDE, PALETTES, STYLES, THEME_BOOT_SCRIPT, appearanceSchema, effectiveAppearance, fontById, normalizeAppearance, paletteById, paletteVars, portalAppearanceSchema, resolveAppearance, styleById } from '@/lib/appearance';
+import { DEFAULT_SCENE, sceneSchema, seededRandom, spread, DEFAULT_APPEARANCE, FONTS, HIDEABLE, MINIMAL_HIDE, PALETTES, STYLES, THEME_BOOT_SCRIPT, appearanceSchema, effectiveAppearance, fontById, normalizeAppearance, paletteById, paletteVars, portalAppearanceSchema, resolveAppearance, styleById } from '@/lib/appearance';
 
 describe('palettes, styles and fonts', () => {
   it('every palette defines all brand tokens for light and dark', () => {
@@ -77,5 +77,21 @@ describe('resolving an appearance for the page', () => {
   it('boot script applies cached attributes before paint and is self-contained', () => {
     expect(THEME_BOOT_SCRIPT).toContain('bugflow-appearance-cache'); expect(THEME_BOOT_SCRIPT).toContain('setAttribute');
     expect(() => new Function(THEME_BOOT_SCRIPT)).not.toThrow();
+  });
+});
+
+describe('scene knobs', () => {
+  it('has sane defaults, bounds and survives old rows without a scene', () => {
+    expect(DEFAULT_SCENE).toMatchObject({ bats: 7, bugs: 5, bugSize: 1, spiders: 2, webs: 2, pumpkins: 3, speed: 1, randomness: 0.5, amount: 1 });
+    expect(appearanceSchema.parse({}).scene).toEqual(DEFAULT_SCENE);
+    expect(appearanceSchema.parse({ scene: { bats: 12, bugSize: 2 } }).scene).toMatchObject({ bats: 12, bugSize: 2, bugs: 5 });
+    expect(sceneSchema.safeParse({ bats: 13 }).success).toBe(false); expect(sceneSchema.safeParse({ bugSize: 0.1 }).success).toBe(false); expect(sceneSchema.safeParse({ extra: 1 }).success).toBe(false);
+    expect(normalizeAppearance({ palette: 'teal', style: 'halloween' }).scene).toEqual(DEFAULT_SCENE);
+  });
+  it('places things the same way for the same seed and spreads evenly at zero randomness', () => {
+    const a = seededRandom(42), b = seededRandom(42); expect([a(), a(), a()]).toEqual([b(), b(), b()]);
+    expect(seededRandom(1)()).not.toBe(seededRandom(2)());
+    const r = seededRandom(5); expect([0, 1, 2, 3].map(i => spread(r, i, 4, 0))).toEqual([0, 1 / 3, 2 / 3, 1]);
+    const v = spread(seededRandom(9), 0, 4, 1); expect(v).toBeGreaterThanOrEqual(0); expect(v).toBeLessThanOrEqual(1);
   });
 });

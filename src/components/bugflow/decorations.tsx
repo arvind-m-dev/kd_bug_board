@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Bug } from 'lucide-react';
 import { useTheme } from './theme-toggle';
-import { styleById } from '@/lib/appearance';
+import { seededRandom, spread, styleById, type Scene } from '@/lib/appearance';
+import { Web } from './scene-web';
 import { SurfaceEffects } from './surface-effects';
 
 /** A bug with legs and feelers that move — the mascot comes alive in the Halloween style and when motion is lively. */
@@ -31,12 +32,6 @@ function Pumpkin({ size, tilt = 0 }: { size: number; tilt?: number }) {
     <g className="bf-pumpkin-face" fill="oklch(.9 .17 85)"><path d="M26 36 l14 10 h-20z" /><path d="M74 36 l-14 10 h20z" /><path d="M50 44 l6 8 h-12z" /><path d="M22 56 q28 22 56 0 l-6 6 -6-4 -6 5 -6-5 -6 5 -6-5 -6 4 -6-4 -6 5z" /></g>
   </svg>;
 }
-/** A corner web whose threads draw themselves in when motion is lively (pathLength lets CSS animate the dash). */
-function Web({ className, size = 150, flip = false }: { className: string; size?: number; flip?: boolean }) {
-  return <svg className={`bf-web ${className}`} viewBox="0 0 120 120" width={size} height={size} style={flip ? { transform: 'scale(-1, -1)' } : undefined} aria-hidden="true"><g fill="none" stroke="currentColor" strokeWidth="1">
-    {['M120 0 L0 0', 'M120 0 L0 120', 'M120 0 L60 120', 'M120 0 L0 60', 'M120 0 L30 120', 'M120 0 L0 30', 'M120 0 L90 120', 'M120 0 L0 90', 'M95 0 Q92 22 72 48 Q48 72 22 95 Q10 108 0 108', 'M70 0 Q68 18 52 36 Q36 52 18 68 Q8 80 0 82', 'M45 0 Q44 12 34 24 Q24 34 12 44 Q5 52 0 54', 'M22 0 Q20 8 14 14 Q8 20 0 26'].map((d, i) => <path key={i} d={d} pathLength={1} style={{ animationDelay: `${i * 0.9}s` }} />)}
-  </g></svg>;
-}
 function Spider({ left, delay, duration }: { left: string; delay: string; duration: string }) {
   const timing = { animationDelay: delay, animationDuration: duration };
   return <span className="bf-spider" style={{ left }}><i className="bf-spider-line" style={timing} /><svg className="bf-spider-body" style={timing} viewBox="0 0 40 40" width="26" height="26" aria-hidden="true"><g className="bf-spider-legs" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"><path d="M14 18 L4 10 M14 22 L2 22 M14 26 L4 34 M15 29 L8 38" /><path d="M26 18 L36 10 M26 22 L38 22 M26 26 L36 34 M25 29 L32 38" /></g><circle cx="20" cy="15" r="5" fill="currentColor" /><ellipse cx="20" cy="26" rx="7" ry="9" fill="currentColor" /><circle cx="18" cy="14" r="1.2" fill="var(--card)" /><circle cx="22" cy="14" r="1.2" fill="var(--card)" /></svg></span>;
@@ -49,8 +44,8 @@ function Ghost() {
 }
 
 /* ───────── Winter & Christmas pieces ───────── */
-function Snow({ count, front = false, seed = 0 }: { count: number; front?: boolean; seed?: number }) {
-  return <>{Array.from({ length: count }, (_, j) => { const i = j + seed; return <i key={j} className="bf-snow" data-front={front || undefined} style={{ left: `${(i * 37) % 100}%`, width: 2 + (i % 4) * 1.5, height: 2 + (i % 4) * 1.5, animationDelay: `${(i * 1.7) % 11}s`, animationDuration: `${(front ? 7 : 10) + ((i * 2.3) % 8)}s`, ['--drift' as string]: `${(i % 2 ? 1 : -1) * (14 + (i % 5) * 8)}px`, ['--blur' as string]: front ? '1.5px' : i % 3 === 0 ? '1px' : '0px' }} />; })}</>;
+function Snow({ count, front = false, seed = 0, speed = 1 }: { count: number; front?: boolean; seed?: number; speed?: number }) {
+  return <>{Array.from({ length: count }, (_, j) => { const i = j + seed; return <i key={j} className="bf-snow" data-front={front || undefined} style={{ left: `${(i * 37) % 100}%`, width: 2 + (i % 4) * 1.5, height: 2 + (i % 4) * 1.5, animationDelay: `${(i * 1.7) % 11}s`, animationDuration: `${((front ? 7 : 10) + ((i * 2.3) % 8)) / speed}s`, ['--drift' as string]: `${(i % 2 ? 1 : -1) * (14 + (i % 5) * 8)}px`, ['--blur' as string]: front ? '1.5px' : i % 3 === 0 ? '1px' : '0px' }} />; })}</>;
 }
 function Tree({ size }: { size: number }) {
   return <svg className="bf-tree" width={size * 0.7} height={size} viewBox="0 0 70 100" aria-hidden="true">
@@ -84,12 +79,20 @@ function Sleigh() {
 function Leaf({ hue }: { hue: number }) {
   return <svg viewBox="0 0 24 24" width="100%" height="100%" aria-hidden="true"><path d="M3 20 C3 8 11 3 21 3 C21 13 15 21 3 20z M3 20 L16 8" fill={`oklch(.62 .16 ${hue})`} stroke={`oklch(.45 .12 ${hue})`} strokeWidth="1" /></svg>;
 }
-function Leaves({ count, front = false, seed = 0 }: { count: number; front?: boolean; seed?: number }) {
-  return <>{Array.from({ length: count }, (_, j) => { const i = j + seed; return <i key={j} className="bf-leaf" data-front={front || undefined} style={{ left: `${(i * 41) % 100}%`, width: 14 + (i % 3) * 4, height: 14 + (i % 3) * 4, animationDelay: `${(i * 2.3) % 13}s`, animationDuration: `${11 + ((i * 3.1) % 9)}s`, ['--drift' as string]: `${(i % 2 ? 1 : -1) * (30 + (i % 4) * 14)}px` }}><Leaf hue={[45, 60, 30, 80][i % 4]!} /></i>; })}</>;
+function Leaves({ count, front = false, seed = 0, speed = 1 }: { count: number; front?: boolean; seed?: number; speed?: number }) {
+  return <>{Array.from({ length: count }, (_, j) => { const i = j + seed; return <i key={j} className="bf-leaf" data-front={front || undefined} style={{ left: `${(i * 41) % 100}%`, width: 14 + (i % 3) * 4, height: 14 + (i % 3) * 4, animationDelay: `${(i * 2.3) % 13}s`, animationDuration: `${(11 + ((i * 3.1) % 9)) / speed}s`, ['--drift' as string]: `${(i % 2 ? 1 : -1) * (30 + (i % 4) * 14)}px` }}><Leaf hue={[45, 60, 30, 80][i % 4]!} /></i>; })}</>;
 }
 
-const bats = [{ top: '8%', delay: '0s', duration: '26s', size: 44 }, { top: '18%', delay: '7s', duration: '31s', size: 36 }, { top: '30%', delay: '14s', duration: '22s', size: 50 }, { top: '12%', delay: '20s', duration: '35s', size: 30 },
-  { top: '22%', delay: '9s', duration: '28s', size: 40, rtl: true }, { top: '10%', delay: '9.6s', duration: '28s', size: 28, rtl: true }, { top: '16%', delay: '10.4s', duration: '28s', size: 34, rtl: true }];
+/** Everything placed from the scene knobs: counts, sizes, speed and a seeded spread, so it is stable until Shuffle. */
+function plan(sc: Scene) {
+  const rand = seededRandom(sc.seed); const R = sc.randomness;
+  const bats = Array.from({ length: sc.bats }, (_, i) => ({ top: `${(5 + spread(rand, i, sc.bats, R) * 32).toFixed(1)}%`, delay: `${(rand() * 22).toFixed(1)}s`, duration: `${((22 + rand() * 14) / sc.speed).toFixed(1)}s`, size: Math.round(26 + rand() * 26), rtl: rand() < 0.4 }));
+  const crawlers = Array.from({ length: sc.bugs }, (_, i) => ({ y: Math.round(2 + spread(rand, i, sc.bugs, R) * 52), size: Math.round((14 + rand() * 12) * sc.bugSize), duration: `${((36 + rand() * 44) / sc.speed).toFixed(1)}s`, delay: `${(rand() * 45).toFixed(1)}s`, dir: rand() < 0.5 ? -1 : 1 }));
+  const spiders = Array.from({ length: sc.spiders }, (_, i) => ({ left: `${Math.round(8 + spread(rand, i, sc.spiders, R) * 84)}%`, delay: `${(rand() * 60).toFixed(1)}s`, duration: `${((80 + rand() * 50) / sc.speed).toFixed(1)}s` }));
+  const webs = (['tr', 'bl', 'tl'] as const).slice(0, sc.webs);
+  const pumpkins = [{ size: 54, tilt: -6 }, { size: 84, tilt: 0 }, { size: 44, tilt: 8 }, { size: 64, tilt: -3 }, { size: 38, tilt: 5 }].slice(0, sc.pumpkins);
+  return { bats, crawlers, spiders, webs, pumpkins, snow: Math.round(26 * sc.amount), snowFront: Math.round(7 * sc.amount), leaves: Math.round(12 * sc.amount), leavesFront: Math.round(4 * sc.amount) };
+}
 
 /**
  * Two decorative layers for styles that have one, both fixed, pointer-events none and aria-hidden.
@@ -99,7 +102,8 @@ const bats = [{ top: '8%', delay: '0s', duration: '26s', size: 44 }, { top: '18%
  */
 export function Decorations() {
   const { effective, ready } = useTheme();
-  const style = styleById(effective.style); const motion = effective.motion; const lively = motion === 'lively';
+  const style = styleById(effective.style); const motion = effective.motion; const lively = motion === 'lively'; const sc = effective.scene;
+  const p = useMemo(() => plan(sc), [sc]);
   const [walking, setWalking] = useState(false);
   // Every 40–90 s the bug scurries along the bottom of the sidebar for 7 s; only while the tab is visible and motion is lively.
   useEffect(() => {
@@ -116,32 +120,34 @@ export function Decorations() {
     <div className="bf-decor bf-decor-back" data-style={id} data-lively={live} aria-hidden="true">
       {id === 'halloween' && <>
         <svg className="bf-moon" viewBox="0 0 64 64" width="84" height="84"><path d="M40 4 a28 28 0 1 0 20 46 a22 22 0 1 1 -20-46z" fill="currentColor" /></svg>
-        <Web className="bf-web-tr" /><Web className="bf-web-bl" size={110} flip />
-        <div className="bf-scene bf-pumpkins"><Pumpkin size={54} tilt={-6} /><Pumpkin size={84} /><Pumpkin size={44} tilt={8} /></div>
+        {p.webs.map((c, i) => <Web key={c} corner={c} size={c === 'tr' ? 190 : 130} seed={sc.seed + i} />)}
+        {p.pumpkins.length > 0 && <div className="bf-scene bf-pumpkins">{p.pumpkins.map((pk, i) => <Pumpkin key={i} size={Math.round(pk.size * sc.bugSize)} tilt={pk.tilt} />)}</div>}
         {lively && <Ghost />}
         {!lively && <><BugMascot size={18} className="bf-still" style={{ left: '38%', bottom: 4, transform: 'rotate(90deg)' }} /><BugMascot size={14} className="bf-still" style={{ right: '28%', bottom: 10, transform: 'rotate(-80deg)' }} /></>}
       </>}
       {id === 'winter' && <>
         <div className="bf-frost" /><div className="bf-aurora" />
         <div className="bf-drift bf-drift-far" /><div className="bf-drift" /><Snowman />
-        {lively && <Snow count={26} />}
+        {lively && <Snow count={p.snow} speed={sc.speed} />}
       </>}
       {id === 'christmas' && <>
         <div className="bf-drift bf-drift-far" /><div className="bf-drift" />
         <div className="bf-scene bf-trees"><Tree size={70} /><Tree size={120} /><Tree size={90} /><Tree size={56} /><Gifts /></div>
-        {lively && <Snow count={22} />}
+        {lively && <Snow count={Math.round(p.snow * 0.85)} speed={sc.speed} />}
       </>}
-      {id === 'autumn' && lively && <Leaves count={12} />}
+      {id === 'autumn' && lively && <Leaves count={p.leaves} speed={sc.speed} />}
     </div>
     <div className="bf-decor bf-decor-front" data-style={id} data-lively={live} aria-hidden="true">
       {id === 'halloween' && lively && <>
-        {bats.map((b, i) => <Bat key={i} {...b} />)}
-        <Spider left="31%" delay="6s" duration="96s" /><Spider left="72%" delay="51s" duration="118s" />
+        {p.bats.map((b, i) => <Bat key={i} {...b} />)}
+        {p.crawlers.map((c, i) => <BugMascot key={i} size={c.size} className="bf-crawl" style={{ bottom: c.y, animationDuration: c.duration, animationDelay: c.delay, ['--rot' as string]: `${90 * c.dir}deg`, animationDirection: c.dir < 0 ? 'reverse' : 'normal' }} />)}
+        {sc.bugs > 0 && <BugMascot size={Math.round(18 * sc.bugSize)} className="bf-climb" style={{ animationDuration: `${90 / sc.speed}s` }} />}
+        {p.spiders.map((sp, i) => <Spider key={i} {...sp} />)}
         {walking && <BugMascot size={30} className="bf-scurry" />}
       </>}
-      {id === 'winter' && lively && <Snow count={7} front seed={100} />}
-      {id === 'christmas' && <><Lights />{lively && <><Snow count={6} front seed={200} /><Sleigh /></>}</>}
-      {id === 'autumn' && lively && <Leaves count={4} front seed={50} />}
+      {id === 'winter' && lively && <Snow count={p.snowFront} front seed={100} speed={sc.speed} />}
+      {id === 'christmas' && <><Lights />{lively && <><Snow count={p.snowFront} front seed={200} speed={sc.speed} /><Sleigh /></>}</>}
+      {id === 'autumn' && lively && <Leaves count={p.leavesFront} front seed={50} speed={sc.speed} />}
       {id === 'terminal' && <div className="bf-scanlines" />}
     </div>
   </>;

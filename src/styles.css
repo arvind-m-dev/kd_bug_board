@@ -1222,7 +1222,7 @@ html[data-skin=terminal] .bf-nav-link[data-status=active] { background: color-mi
 /* ───────────── Seasonal scenes. Back layer: behind cards, only in the gaps. Front layer: moving parts that cross content briefly. ───────────── */
 .bf-decor-back { z-index: -1; } .bf-decor-front { z-index: 35; }
 .bf-scene { position: absolute; right: 28px; bottom: 0; display: flex; align-items: flex-end; gap: 4px; opacity: .95; filter: drop-shadow(0 6px 10px rgb(0 0 0 / .25)); }
-@media (max-width: 760px) { .bf-scene, .bf-moon, .bf-lights, .bf-drift, .bf-snowman, .bf-web-bl, .bf-ghost, .bf-sleigh, .bf-spider { display: none; } }
+@media (max-width: 760px) { .bf-scene, .bf-moon, .bf-lights, .bf-drift, .bf-snowman, .bf-web-bl, .bf-web-tl, .bf-ghost, .bf-sleigh, .bf-spider { display: none; } }
 /* Halloween */
 .bf-pumpkin { display: block; transform-origin: 50% 100%; } .bf-pumpkin-face { filter: drop-shadow(0 0 4px oklch(.85 .18 80)); }
 @keyframes bf-candle { 0%, 100% { opacity: 1; filter: drop-shadow(0 0 4px oklch(.85 .18 80)); } 30% { opacity: .75; filter: drop-shadow(0 0 2px oklch(.85 .18 80)); } 55% { opacity: .95; filter: drop-shadow(0 0 7px oklch(.9 .18 85)); } 70% { opacity: .7; } }
@@ -1232,9 +1232,13 @@ html[data-skin=terminal] .bf-nav-link[data-status=active] { background: color-mi
 .dark .bf-moon { opacity: .85; }
 @keyframes bf-moon-drift { from { transform: translate(0, 0); } 50% { transform: translate(30vw, -34px); } to { transform: translate(60vw, 0); } }
 .bf-decor[data-lively] .bf-moon { animation: bf-moon-drift 900s ease-in-out infinite alternate; }
-.bf-web { position: absolute; color: color-mix(in oklab, var(--foreground) 55%, transparent); opacity: .5; } .bf-web-tr { top: 0; right: 0; } .bf-web-bl { bottom: 0; left: 236px; opacity: .4; }
-@keyframes bf-web-grow { 0% { stroke-dashoffset: 1; } 10% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 0; } }
-.bf-decor[data-lively] .bf-web path { stroke-dasharray: 1; stroke-dashoffset: 0; animation: bf-web-grow 300s linear infinite; }
+.bf-web { position: absolute; color: color-mix(in oklab, var(--foreground) 60%, transparent); opacity: .55; filter: drop-shadow(0 0 1px rgb(255 255 255 / .25)); } .bf-web-tr { top: 0; right: 0; } .bf-web-bl { bottom: 0; left: 236px; opacity: .45; } .bf-web-tl { top: 0; left: 236px; opacity: .4; }
+/* Lively: every thread draws itself in once, spokes first, then the rings; a spider sits on the web and shifts now and then. */
+@keyframes bf-web-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.bf-decor[data-lively] .bf-web path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: bf-web-draw 1.6s ease-out both; }
+@keyframes bf-web-spider-shift { 0%, 88%, 100% { transform: translate(0, 0); } 92% { transform: translate(2px, 3px); } 96% { transform: translate(-1px, 2px); } }
+.bf-decor[data-lively] .bf-web-spider { animation: bf-web-spider-shift 14s ease-in-out 6s infinite; }
+.bf-web-spider { transform-box: fill-box; transform-origin: center; }
 @keyframes bf-ghost-rise { 0% { transform: translateY(0) translateX(0); opacity: 0; } 2% { opacity: .55; } 8% { transform: translateY(-50vh) translateX(18px); opacity: .5; } 13% { transform: translateY(-92vh) translateX(-10px); opacity: 0; } 100% { transform: translateY(-92vh); opacity: 0; } }
 .bf-ghost { position: absolute; left: 250px; bottom: -80px; opacity: 0; filter: blur(.4px) drop-shadow(0 0 10px rgb(255 255 255 / .5)); animation: bf-ghost-rise 170s linear 25s infinite; }
 @keyframes bf-bat-fly { 0% { transform: translateX(-10vw) translateY(0) scale(.9); } 25% { transform: translateX(25vw) translateY(-18px) scale(1); } 50% { transform: translateX(55vw) translateY(10px) scale(.95); } 75% { transform: translateX(80vw) translateY(-22px) scale(1.05); } 100% { transform: translateX(110vw) translateY(0) scale(.9); } }
@@ -1388,3 +1392,7 @@ html[data-motion=off] .bf-surface-effects { display: none; }
 .bf-studio-cta:hover { filter: brightness(1.08); transform: translateY(-1px); } .bf-studio-cta:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 html[data-motion=off] .bf-studio-cta { animation: none; }
 @media (prefers-reduced-motion: reduce) { .bf-studio-cta { animation: none; } }
+
+/* Theme Studio: scene knobs */
+.bf-knobs { display: grid; gap: 10px 18px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.bf-knob { display: grid; gap: 6px; font-size: 12px; } .bf-knob > span { display: flex; justify-content: space-between; font-weight: 600; } .bf-knob > span b { font-weight: 500; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }

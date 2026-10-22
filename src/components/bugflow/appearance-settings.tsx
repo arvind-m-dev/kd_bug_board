@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { Check, Eye, LockKeyhole, Moon, Palette as PaletteIcon, RotateCcw, Save, Sun, Undo2, Users, Wand2 } from 'lucide-react';
+import { Check, Dices, Eye, LockKeyhole, Moon, Palette as PaletteIcon, RotateCcw, Save, Sun, Undo2, Users, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { FONTS, HIDEABLE, MINIMAL_HIDE, PALETTES, STYLES, fontById, paletteById, portalAppearanceSchema, resolveAppearance, styleById, type Appearance, type PortalAppearance } from '@/lib/appearance';
+import { Slider } from '@/components/ui/slider';
+import { DEFAULT_SCENE, FONTS, HIDEABLE, MINIMAL_HIDE, PALETTES, STYLES, fontById, paletteById, portalAppearanceSchema, resolveAppearance, styleById, type Appearance, type PortalAppearance, type Scene } from '@/lib/appearance';
 import { cssOklchToHex } from '@/lib/color';
 import { saveAppearance } from '@/lib/appearance.functions';
 import { savePortalAppearance } from '@/lib/member-management.functions';
@@ -76,6 +77,7 @@ export function ThemeStudio(props: Scope) {
   });
 
   const set = (patch: Partial<Appearance>) => setDraft(d => ({ ...d, ...patch }));
+  const scene = (patch: Partial<Scene>) => setDraft(d => ({ ...d, scene: { ...d.scene, ...patch } }));
   const style = styleById(draft.style); const mode = dark ? 'dark' : 'light';
   const live = resolveAppearance(draft, dark).vars;
   const accentHex = draft.accent ?? cssOklchToHex(live['--primary']!) ?? '#0e7490';
@@ -128,6 +130,21 @@ export function ThemeStudio(props: Scope) {
       <Row title="Motion" hint="Off stops every animation and decoration. Lively adds the moving parts of decorated styles — bats and crawling bugs, snow, falling leaves, twinkling lights.">
         <Seg label="Motion" value={draft.motion} onChange={v => set({ motion: v })} options={[{ value: 'off', label: 'Off' }, { value: 'subtle', label: 'Subtle' }, { value: 'lively', label: 'Lively' }]} />
       </Row>
+      {style.decorated && style.id !== 'terminal' && <Row title="Scene" hint={style.id === 'halloween' ? 'How much is going on: how many bats, bugs, spiders, webs and pumpkins, how big the bugs are, how fast everything moves, and how random the placement is. Shuffle rolls new positions.' : 'How much falls, how fast, and how random the placement is. Shuffle rolls new positions.'}>
+        <div className="bf-knobs">
+          {style.id === 'halloween' ? <>
+            <Knob label="Bats" value={draft.scene.bats} min={0} max={12} step={1} onChange={v => scene({ bats: v })} />
+            <Knob label="Bugs" value={draft.scene.bugs} min={0} max={10} step={1} onChange={v => scene({ bugs: v })} />
+            <Knob label="Bug size" value={draft.scene.bugSize} min={0.5} max={2} step={0.1} format={v => `${v.toFixed(1)}×`} onChange={v => scene({ bugSize: v })} />
+            <Knob label="Spiders" value={draft.scene.spiders} min={0} max={4} step={1} onChange={v => scene({ spiders: v })} />
+            <Knob label="Webs" value={draft.scene.webs} min={0} max={3} step={1} onChange={v => scene({ webs: v })} />
+            <Knob label="Pumpkins" value={draft.scene.pumpkins} min={0} max={5} step={1} onChange={v => scene({ pumpkins: v })} />
+          </> : <Knob label="Amount" value={draft.scene.amount} min={0} max={2} step={0.1} format={v => `${Math.round(v * 100)}%`} onChange={v => scene({ amount: v })} />}
+          <Knob label="Speed" value={draft.scene.speed} min={0.5} max={2} step={0.1} format={v => `${v.toFixed(1)}×`} onChange={v => scene({ speed: v })} />
+          <Knob label="Randomness" value={draft.scene.randomness} min={0} max={1} step={0.05} format={v => `${Math.round(v * 100)}%`} onChange={v => scene({ randomness: v })} />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" onClick={() => scene({ seed: Math.floor(Math.random() * 10000) })}><Dices />Shuffle positions</Button><Button type="button" variant="ghost" size="sm" onClick={() => set({ scene: DEFAULT_SCENE })}><Undo2 />Reset scene</Button></div>
+      </Row>}
       <Row title="Show or hide" hint="Turn off what you don't need. Nothing here changes what anyone is allowed to see — only what is on screen.">
         <div className="mb-3 flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" onClick={() => set({ hide: [...MINIMAL_HIDE] })}><Eye />Minimal</Button><Button type="button" variant="outline" size="sm" onClick={() => set({ hide: [] })}><Undo2 />Show everything</Button></div>
         <div className="bf-hide-grid">{HIDEABLE.map(h => <label key={h.key}><Checkbox checked={!hidden(h.key)} onCheckedChange={v => toggleHide(h.key, v === true)} aria-label={`Show ${h.label.toLowerCase()}`} /><span>{h.label}<small>{h.hint}</small></span></label>)}</div>
@@ -150,6 +167,9 @@ export function ThemeStudio(props: Scope) {
   </section>;
 }
 
+function Knob({ label, value, min, max, step, format, onChange }: { label: string; value: number; min: number; max: number; step: number; format?: (v: number) => string; onChange: (v: number) => void }) {
+  return <label className="bf-knob"><span>{label}<b>{format ? format(value) : value}</b></span><Slider aria-label={label} value={[value]} min={min} max={max} step={step} onValueChange={([v]) => { if (v !== undefined) onChange(Math.round(v * 100) / 100); }} /></label>;
+}
 function Row({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
   return <div className="bf-studio-row"><div><h3>{title}</h3><p>{hint}</p></div><div className="min-w-0">{children}</div></div>;
 }
