@@ -78,10 +78,10 @@ export const STYLES: Style[] = [
   { id: 'keydemand', name: 'Keydemand', description: 'White cards on cool grey, teal pills and gold counts — the Keydemand product look.', fonts: 'jakarta', palette: 'keydemand' },
   { id: 'sketch', name: 'Pencil sketch', description: 'Graphite on paper with hand-drawn lines; a chalkboard in dark mode.', fonts: 'hand', palette: 'graphite' },
   { id: 'ink', name: 'Ink', description: 'Only black and white — pen-and-ink outlines and hatching; scratchboard in dark mode.', fonts: 'ink', palette: 'graphite', monochrome: true },
-  { id: 'halloween', name: 'Halloween', description: 'Pumpkin and violet, glowing jack-o’-lanterns, cobwebs, bats and bugs that crawl across the screen.', fonts: 'spooky', palette: 'pumpkin', decorated: true },
-  { id: 'winter', name: 'Winter', description: 'Frosted blues and gently falling snow.', fonts: 'festive', palette: 'ocean', decorated: true },
-  { id: 'christmas', name: 'Christmas', description: 'Berry red and fir green, a row of trees, fairy lights along the top and snow when lively.', fonts: 'festive', palette: 'holly', decorated: true },
-  { id: 'autumn', name: 'Autumn', description: 'Warm copper and cream with leaves drifting down when lively.', fonts: 'serif', palette: 'copper', decorated: true },
+  { id: 'halloween', name: 'Halloween', description: '3D beetles explore cards and tables, spiders descend on silk, and bats fly from a twisted tree and return to roost.', fonts: 'spooky', palette: 'pumpkin', decorated: true },
+  { id: 'winter', name: 'Winter', description: 'Snow-covered 3D firs and six-point snowflakes that bounce off cards and table edges.', fonts: 'festive', palette: 'ocean', decorated: true },
+  { id: 'christmas', name: 'Christmas', description: '3D Christmas trees, golden stars, Santa’s sleigh and galloping reindeer, with snow that bounces on your workspace.', fonts: 'festive', palette: 'holly', decorated: true },
+  { id: 'autumn', name: 'Autumn', description: 'A sculpted copper canopy sways in the breeze as leaves tumble across your workspace.', fonts: 'serif', palette: 'copper', decorated: true },
   { id: 'terminal', name: 'Terminal', description: 'Phosphor green on black with scanlines and a mono face.', fonts: 'mono', palette: 'emerald', decorated: true },
 ];
 export const styleById = (id: string | null | undefined) => STYLES.find(s => s.id === id) ?? STYLES[0]!;

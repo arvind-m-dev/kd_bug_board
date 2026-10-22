@@ -1378,6 +1378,13 @@ html[data-motion=off] .bf-surface-effects { display: none; }
 .bf-help-arrow::after { content: ''; position: absolute; right: -2px; top: -4px; border: 5px solid transparent; border-left: 8px solid #facc15; }
 .bf-help-drop { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 8px; padding: 10px; border: 1px dashed var(--border); border-radius: 6px; color: var(--muted-foreground); font-size: 11.5px; }
 .bf-help-preview p { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin: 8px 0 0; color: var(--muted-foreground); font-size: 11.5px; }
+
+/* A transparent, lit WebGL diorama. Every layer is inert and below dialogs. */
+.bf-seasonal-3d { position: fixed; inset: 0; z-index: 36; pointer-events: none !important; user-select: none; overflow: hidden; contain: strict; transition: opacity .18s ease; }
+.bf-seasonal-3d canvas { display: block; pointer-events: none !important; width: 100%; height: 100%; }
+body:has(.bf-seasonal-3d[data-ready=true]) :is(.bf-surface-bug, .bf-spider, .bf-bat, .bf-scurry, .bf-still, .bf-trees, .bf-sleigh, .bf-snow, .bf-snowman, .bf-gust-snow, .bf-leaf, .bf-pumpkins, .bf-web, .bf-ghost, .bf-crawl, .bf-climb) { display: none; }
+html[data-motion=off] .bf-seasonal-3d { display: none; }
+@media print { .bf-seasonal-3d, .bf-surface-effects, .bf-decor { display: none !important; } }
 /* Dropdown options: drag to arrange */
 .bf-option-row { position: relative; }
 .bf-option-row[draggable=true] { cursor: default; }
@@ -1392,6 +1399,11 @@ html[data-motion=off] .bf-surface-effects { display: none; }
 .bf-studio-cta:hover { filter: brightness(1.08); transform: translateY(-1px); } .bf-studio-cta:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 html[data-motion=off] .bf-studio-cta { animation: none; }
 @media (prefers-reduced-motion: reduce) { .bf-studio-cta { animation: none; } }
+.bf-brand-sculpture { position: relative; display: grid; place-items: center; width: 32px; height: 32px; flex: none; filter: drop-shadow(0 2px 1px rgb(0 0 0 / .3)); }
+.bf-brand-canvas { position: absolute; inset: 0; pointer-events: none; }
+.bf-brand-canvas canvas { display: block; width: 32px; height: 32px; pointer-events: none; }
+.bf-brand-sculpture[data-ready=true] .bf-brand-fallback { opacity: 0; }
+.bf-logo:has(.bf-brand-sculpture) { background: linear-gradient(145deg, color-mix(in oklab, var(--card) 90%, white), color-mix(in oklab, var(--card) 75%, var(--primary))); box-shadow: inset 0 1px 1px rgb(255 255 255 / .4), inset 0 -2px 3px rgb(0 0 0 / .2), 0 3px 8px rgb(0 0 0 / .2); border: 1px solid color-mix(in oklab, var(--primary) 35%, var(--border)); }
 
 /* Theme Studio: scene knobs */
 .bf-knobs { display: grid; gap: 10px 18px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }

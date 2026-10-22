@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bug } from 'lucide-react';
+import { BrandLogo3D } from './brand-logo-3d';
 import { useTheme } from './theme-toggle';
 import { seededRandom, spread, styleById, type Scene } from '@/lib/appearance';
 import { Web } from './scene-web';
 import { SurfaceEffects } from './surface-effects';
+import { Seasonal3D } from './seasonal-3d';
 
 /** A bug with legs and feelers that move — the mascot comes alive in the Halloween style and when motion is lively. */
 export function BugMascot({ size = 24, className = '', style }: { size?: number; className?: string; style?: React.CSSProperties }) {
@@ -18,10 +19,10 @@ export function BugMascot({ size = 24, className = '', style }: { size?: number;
   </svg>;
 }
 
-/** The brand mark: the living bug in Halloween, the plain icon otherwise. */
+/** One lit brand sculpture shared by workspace and member portals. */
 export function BrandMark() {
-  const { effective, ready } = useTheme();
-  return ready && effective.style === 'halloween' ? <BugMascot size={26} /> : <Bug size={23} />;
+  const { effective, dark } = useTheme();
+  return <BrandLogo3D motion={effective.motion} colorKey={`${effective.palette}:${effective.accent}:${effective.style}:${dark}`} />;
 }
 
 /* ───────── Halloween pieces ───────── */
@@ -116,6 +117,7 @@ export function Decorations() {
   if (!ready || motion === 'off' || !style.decorated) return null;
   const id = style.id; const live = lively || undefined;
   return <>
+    {['halloween', 'winter', 'christmas', 'autumn'].includes(id) && <Seasonal3D season={id} lively={lively} scene={sc} />}
     {lively && ['halloween', 'winter', 'christmas', 'autumn'].includes(id) && <SurfaceEffects season={id} />}
     <div className="bf-decor bf-decor-back" data-style={id} data-lively={live} aria-hidden="true">
       {id === 'halloween' && <>
