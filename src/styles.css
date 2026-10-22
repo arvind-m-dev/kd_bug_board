@@ -1374,3 +1374,11 @@ html[data-motion=off] .bf-surface-effects { display: none; }
 .bf-help-arrow::after { content: ''; position: absolute; right: -2px; top: -4px; border: 5px solid transparent; border-left: 8px solid #facc15; }
 .bf-help-drop { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 8px; padding: 10px; border: 1px dashed var(--border); border-radius: 6px; color: var(--muted-foreground); font-size: 11.5px; }
 .bf-help-preview p { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin: 8px 0 0; color: var(--muted-foreground); font-size: 11.5px; }
+/* Dropdown options: drag to arrange */
+.bf-option-row { position: relative; }
+.bf-option-row[draggable=true] { cursor: default; }
+.bf-grip { display: grid; place-items: center; width: 22px !important; height: 28px; margin-right: 2px; border: 0; background: none; color: var(--muted-foreground); cursor: grab; border-radius: 6px; }
+.bf-grip:hover, .bf-grip:focus-visible { color: var(--foreground); background: var(--muted); outline: none; } .bf-grip:focus-visible { box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary) 50%, transparent); }
+.bf-option-row[data-dragging] { opacity: .4; } .bf-option-row[data-dragging] .bf-grip { cursor: grabbing; }
+.bf-option-row[data-drop]::after { content: ''; position: absolute; left: 0; right: 0; height: 2px; background: var(--primary); border-radius: 2px; pointer-events: none; }
+.bf-option-row[data-drop=before]::after { top: -1px; } .bf-option-row[data-drop=after]::after { bottom: -1px; }
