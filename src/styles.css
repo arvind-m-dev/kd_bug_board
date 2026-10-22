@@ -319,7 +319,8 @@ body { font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; 
 .bf-nav-label { letter-spacing: .08em; }
 
 /* Top bar stays visible and lets content glow through */
-.bf-topbar { position: sticky; top: 0; z-index: 20; background: color-mix(in oklab, var(--card) 82%, transparent); backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px); }
+/* Opaque enough that nothing scrolling underneath shows through; the blur only softens the last few percent. */
+.bf-topbar { position: sticky; top: 0; z-index: 20; background: color-mix(in oklab, var(--card) 97%, transparent); backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px); }
 
 /* Page heading */
 .bf-page-heading h1 { font-size: 28px; letter-spacing: -.02em; }
@@ -1016,7 +1017,7 @@ html[data-skin=sketch] :is(.bf-status-pill, .bf-sev, .bf-pri, .bf-nav-count, .bf
 html[data-skin=sketch] [role=dialog] { border: 1.5px solid var(--border); border-radius: 18px 6px 16px 8px / 8px 16px 6px 18px; box-shadow: var(--shadow-lift); }
 html[data-skin=sketch] .bf-logo { background: var(--foreground); color: var(--background); box-shadow: 2px 2px 0 color-mix(in oklab, var(--foreground) 35%, transparent); border-radius: 12px 5px 10px 6px / 6px 10px 5px 12px; }
 html[data-skin=sketch] .bf-sidebar { background: var(--card); border-right: 1.5px solid var(--border); }
-html[data-skin=sketch] .bf-topbar { background: color-mix(in oklab, var(--card) 94%, transparent); border-bottom: 1.5px solid var(--border); backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-skin=sketch] .bf-topbar { background: var(--card); border-bottom: 1.5px solid var(--border); backdrop-filter: none; -webkit-backdrop-filter: none; }
 html[data-skin=sketch] .bf-nav-link[data-status=active] { background: var(--accent); color: var(--foreground); box-shadow: inset 0 0 0 1.5px var(--border); }
 html[data-skin=sketch] .bf-nav-link[data-status=active]::before { background: var(--foreground); }
 html[data-skin=sketch] .bf-nav-link[data-status=active] .bf-nav-count { background: var(--foreground); color: var(--background); }
@@ -1025,6 +1026,7 @@ html[data-skin=sketch] :is(.bf-summary-card, .bf-stat, .bf-status-card, .bf-port
 html[data-skin=sketch] .bf-table tbody tr:nth-child(even) { background: color-mix(in oklab, var(--foreground) 3%, transparent); }
 html[data-skin=sketch] .bf-table tbody tr:hover { background: var(--accent); box-shadow: inset 3px 0 0 var(--foreground); }
 html[data-skin=sketch] .bf-table th { border-bottom: 1.5px dashed var(--border); background: transparent; }
+html[data-skin=sketch] .bf-sticky-table thead th { background: var(--card); box-shadow: inset 0 -1.5px 0 var(--border); }
 html[data-skin=sketch] .bf-table td { border-bottom: 1px solid color-mix(in oklab, var(--border) 55%, transparent); }
 html[data-skin=sketch] :is(.bf-person-link, a):hover { text-decoration: underline wavy; text-underline-offset: 3px; }
 html[data-skin=sketch] .bf-login > div:last-child { border: 1.5px solid var(--border); border-radius: 18px 6px 16px 8px / 8px 16px 6px 18px; box-shadow: var(--shadow-lift); }
@@ -1193,7 +1195,7 @@ html[data-skin=halloween] .bf-avatar { background: linear-gradient(135deg, color
 /* ───────────── Winter: frosted blues ───────────── */
 html[data-skin=winter] { --background: oklch(.975 .012 230); --card: oklch(1 0 0); --foreground: oklch(.25 .04 250); --muted: oklch(.94 .015 230); --muted-foreground: oklch(.48 .03 240); --secondary: oklch(.95 .012 230); --border: oklch(.9 .02 230); }
 html[data-skin=winter].dark { --background: oklch(.19 .035 245); --card: oklch(.24 .04 245); --foreground: oklch(.96 .01 230); --muted: oklch(.29 .04 245); --muted-foreground: oklch(.75 .03 235); --secondary: oklch(.27 .04 245); --border: oklch(.35 .04 245); }
-html[data-skin=winter] .bf-topbar { background: linear-gradient(180deg, color-mix(in oklab, var(--card) 90%, white), color-mix(in oklab, var(--card) 82%, transparent)); }
+html[data-skin=winter] .bf-topbar { background: linear-gradient(180deg, color-mix(in oklab, var(--card) 90%, white), color-mix(in oklab, var(--card) 97%, transparent)); }
 html[data-skin=winter] .bf-logo { background: linear-gradient(135deg, var(--primary), var(--brand-2)); box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 20%, transparent), 0 6px 16px -6px color-mix(in oklab, var(--primary) 60%, transparent); }
 html[data-skin=winter] .bf-page-heading h1 { font-weight: 700; letter-spacing: .01em; }
 html[data-skin=winter] :is(.bf-panel, .bf-kpi, .bf-stat, .bf-status-card, .bf-summary-card) { box-shadow: 0 1px 2px oklch(.3 .05 250 / .08), 0 10px 28px -16px oklch(.3 .05 250 / .35); }
