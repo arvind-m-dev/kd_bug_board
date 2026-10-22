@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Bug } from 'lucide-react';
 import { useTheme } from './theme-toggle';
 import { styleById } from '@/lib/appearance';
+import { SurfaceEffects } from './surface-effects';
 
 /** A bug with legs and feelers that move — the mascot comes alive in the Halloween style and when motion is lively. */
 export function BugMascot({ size = 24, className = '', style }: { size?: number; className?: string; style?: React.CSSProperties }) {
@@ -87,11 +88,6 @@ function Leaves({ count, front = false, seed = 0 }: { count: number; front?: boo
   return <>{Array.from({ length: count }, (_, j) => { const i = j + seed; return <i key={j} className="bf-leaf" data-front={front || undefined} style={{ left: `${(i * 41) % 100}%`, width: 14 + (i % 3) * 4, height: 14 + (i % 3) * 4, animationDelay: `${(i * 2.3) % 13}s`, animationDuration: `${11 + ((i * 3.1) % 9)}s`, ['--drift' as string]: `${(i % 2 ? 1 : -1) * (30 + (i % 4) * 14)}px` }}><Leaf hue={[45, 60, 30, 80][i % 4]!} /></i>; })}</>;
 }
 
-/** Bugs wander along the bottom in both directions with pauses and wobbles; one climbs the right edge. */
-const crawlers = [
-  { y: 6, size: 22, duration: '46s', delay: '0s', dir: 1 }, { y: 30, size: 16, duration: '64s', delay: '12s', dir: -1 }, { y: 14, size: 18, duration: '52s', delay: '27s', dir: 1 },
-  { y: 48, size: 14, duration: '80s', delay: '5s', dir: -1 }, { y: 2, size: 26, duration: '38s', delay: '41s', dir: 1 },
-];
 const bats = [{ top: '8%', delay: '0s', duration: '26s', size: 44 }, { top: '18%', delay: '7s', duration: '31s', size: 36 }, { top: '30%', delay: '14s', duration: '22s', size: 50 }, { top: '12%', delay: '20s', duration: '35s', size: 30 },
   { top: '22%', delay: '9s', duration: '28s', size: 40, rtl: true }, { top: '10%', delay: '9.6s', duration: '28s', size: 28, rtl: true }, { top: '16%', delay: '10.4s', duration: '28s', size: 34, rtl: true }];
 
@@ -116,6 +112,7 @@ export function Decorations() {
   if (!ready || motion === 'off' || !style.decorated) return null;
   const id = style.id; const live = lively || undefined;
   return <>
+    {lively && ['halloween', 'winter', 'christmas', 'autumn'].includes(id) && <SurfaceEffects season={id} />}
     <div className="bf-decor bf-decor-back" data-style={id} data-lively={live} aria-hidden="true">
       {id === 'halloween' && <>
         <svg className="bf-moon" viewBox="0 0 64 64" width="84" height="84"><path d="M40 4 a28 28 0 1 0 20 46 a22 22 0 1 1 -20-46z" fill="currentColor" /></svg>
@@ -139,8 +136,6 @@ export function Decorations() {
     <div className="bf-decor bf-decor-front" data-style={id} data-lively={live} aria-hidden="true">
       {id === 'halloween' && lively && <>
         {bats.map((b, i) => <Bat key={i} {...b} />)}
-        {crawlers.map((c, i) => <BugMascot key={i} size={c.size} className="bf-crawl" style={{ bottom: c.y, animationDuration: c.duration, animationDelay: c.delay, ['--rot' as string]: `${90 * c.dir}deg`, animationDirection: c.dir < 0 ? 'reverse' : 'normal' }} />)}
-        <BugMascot size={18} className="bf-climb" />
         <Spider left="31%" delay="6s" duration="96s" /><Spider left="72%" delay="51s" duration="118s" />
         {walking && <BugMascot size={30} className="bf-scurry" />}
       </>}

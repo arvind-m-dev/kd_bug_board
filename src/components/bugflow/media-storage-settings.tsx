@@ -30,7 +30,8 @@ export function MediaStorageCard() {
   const test = useMutation({ mutationFn: () => read({ data: { test: true } }), onSuccess: r => client.setQueryData(['media-status'], r) });
   const s = test.data ?? q.data; const [guide, setGuide] = useState(false);
   const [choice, setChoice] = useState<MediaSource>('default'); const [form, setForm] = useState<Form>(fromStatus(undefined)); const [touched, setTouched] = useState(false);
-  useEffect(() => { if (q.data && !touched) { setChoice(q.data.source === 'custom' ? 'custom' : 'default'); setForm(fromStatus(q.data)); } }, [q.data, touched]);
+  // Nothing set up anywhere → open on the own-bucket form, so the input boxes are the first thing Admin sees.
+  useEffect(() => { if (q.data && !touched) { setChoice(q.data.source === 'custom' || (!q.data.configured && !q.data.defaultAvailable) ? 'custom' : 'default'); setForm(fromStatus(q.data)); } }, [q.data, touched]);
   const storage = useMutation({
     mutationFn: (data: z.infer<typeof mediaStorageSchema>) => save({ data }),
     onSuccess: r => { client.setQueryData(['media-status'], r); void client.invalidateQueries({ queryKey: ['bug-workspace'] }); setTouched(false); setForm(f => ({ ...f, secretAccessKey: '' })); toast[r.test?.ok ? 'success' : 'warning'](r.test?.ok ? 'Storage saved and connected' : 'Storage saved, but the test failed', { description: r.test?.message }); },
@@ -97,7 +98,7 @@ export function MediaStorageCard() {
         <li><strong>Connect it</strong>: choose <em>My own bucket</em> above, paste the three values and press <em>Save &amp; test</em>. Hosts can instead set {VARS.map((v, i) => <span key={v}>{i > 0 && ', '}<code>{v}</code></span>)} in the environment to provide the default bucket. Backblaze B2 or AWS S3 work the same way (set the region).</li>
         <li><strong>Allow the browser to upload and read</strong>: bucket → Settings → CORS policy, add this rule (uploads go straight from the browser to the bucket; GET lets screenshots and recordings be marked up):
           <pre>{JSON.stringify([{ AllowedOrigins: [origin], AllowedMethods: ['PUT', 'GET'], AllowedHeaders: ['content-type', 'if-none-match'], ExposeHeaders: ['ETag'], MaxAgeSeconds: 3600 }], null, 2)}</pre></li>
-        <li><strong>Try it</strong>: attach a screenshot to any bug. Files stay private: every view uses a 10-minute signed link minted after the usual bug permission check.</li>
+        <li><strong>Try it</strong>: attach a screenshot to any bug. Files stay private: every view uses a 10-minute signed link minted after the usual bug permission check. What members see, with a picture, is under Help &amp; support (sidebar) → Attachments &amp; media.</li>
       </ol>}
     </div>}
   </>;
