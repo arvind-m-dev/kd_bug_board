@@ -15,3 +15,17 @@ describe('member favicon', () => {
     expect(memberFaviconSvg('<x> y', 'AB')).not.toContain('<x>');
   });
 });
+
+describe('panel badge', () => {
+  it('gives each panel type its own badge on top of the member colour, and a title that names the panel', async () => {
+    const { PANEL_BADGES, panelLabel } = await import('@/hooks/use-member-favicon');
+    const plain = memberFaviconSvg('Jenith Kumar', '1A2B3C4D');
+    const reporter = memberFaviconSvg('Jenith Kumar', '1A2B3C4D', 'reporter');
+    const developer = memberFaviconSvg('Jenith Kumar', '1A2B3C4D', 'developer');
+    expect(plain).not.toContain('<circle'); expect(reporter).toContain('>R<'); expect(developer).toContain('>D<');
+    expect(reporter).not.toBe(developer); expect(reporter).toContain(PANEL_BADGES['reporter']!.color);
+    expect(reporter).toContain(`hsl(${memberHue('1A2B3C4D')} 65% 42%)`); // the member colour stays the same across panels
+    expect(panelLabel('qa')).toBe('QA portal'); expect(panelLabel(undefined)).toBe('Portal'); expect(panelLabel('nope')).toBe('Portal');
+    expect(memberFaviconSvg('<b>x</b>', 'Z', 'qa')).not.toContain('<b>');
+  });
+});

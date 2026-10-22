@@ -36,7 +36,7 @@ export function PersonalPortal({token,type}:{token:string;type:'reporter'|'qa'|'
  const portal=useQuery({queryKey:['personal-portal',type,token],queryFn:()=>read({data:{token,type}}),retry:2,retryDelay:n=>1000*2**n,refetchOnWindowFocus:true,refetchInterval:45000,refetchIntervalInBackground:true,staleTime:0,gcTime:0});
  // Links keep working after an Admin changes the member's role: follow the portal's current type.
  useEffect(()=>{const t=portal.data?.type;if(t&&t!==type)void navigate({to:`/${t}/$portalToken`,params:{portalToken:token},replace:true});},[portal.data?.type,type,token,navigate]);
- useMemberFavicon(portal.data?{name:portal.data.name,code:portal.data.memberCode}:null);
+ useMemberFavicon(portal.data?{name:portal.data.name,code:portal.data.memberCode,panel:type}:null);
  // Online while this portal is open; offline as soon as it's closed.
  usePresence(token,portal.data?.type??type,!!portal.data);
  // The member's own theme (saved on their portal) applies here and only here; leaving the portal drops it again.
