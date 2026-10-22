@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { periodFields, validRange } from './period';
+import { statusLabel } from './format';
 
 /** Client-safe activity types, filter categories and display helpers. */
 
@@ -89,10 +90,7 @@ export function formatWhen(at: string) {
 const UUID = /^[0-9a-f-]{36}$/i;
 function clean(value: string | undefined): value is string { return !!value && value !== 'null' && !UUID.test(value) && !/^[[{]/.test(value); }
 
-export function statusText(v: string | undefined) {
-  if (!v) return '—';
-  return v === 'RECHECK' ? 'Ready for QA retest' : v.toLowerCase().replaceAll('_', ' ').replace(/^./, c => c.toUpperCase());
-}
+export const statusText = (v: string | undefined) => (v ? statusLabel(v) : '—');
 
 export function changeText(row: ActivityRow) {
   const d = row.detail; const parts: string[] = [];

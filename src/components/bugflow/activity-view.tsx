@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getActivity, getActivityInsights, getActivityPeople, getTeamPerformance } from '@/lib/activity.functions';
 import { ACTIVITY_CATEGORIES, ACTIVITY_SERIES, ACTIVITY_SOURCES, changeText, durationText, formatWhen, nameWithRole, roleName, type PersonPerformance, type ActivityFilters, type ActivityInsights, type ActivityRow } from '@/lib/activity';
+import { dayHeading, initials } from '@/lib/format';
 import { notificationLabel } from '@/lib/notifications';
 import { ThemedSelect } from './themed-select';
 import { PeriodPicker } from './period-picker';
@@ -27,14 +28,7 @@ function kindOf(action: string) {
   return KIND[k] ? k : 'team';
 }
 const categoryLabel = (key: string) => ACTIVITY_CATEGORIES.find(c => c.key === key)?.label ?? key;
-const initials = (name: string) => name.split(/\s+/).filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase() || '?';
 const dayKey = (at: string) => new Date(at).toDateString();
-function dayHeading(at: string) {
-  const d = new Date(at); const today = new Date(); const y = new Date(); y.setDate(today.getDate() - 1);
-  if (d.toDateString() === today.toDateString()) return 'Today';
-  if (d.toDateString() === y.toDateString()) return 'Yesterday';
-  return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric' });
-}
 const time = (at: string) => new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 const shortDay = (day: string) => new Date(`${day}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 

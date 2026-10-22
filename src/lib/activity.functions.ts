@@ -6,7 +6,7 @@ import { periodFields, validRange } from './period';
 const periodOnly = z.object(periodFields).strict().refine(validRange, 'The start date must be on or before the end date.');
 
 export const getActivity = createServerFn({ method: 'POST' })
-  .inputValidator((v: unknown) => activityQuerySchema.parse(v))
+  .validator((v: unknown) => activityQuerySchema.parse(v))
   .handler(async ({ data }) => {
     const s = await import('./activity.server');
     const a = await import('./portal-access.server');
@@ -15,7 +15,7 @@ export const getActivity = createServerFn({ method: 'POST' })
   });
 
 export const getActivityInsights = createServerFn({ method: 'POST' })
-  .inputValidator((v: unknown) => activityQuerySchema.parse(v))
+  .validator((v: unknown) => activityQuerySchema.parse(v))
   .handler(async ({ data }) => {
     const s = await import('./activity.server');
     const a = await import('./portal-access.server');
@@ -30,7 +30,7 @@ export const getActivityPeople = createServerFn({ method: 'GET' }).handler(async
 });
 
 export const getTeamPerformance = createServerFn({ method: 'POST' })
-  .inputValidator((v: unknown) => periodOnly.parse(v))
+  .validator((v: unknown) => periodOnly.parse(v))
   .handler(async ({ data }) => {
     const s = await import('./activity.server');
     const a = await import('./portal-access.server');

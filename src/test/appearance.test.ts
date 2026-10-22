@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PALETTES, appearanceSchema, paletteById, paletteVars, THEME_BOOT_SCRIPT } from '@/lib/appearance';
+import { PALETTES, appearanceSchema, paletteById, paletteVars, skinOf, THEME_BOOT_SCRIPT } from '@/lib/appearance';
 
 describe('colour palettes', () => {
   it('every palette defines all brand tokens for light and dark', () => {
@@ -17,6 +17,11 @@ describe('colour palettes', () => {
   it('only accepts known palettes', () => {
     expect(appearanceSchema.safeParse({ palette: 'emerald' }).success).toBe(true);
     expect(appearanceSchema.safeParse({ palette: 'neon' }).success).toBe(false);
+  });
+  it('only the pencil sketch palette carries a skin, and the boot script applies it before paint', () => {
+    expect(PALETTES.filter(p => p.skin).map(p => p.id)).toEqual(['sketch']);
+    expect(skinOf('sketch')).toBe('sketch'); expect(skinOf('teal')).toBeNull();
+    expect(THEME_BOOT_SCRIPT).toContain('data-skin');
   });
   it('boot script is self-contained and runs without errors', () => {
     expect(() => new Function(THEME_BOOT_SCRIPT)).not.toThrow();

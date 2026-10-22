@@ -9,16 +9,16 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { getNotifications, updateNotifications } from '@/lib/notifications.functions';
 import { NOTIFICATION_DAYS, notificationLabel, notificationTone, type NotificationItem } from '@/lib/notifications';
 import { ConfirmAction, ErrorNotice, actionError } from './action-feedback';
+import { dateLabel, dayHeading, statusLabel, timeAgo } from '@/lib/format';
 
-const when = (at: string) => {
-  const d = new Date(at); const diff = Date.now() - d.getTime();
-  if (diff < 60000) return 'Just now'; if (diff < 3600000) return `${Math.floor(diff / 60000)} min ago`;
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)} h ago`;
-  return d.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
-};
 const iconFor = (a: string) => a.startsWith('member.') || a.startsWith('portal.') ? UserCheck : a.includes('comment') ? MessageSquare : a.includes('assign') ? UserCheck : a.includes('verify') ? ClipboardCheck : a.includes('priority') ? Flag : Bug;
-const status = (s: string) => s ? s.toLowerCase().replaceAll('_', ' ').replace(/^./, c => c.toUpperCase()) : '';
 
+/** Notifications arrive newest first; keep that order and cut it into days. */
+function groupByDay(items: NotificationItem[]) {
+  const groups: { day: string; items: NotificationItem[] }[] = [];
+  for (const n of items) { const day = dayHeading(n.at); const g = groups[groups.length - 1]; if (g && g.day === day) g.items.push(n); else groups.push({ day, items: [n] }); }
+  return groups;
+}
 function useNotifications(limit: number) {
   const fn = useServerFn(getNotifications);
   return useQuery({ queryKey: ['notifications', limit], queryFn: () => fn({ data: { limit } }), retry: false, staleTime: 30000, refetchInterval: 60000 });
@@ -33,9 +33,9 @@ function Item({ n, onClick }: { n: NotificationItem; onClick?: () => void }) {
   return <Link to={n.action.startsWith("bug.") ? "/admin/bugs" : "/admin/users"} onClick={onClick} className={`bf-notice ${n.unread ? 'bf-notice-unread' : ''}`}>
     <span className="bf-notice-icon"><Icon size={17} /></span>
     <span className="min-w-0 flex-1">
-      <span className="flex items-center gap-2"><strong className="text-sm">{notificationLabel(n.action)}</strong>{n.unread && <span className="bf-notice-dot" data-tone={notificationTone(n.action, n.status)} aria-label="Unread" />}{n.status && <span className="bf-notice-tag ml-auto">{status(n.status)}</span>}</span>
+      <span className="flex items-center gap-2"><strong className="text-sm">{notificationLabel(n.action)}</strong>{n.unread && <span className="bf-notice-dot" data-tone={notificationTone(n.action, n.status)} aria-label="Unread" />}{n.status && <span className="bf-notice-tag ml-auto">{statusLabel(n.status)}</span>}</span>
       <span className="block truncate text-xs text-muted-foreground">{n.title || (n.action.startsWith('bug.') ? 'Bug update' : 'Team & access')} · by {n.actor}</span>
-      <span className="block text-xs text-muted-foreground">{when(n.at)}</span>
+      <time className="block text-xs text-muted-foreground" title={dateLabel(n.at)}>{timeAgo(n.at)}</time>
     </span>
   </Link>;
 }
@@ -75,7 +75,10 @@ export function NotificationsPage() {
         <ConfirmAction open={confirm} onOpenChange={setConfirm} destructive title="Clear notifications?" description={`This clears all notifications from the last ${NOTIFICATION_DAYS} days. Bug history is kept.`} confirmLabel="Clear all" onConfirm={async () => { await mark.mutateAsync('clear'); }} />
       </div>
     </div>
-    {items.length ? <div className="grid gap-2">{items.map(n => <Item key={n.id} n={n} />)}</div>
+    {items.length ? groupByDay(items).map(g => <section key={g.day} className="grid gap-2" aria-label={g.day}>
+        <h2 className="bf-day-heading">{g.day}<span>{g.items.length}</span></h2>
+        {g.items.map(n => <Item key={n.id} n={n} />)}
+      </section>)
       : <p className="rounded-md border p-8 text-center text-sm text-muted-foreground">No notifications in the last {NOTIFICATION_DAYS} days.</p>}
   </div>;
 }

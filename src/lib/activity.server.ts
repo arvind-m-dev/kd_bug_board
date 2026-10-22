@@ -15,7 +15,7 @@ const CATEGORY: Record<string, string[]> = {
   comment: ['bug.comment'],
   edited: ['bug.edited'],
   deleted: ['bug.deleted'],
-  team: ['member.updated', 'member.deactivate', 'member.activate', 'member.delete', 'portal.created', 'portal.regenerated', 'portal.revoked', 'project.created', 'settings.dropdowns'],
+  team: ['member.updated', 'member.deactivate', 'member.activate', 'member.delete', 'portal.created', 'portal.regenerated', 'portal.revoked', 'project.created', 'project.archived', 'project.restored', 'settings.dropdowns', 'settings.appearance'],
 };
 
 /** Source portal of an actor: their most recent portal type. */

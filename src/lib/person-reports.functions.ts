@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { personReportQuerySchema } from './person-reports';
 
 export const getPersonOverview = createServerFn({ method: 'POST' })
-  .inputValidator((v: unknown) => personReportQuerySchema.parse(v))
+  .validator((v: unknown) => personReportQuerySchema.parse(v))
   .handler(async ({ data }) => {
     const s = await import('./person-reports.server');
     const a = await import('./portal-access.server');
@@ -10,7 +10,7 @@ export const getPersonOverview = createServerFn({ method: 'POST' })
   });
 
 export const getPersonDetail = createServerFn({ method: 'POST' })
-  .inputValidator((v: unknown) => { const d = personReportQuerySchema.parse(v); if (!d.person) throw new Error('Choose a person.'); return { ...d, person: d.person }; })
+  .validator((v: unknown) => { const d = personReportQuerySchema.parse(v); if (!d.person) throw new Error('Choose a person.'); return { ...d, person: d.person }; })
   .handler(async ({ data }) => {
     const s = await import('./person-reports.server');
     const a = await import('./portal-access.server');

@@ -79,11 +79,36 @@ export function groupCounts(counts:StatusCount[],assignedOnly=false){
  const scoped=counts.filter(c=>!assignedOnly||c.assigned);
  return {total:scoped.reduce((n,c)=>n+c.count,0),groups:STATUS_GROUPS.map(g=>({...g,count:scoped.filter(c=>(g.statuses as readonly string[]).includes(c.status)).reduce((n,c)=>n+c.count,0)}))};
 }
-export function matchesFilter(filter:string,b:{status:string;assigneeId:string|null;reporterId:string},me:string){
+export type FilterableBug={status:string;assigneeId:string|null;reporterId:string;assignees?:{id:string}[]};
+/** 'all' | 'mine' | 'owned' | 'open' | 'unassigned' | a status | a 'g:' group, or two of them joined by ':' (e.g. 'owned:RECHECK' = my fixes awaiting QA). */
+export function matchesFilter(filter:string,b:FilterableBug,me:string):boolean{
+ const sep=filter.indexOf(':');
+ if(sep>0&&!filter.startsWith('g:'))return matchesFilter(filter.slice(0,sep),b,me)&&matchesFilter(filter.slice(sep+1),b,me);
  if(filter==='all')return true; if(filter==='mine')return b.reporterId===me; if(filter==='unassigned')return b.assigneeId===null;
+ if(filter==='owned')return b.assigneeId===me||!!b.assignees?.some(a=>a.id===me);
  if(filter==='open')return !['RESOLVED','DUPLICATE','NOT_A_BUG','WONT_FIX'].includes(b.status);
  const g=STATUS_GROUPS.find(x=>x.key===filter); return g?(g.statuses as readonly string[]).includes(b.status):b.status===filter;
 }
+export type FocusCard={key:string;label:string;hint:string;filter:string;tone:string};
+/** The four "what needs me" cards on a member portal, chosen by what the person does (not just their title). */
+export function portalFocus(role:string,permissions:readonly string[]):FocusCard[]{
+ if(role==='developer'||permissions.includes('progress'))return [
+  {key:'owned',label:'Assigned to me',hint:'Everything I own',filter:'owned',tone:'teal'},
+  {key:'progress',label:'In progress',hint:'What I am fixing now',filter:'owned:IN_PROGRESS',tone:'warning'},
+  {key:'qa',label:'Awaiting QA',hint:'My fixes waiting for a retest',filter:'owned:RECHECK',tone:'info'},
+  {key:'reopened',label:'Sent back',hint:'My fixes that failed QA',filter:'owned:REOPENED',tone:'danger'}];
+ if(role==='qa'||permissions.includes('validate')||permissions.includes('verify'))return [
+  {key:'new',label:'To validate',hint:'New reports to check',filter:'g:new',tone:'info'},
+  {key:'retest',label:'To retest',hint:'Fixes waiting for me',filter:'RECHECK',tone:'warning'},
+  {key:'reopened',label:'Reopened',hint:'Fixes that failed a retest',filter:'REOPENED',tone:'danger'},
+  {key:'resolved',label:'Verified',hint:'Fixes that passed',filter:'RESOLVED',tone:'success'}];
+ return [
+  {key:'mine',label:'My reports',hint:'Bugs I raised',filter:'mine',tone:'teal'},
+  {key:'open',label:'Still open',hint:'Not fixed yet',filter:'mine:open',tone:'info'},
+  {key:'info',label:'Need my input',hint:'Waiting for details from me',filter:'mine:NEEDS_INFORMATION',tone:'warning'},
+  {key:'fixed',label:'Fixed',hint:'Verified by QA',filter:'mine:RESOLVED',tone:'success'}];
+}
+export const focusCounts=(cards:FocusCard[],bugs:FilterableBug[],me:string)=>cards.map(c=>({...c,count:bugs.filter(b=>matchesFilter(c.filter,b,me)).length}));
 /** Statuses where a short reason helps the next person; the app asks for one but never requires it. */
 export const NOTES_SUGGESTED=['RECHECK','REOPENED','NEEDS_INFORMATION','NOT_A_BUG','DUPLICATE','WONT_FIX'];
 /** @deprecated notes are optional now; kept for older imports. */

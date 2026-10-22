@@ -8,9 +8,9 @@ export const getAppearance = createServerFn({ method: 'GET' }).handler(async () 
 });
 
 export const saveAppearance = createServerFn({ method: 'POST' })
-  .inputValidator((v: unknown) => appearanceSchema.parse(v))
+  .validator((v: unknown) => appearanceSchema.parse(v))
   .handler(async ({ data }) => {
     const s = await import('./appearance.server');
     const a = await import('./portal-access.server');
-    return a.databaseCall(() => s.writeAppearance(data.palette));
+    return a.databaseCall(() => s.writeAppearance(data));
   });

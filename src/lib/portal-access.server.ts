@@ -2,6 +2,7 @@ import { getCookie, setCookie, deleteCookie, getRequest, setResponseHeader } fro
 import { neonQuery, neonExecute, neonUserError } from './neon.server';
 import { hashToken, randomToken, equalSecret, portalTypesByRole, type saveMemberSchema, type unlockSchema, type portalReadSchema } from './portal-access';
 import { encryptPortal } from './portal-crypto.server';
+import { portalAppearanceSchema } from './appearance';
 import type { z } from 'zod';
 
 export async function databaseCall<T>(work: () => Promise<T>): Promise<T> {
@@ -68,6 +69,25 @@ export async function listProjects() {
   await requireAdmin(); const { rows } = await neonQuery('select id,name from bugflow.projects where not archived order by name,id limit 100');
   return rows.map(r => ({ id: String(r['id']), name: String(r['name']) }));
 }
+/** Per-project bug, module and member counts for the Projects & modules page. */
+export async function projectSummary() {
+  await requireAdmin();
+  const { rows } = await neonQuery(`select p.id, p.name, p.environment, p.archived, to_json(p.created_at) as created_at,
+    (select count(*)::int from bugflow.bugs b where b.project_id=p.id and b.deleted_at is null) as total,
+    (select count(*)::int from bugflow.bugs b where b.project_id=p.id and b.deleted_at is null and b.status not in ('RESOLVED','NOT_A_BUG','DUPLICATE','WONT_FIX')) as open,
+    (select count(distinct d.module_name)::int from bugflow.bugs b join bugflow.bug_details d on d.bug_id=b.id where b.project_id=p.id and b.deleted_at is null and d.module_name<>'') as modules,
+    (select count(*)::int from bugflow.portal_projects pp join bugflow.portals x on x.id=pp.portal_id join bugflow.users u on u.id=x.user_id where pp.project_id=p.id and x.type<>'admin' and x.active and u.active and u.deleted_at is null and x.revoked_at is null and (x.expires_at is null or x.expires_at>now())) as members,
+    (select to_json(max(b.updated_at)) from bugflow.bugs b where b.project_id=p.id and b.deleted_at is null) as last_update
+   from bugflow.projects p order by p.name, p.id limit 200`);
+  return rows.map(r => ({ id: String(r['id']), name: String(r['name']), environment: String(r['environment']), archived: r['archived'] === true, createdAt: String(r['created_at']), total: Number(r['total']), open: Number(r['open']), modules: Number(r['modules']), members: Number(r['members']), lastUpdate: r['last_update'] ? String(r['last_update']) : null }));
+}
+/** Archive hides a project from report forms and project choices; bugs, history and member scopes are kept. */
+export async function setProjectArchived(id: string, archived: boolean) {
+  checkOrigin(); const admin = await requireAdmin();
+  const { rows } = await neonExecute<{ rows: Record<string, unknown>[] }>('with changed as (update bugflow.projects set archived=$2 where id=$1 and archived<>$2 returning id) insert into bugflow.activity(id,actor_id,action,detail) select $3,$4,$5,$6 from changed returning id', [id, archived, crypto.randomUUID(), admin.userId, archived ? 'project.archived' : 'project.restored', { projectId: id }]);
+  if (!rows.length) throw new Error('This project was already changed. Refresh and try again.');
+  return { id, archived };
+}
 export async function createProject(name: string) {
   checkOrigin(); const admin = await requireAdmin(); const id = crypto.randomUUID();
   await neonExecute([{ query: 'insert into bugflow.projects(id,name) values($1,$2)', params: [id,name] }, { query: 'insert into bugflow.activity(id,actor_id,action,detail) values($1,$2,$3,$4)', params: [crypto.randomUUID(),admin.userId,'project.created',{projectId:id}] }]);
@@ -96,9 +116,10 @@ export async function changePortal(id: string, regenerate: boolean) {
   const row = result.results[0]?.rows[0]; if (!row) throw new Error('Member portal not found.');
   return { path: token ? `/${String(row['type'])}/${token}` : '' };
 }
+const parsePortalAppearance = (v: unknown) => { const r = portalAppearanceSchema.safeParse(v); return r.success ? r.data : null; };
 export async function readPortal(data: z.infer<typeof portalReadSchema>) {
-  const { rows } = await neonQuery("select p.id,p.user_id,p.type,to_json(p.created_at) as since,p.welcome_seen_at,u.name,o.welcome,o.permissions,o.scope_note,o.collaborator_role from bugflow.portals p join bugflow.users u on u.id=p.user_id join bugflow.portal_onboarding o on o.portal_id=p.id where p.token_hash=$1 and p.type<>'admin' and p.active and u.active and u.deleted_at is null and p.revoked_at is null and (p.expires_at is null or p.expires_at>now()) limit 1", [await hashToken(data.token)]);
+  const { rows } = await neonQuery("select p.id,p.user_id,p.type,to_json(p.created_at) as since,p.welcome_seen_at,p.appearance,u.name,o.welcome,o.permissions,o.scope_note,o.collaborator_role from bugflow.portals p join bugflow.users u on u.id=p.user_id join bugflow.portal_onboarding o on o.portal_id=p.id where p.token_hash=$1 and p.type<>'admin' and p.active and u.active and u.deleted_at is null and p.revoked_at is null and (p.expires_at is null or p.expires_at>now()) limit 1", [await hashToken(data.token)]);
   const row = rows[0]; if (!row) return null;
   await neonExecute('update bugflow.portals set last_seen_at=now() where id=$1', [row['id']]).catch(() => undefined);
-  return { type: String(row['type']) as typeof data.type, memberCode: String(row['user_id']).slice(0, 8).toUpperCase(), since: String(row['since']), firstVisit:!row['welcome_seen_at'], name: String(row['name']), welcome: String(row['welcome']), permissions: Array.isArray(row['permissions']) ? row['permissions'].filter((p): p is string=>typeof p==='string') : [], scope: String(row['scope_note']), role: String(row['collaborator_role']) };
+  return { type: String(row['type']) as typeof data.type, memberCode: String(row['user_id']).slice(0, 8).toUpperCase(), since: String(row['since']), firstVisit:!row['welcome_seen_at'], name: String(row['name']), welcome: String(row['welcome']), permissions: Array.isArray(row['permissions']) ? row['permissions'].filter((p): p is string=>typeof p==='string') : [], scope: String(row['scope_note']), role: String(row['collaborator_role']), appearance: parsePortalAppearance(row['appearance']) };
 }

@@ -4,12 +4,15 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { useServerFn } from '@tanstack/react-start';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipProps } from 'recharts';
-import { ChevronRight, Search, UsersRound } from 'lucide-react';
+import { ChevronRight, FileDown, Search, UsersRound } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { getPersonDetail, getPersonOverview, getTeamDetail } from '@/lib/person-reports.functions';
 import { getBugWorkspace } from '@/lib/bug-workflow.functions';
 import { OUTCOMES, acceptanceRate, outcomeCounts, passRate, reportFocus, teamMetrics, type Counts, type PersonMetrics, type PersonRecentBug } from '@/lib/person-reports';
 import { durationText, roleName, statusText } from '@/lib/activity';
+import { initials } from '@/lib/format';
+import { toCsv, downloadText, exportName } from '@/lib/export';
 import { periodLabel as describePeriod, viewerTimeZone, type Period } from '@/lib/period';
 import { PeriodPicker } from './period-picker';
 import { DEFAULT_SEVERITIES, PRIORITIES, severityLevel, type BugAccess } from '@/lib/bug-workflow';
@@ -19,7 +22,6 @@ import { ThemedSelect } from './themed-select';
 import { ErrorNotice, actionError } from './action-feedback';
 
 const admin: BugAccess = { kind: 'admin' };
-const initials = (name: string) => name.split(/\s+/).filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase() || '?';
 const FOCUS_LABEL = { tester: 'Tester', developer: 'Developer', qa: 'QA', admin: 'Admin' } as const;
 const ROLE_FILTERS = [{ value: 'all', label: 'All roles' }, { value: 'tester', label: 'Testers' }, { value: 'developer', label: 'Developers' }, { value: 'qa', label: 'QA' }, { value: 'admin', label: 'Admin' }];
 const OUTCOME_COLORS: Record<string, string> = { fixed: 'var(--success)', open: 'var(--info)', notabug: 'var(--sev-5)', duplicate: 'var(--violet)', wontfix: 'var(--warning)' };
@@ -90,6 +92,9 @@ export function TeamReports() {
       <div className="bf-search"><Search /><Input aria-label="Search people" placeholder="Search people…" value={text} onChange={e => setText(e.target.value)} /></div>
       <ThemedSelect label="Role" value={role} onChange={setRole} options={ROLE_FILTERS} />
       <PeriodPicker value={period} onChange={setPeriod} />
+      <Button variant="outline" size="sm" title="Download these people as a spreadsheet" disabled={!people.length} onClick={() => downloadText(exportName(`team-report-${describePeriod(period).replaceAll(' ', '-')}`), toCsv(
+        ['Name', 'Role', 'Status', 'Raised', 'Reports fixed', 'Reports rejected', 'Acceptance %', 'Assigned', 'Sent to QA', 'Fixes passed', 'Fixes reopened', 'Validated', 'Rejected', 'Revalidated', 'Retests', 'Pass rate %', 'Avg fix days', 'Total changes'],
+        people.map(m => { const o = outcomeCounts(m.raisedByStatus); return [m.name, roleName(m.role) || FOCUS_LABEL[reportFocus(m)], m.current ? 'Current' : 'Former', m.raised, o.fixed, o.notabug, acceptanceRate(m), m.owned, m.sentToQa, m.fixed, m.ownedReopened, m.validated, m.rejected, m.revalidated, m.qaPassed + m.qaFailed, passRate(m), m.avgFixDays == null ? null : Math.round(m.avgFixDays * 10) / 10, m.changes]; })))}><FileDown />CSV</Button>
     </div>
     {q.isError && <ErrorNotice message={actionError(q.error, 'Team reports could not load.')} onRetry={() => q.refetch()} retrying={q.isFetching} />}
     {q.isPending ? <div className="bf-reports"><div className="bf-people"><SkeletonRows rows={6} label="Loading people" /></div><div className="bf-report-loading" role="status"><span /><span /><span /></div></div>

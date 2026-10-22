@@ -2,21 +2,29 @@ import { useState, useEffect } from 'react';
 import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { useNavigate } from '@tanstack/react-router';
-import { Bug, ShieldCheck, LockKeyhole, ClipboardCheck, Menu, X, UserRound } from 'lucide-react';
+import { Bug, ShieldCheck, LockKeyhole, Menu, X, CircleHelp, FolderKanban, CalendarDays, Hash, CircleCheck, CircleMinus, type LucideIcon } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import { Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription } from '@/components/ui/dialog';
 import { dismissWelcome } from '@/lib/member-management.functions';
 import { getMemberPortal } from '@/lib/portal-access.functions';
-import { permissionLabels, type Permission } from '@/lib/onboarding';
+import { permissionLabels, rolePermissions, type Permission } from '@/lib/onboarding';
 import { Button } from '@/components/ui/button';
 import { ErrorNotice } from './action-feedback';
 import { BugWorkspace } from './bug-workspace';
+import { HelpContent, roleGuide } from './help-content';
 import { getBugWorkspace } from '@/lib/bug-workflow.functions';
-import { groupCounts } from '@/lib/bug-workflow';
+import { focusCounts, portalFocus, type BugAccess } from '@/lib/bug-workflow';
+import { initials, roleText } from '@/lib/format';
 import { useMemberFavicon } from '@/hooks/use-member-favicon';
 import { usePresence } from '@/hooks/use-presence';
+
+type Tab='bugs'|'access'|'help';
+type Focus={filter:string;label:string};
+const TABS:{id:Tab;label:string;icon:LucideIcon}[]=[{id:'bugs',label:'My bugs',icon:Bug},{id:'access',label:'My access',icon:ShieldCheck},{id:'help',label:'How it works',icon:CircleHelp}];
+
 export function PersonalPortal({token,type}:{token:string;type:'reporter'|'qa'|'developer'|'member'}){
- const client=useQueryClient();const acknowledge=useServerFn(dismissWelcome);const welcome=useMutation({mutationFn:acknowledge,onSuccess:()=>client.invalidateQueries({queryKey:['personal-portal']})});const read=useServerFn(getMemberPortal);const [tab,setTab]=useState('bugs');const [menu,setMenu]=useState(false);
+ const client=useQueryClient();const acknowledge=useServerFn(dismissWelcome);const welcome=useMutation({mutationFn:acknowledge,onSuccess:()=>client.invalidateQueries({queryKey:['personal-portal']})});const read=useServerFn(getMemberPortal);
+ const [tab,setTab]=useState<Tab>('bugs');const [menu,setMenu]=useState(false);const [focus,setFocus]=useState<Focus>({filter:'all',label:'All bugs'});
  const navigate=useNavigate();
  // Retry transient failures; a missing portal (null) is final and is not retried.
  const portal=useQuery({queryKey:['personal-portal',type,token],queryFn:()=>read({data:{token,type}}),retry:2,retryDelay:n=>1000*2**n,refetchOnWindowFocus:true,refetchInterval:45000,refetchIntervalInBackground:true,staleTime:0,gcTime:0});
@@ -27,23 +35,53 @@ export function PersonalPortal({token,type}:{token:string;type:'reporter'|'qa'|'
  usePresence(token,portal.data?.type??type,!!portal.data);
  if(portal.isPending)return <main className="bf-main"><div className="bf-access" role="status"><Bug className="mx-auto mb-4 animate-pulse text-primary" size={30}/><h1>Opening your portal…</h1><p><LiveClock/></p></div></main>;
  if(!portal.data)return <div className="min-h-screen bg-background"><header className="bf-topbar"><strong>Futurist Global Bug Board</strong></header><main className="bf-main"><div className="bf-access"><LockKeyhole className="mx-auto mb-5 text-primary" size={32}/><h1>Portal unavailable</h1><p>This link may be invalid, expired, or revoked. Ask your Admin for a new link if the problem continues.</p>{portal.isError&&<ErrorNotice message="This portal could not be verified. Please try again." onRetry={()=>{void portal.refetch();}} retrying={portal.isFetching}/>}</div></main></div>;
- const p=portal.data;const tabs=[{id:'bugs',label:'Total bugs',icon:Bug},{id:'permissions',label:'My access',icon:ShieldCheck}];
- return <div className="bf-shell"><aside className="bf-sidebar" data-open={menu} aria-label="Portal navigation"><div className="bf-brand"><span className="bf-logo"><Bug size={23}/></span><span className="bf-brand-name">Futurist Global Bug Board<span className="text-primary">.</span></span></div><div className="bf-workspace"><span className="bf-avatar"><UserRound size={17}/></span><div className="min-w-0"><strong className="block break-words text-xs">{p.name}</strong><span className="text-[11.5px] text-muted-foreground">{p.role.toUpperCase()}</span></div></div><nav className="bf-nav">{tabs.map(t=><Button key={t.id} variant="ghost" className="bf-nav-link w-full justify-start" data-status={tab===t.id?'active':undefined} onClick={()=>{setTab(t.id);setMenu(false);}}><t.icon/>{t.label}</Button>)}</nav><div className="bf-sidebar-bottom"><div className="bf-connection"><span className="flex items-center gap-2 text-xs font-semibold"><ShieldCheck size={15}/>Private member portal</span><p className="mt-2 text-xs text-muted-foreground">{p.scope||'No projects assigned'}</p></div><div className="mt-3 flex items-center justify-between rounded-md border px-3 py-1 text-xs"><span>Theme</span><ThemeToggle/></div></div></aside><div className="bf-body"><header className="bf-topbar"><div className="bf-topbar-left"><Button variant="ghost" size="icon" className="bf-mobile-menu" aria-label={menu?'Close navigation':'Open navigation'} onClick={()=>setMenu(!menu)}>{menu?<X/>:<Menu/>}</Button><Button variant="link" className="p-0 text-xs" onClick={()=>setTab('bugs')}>My portal</Button><span className="text-xs text-muted-foreground">/ {tabs.find(t=>t.id===tab)?.label}</span></div><ThemeToggle/></header><main className="bf-main"><div className="bf-identity"><span className="bf-avatar">{p.name.slice(0,2).toUpperCase()}</span><div className="min-w-0"><strong className="block truncate text-sm">{p.name}</strong><span className="text-xs text-muted-foreground"><span className="font-mono">ID · {p.memberCode}</span> · {p.role==='qa'?'QA':p.role.charAt(0).toUpperCase()+p.role.slice(1)} · Member since {new Date(p.since).toLocaleDateString('en-GB',{dateStyle:'medium'})}</span></div><span className="ml-auto text-right text-xs text-muted-foreground"><LiveClock/></span></div><div className="bf-page-heading"><div><span className="text-xs font-semibold text-primary">{p.scope||'No projects assigned'}</span><h1 className="mt-2">{tab==='bugs'?'Total bugs':'Your permissions'}</h1></div><ClipboardCheck className="text-primary"/></div>{tab==='bugs'?<><PortalSummary token={token} type={type}/><BugWorkspace access={{kind:'portal',token,type}}/></>:<section className="border-t py-7"><ul className="grid gap-4 text-sm sm:grid-cols-2">{p.permissions.map(v=><li className="flex gap-2" key={v}><ShieldCheck size={16} className="text-primary"/>{permissionLabels[v as Permission]??v}</li>)}</ul></section>}<footer className="bf-footer"><span>Futurist Global Bug Board · {p.name}</span><span>Private access · Shared records</span></footer></main></div><Dialog open={p.firstVisit&&Boolean(p.welcome)}><DialogContent className="max-h-[80vh] overflow-y-auto [&_.bf-dialog-close]:hidden"><DialogHeader><DialogTitle>Welcome, {p.name}</DialogTitle><DialogDescription>{p.scope} · {p.role}</DialogDescription></DialogHeader><p className="whitespace-pre-wrap text-sm leading-7">{p.welcome}</p>{welcome.isError&&<ErrorNotice message="Your welcome could not be dismissed. Please try again."/>}<Button disabled={welcome.isPending} onClick={()=>welcome.mutate({data:{token,type}})}>{welcome.isPending?'Opening…':'Continue to my bugs'}</Button></DialogContent></Dialog></div>;
+ const p=portal.data;const access:BugAccess={kind:'portal',token,type};const role=roleText(p.role);const first=p.name.trim().split(/\s+/)[0]||p.name;const current=TABS.find(t=>t.id===tab)!;
+ return <div className="bf-shell">
+  <aside className="bf-sidebar" data-open={menu} aria-label="Portal navigation">
+   <div className="bf-brand"><span className="bf-logo"><Bug size={23}/></span><span className="bf-brand-name">Futurist Global Bug Board<span className="text-primary">.</span></span></div>
+   <div className="bf-workspace"><span className="bf-avatar">{initials(p.name)}</span><div className="min-w-0"><strong className="block truncate text-xs">{p.name}</strong><span className="text-[11.5px] text-muted-foreground">{role} · <span className="font-mono">{p.memberCode}</span></span></div></div>
+   <div className="bf-nav-label">My portal</div>
+   <nav className="bf-nav">{TABS.map(t=><button type="button" key={t.id} className="bf-nav-link" data-status={tab===t.id?'active':undefined} aria-current={tab===t.id?'page':undefined} onClick={()=>{setTab(t.id);setMenu(false);}}><t.icon/>{t.label}</button>)}</nav>
+   <div className="bf-sidebar-bottom"><div className="bf-connection"><span className="flex items-center gap-2 text-xs font-semibold"><FolderKanban size={15}/>My projects</span><p className="mt-2 text-xs text-muted-foreground">{p.scope||'No projects assigned yet'}</p></div><div className="flex items-center justify-between rounded-md border px-3 py-1 text-xs"><span>Theme</span><ThemeToggle/></div></div>
+  </aside>
+  <div className="bf-body">
+   <header className="bf-topbar"><div className="bf-topbar-left"><Button variant="ghost" size="icon" className="bf-mobile-menu" aria-label={menu?'Close navigation':'Open navigation'} onClick={()=>setMenu(!menu)}>{menu?<X/>:<Menu/>}</Button><Button variant="link" className="p-0 text-xs" onClick={()=>setTab('bugs')}>My portal</Button><span className="text-xs text-muted-foreground">/ {current.label}</span></div><div className="bf-topbar-right"><span className="hidden text-xs text-muted-foreground md:inline"><LiveClock/></span><ThemeToggle/></div></header>
+   <main className="bf-main">
+    <section className="bf-portal-hero" aria-label="About you">
+     <div><span className="bf-portal-role">{role}{p.scope?` · ${p.scope}`:''}</span><h1>Hi {first}</h1><p>{roleGuide(p.role)}</p></div>
+     <dl className="bf-portal-meta"><div><dt><Hash size={12}/>Member ID</dt><dd className="font-mono">{p.memberCode}</dd></div><div><dt><CalendarDays size={12}/>Member since</dt><dd>{new Date(p.since).toLocaleDateString('en-GB',{dateStyle:'medium'})}</dd></div><div><dt><ShieldCheck size={12}/>Permissions</dt><dd>{p.permissions.length}</dd></div></dl>
+    </section>
+    {tab==='bugs'&&<><PortalFocus access={access} role={p.role} permissions={p.permissions} focus={focus.filter} onFocus={setFocus}/><BugWorkspace key={focus.filter} access={access} initialFilter={focus.filter} initialFilterLabel={focus.label}/></>}
+    {tab==='access'&&<AccessPanel role={p.role} granted={p.permissions} scope={p.scope}/>}
+    {tab==='help'&&<div className="bf-panel p-5"><HelpContent audience="portal" role={p.role}/></div>}
+    <footer className="bf-footer"><span>Futurist Global Bug Board · {p.name}</span><span>Private access · Shared records</span></footer>
+   </main>
+  </div>
+  <Dialog open={p.firstVisit&&Boolean(p.welcome)}><DialogContent className="max-h-[80vh] overflow-y-auto [&_.bf-dialog-close]:hidden"><DialogHeader><DialogTitle>Welcome, {p.name}</DialogTitle><DialogDescription>{p.scope} · {role}</DialogDescription></DialogHeader><p className="whitespace-pre-wrap text-sm leading-7">{p.welcome}</p>{welcome.isError&&<ErrorNotice message="Your welcome could not be dismissed. Please try again."/>}<Button disabled={welcome.isPending} onClick={()=>welcome.mutate({data:{token,type}})}>{welcome.isPending?'Opening…':'Continue to my bugs'}</Button></DialogContent></Dialog>
+ </div>;
 }
 
 function LiveClock(){const [now,setNow]=useState<Date|null>(null);useEffect(()=>{setNow(new Date());const t=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(t);},[]);return <time suppressHydrationWarning>{now?now.toLocaleString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):''}</time>;}
 
-/** Read-only overview for a member portal: totals, status groups and who bugs are assigned to, within the portal's own scope. */
-function PortalSummary({token,type}:{token:string;type:string}){
- const fetch=useServerFn(getBugWorkspace);const access={kind:'portal' as const,token,type:type as never};
+/** "What needs me" cards: the whole view first, then four role-specific slices; each one filters the table below. */
+function PortalFocus({access,role,permissions,focus,onFocus}:{access:BugAccess;role:string;permissions:string[];focus:string;onFocus:(f:Focus)=>void}){
+ const fetch=useServerFn(getBugWorkspace);
  const q=useQuery({queryKey:['bug-workspace',access,undefined],queryFn:()=>fetch({data:{access}}),retry:false,staleTime:10000,refetchInterval:20000});
- if(!q.data)return null;const d=q.data;const g=groupCounts(d.statusCounts??[]);
- const owners=new Map<string,number>();for(const b of d.bugs){const names=b.assignees?.length?b.assignees.map(a=>a.name):[b.assigneeId?b.assignee:'Unassigned'];for(const n of names)owners.set(n,(owners.get(n)??0)+1);}
- return <section className="mb-5 border-y" aria-label="Bug summary (view only)">
-  <div className="grid divide-y lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:divide-x lg:divide-y-0">
-   <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 py-4 lg:pr-6"><div className="min-w-0"><p className="text-xs font-semibold text-muted-foreground">Total bugs in your view</p><div className="mt-2 flex items-baseline gap-3"><strong className="text-3xl">{g.total}</strong><span className="text-xs text-muted-foreground">{d.open} open · {d.resolved} resolved</span></div></div><span className="bf-tag shrink-0">VIEW ONLY</span></div>
-   <div className="grid grid-cols-2 gap-x-5 gap-y-2 py-4 sm:grid-cols-4 lg:pl-6">{g.groups.map(x=><div key={x.key} className="flex min-w-0 items-center justify-between gap-2 text-xs"><span className="flex min-w-0 items-center gap-2 text-muted-foreground"><span className="bf-status-pill shrink-0 !p-1" data-tone={x.tone}><span className="bf-dot"/></span><span>{x.label}</span></span><strong className="shrink-0">{x.count}</strong></div>)}</div>
-  </div>
-  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t py-3 text-xs"><span className="font-semibold text-muted-foreground">Assigned to{d.nextCursor?' · latest 50 bugs':''}</span>{[...owners].sort((a,b)=>b[1]-a[1]).map(([n,c])=><span key={n} className="inline-flex items-center gap-2"><span className="bf-avatar !size-6 !text-[10.5px]">{n==='Unassigned'?<UserRound size={12}/>:n.slice(0,2).toUpperCase()}</span><span>{n}</span><strong className="text-primary">{c}</strong></span>)}{owners.size===0&&<span className="text-muted-foreground">No bugs yet</span>}</div>
+ const d=q.data;if(!d)return null;
+ const cards=[{key:'all',label:'All in my view',hint:`${d.open} open · ${d.resolved} resolved`,filter:'all',tone:'neutral',count:d.total},...focusCounts(portalFocus(role,permissions),d.bugs,d.actor.userId)];
+ return <>
+  <div className="bf-status-cards bf-focus-cards" role="tablist" aria-label="Bugs that need me">{cards.map(c=><button type="button" role="tab" key={c.key} className="bf-status-card" data-selected={focus===c.filter} aria-selected={focus===c.filter} data-tone={c.tone} onClick={()=>onFocus({filter:c.filter,label:c.label})}><span className="flex items-center gap-2 text-xs text-muted-foreground"><span className="bf-dot"/>{c.label}</span><strong>{c.count}</strong><small>{c.hint}</small></button>)}</div>
+  {d.nextCursor&&<p className="bf-focus-note">Counts cover the latest {d.bugs.length} bugs in your view; use Next in the table for older ones.</p>}
+ </>;
+}
+
+/** Every permission the role can have, marked granted or not, so people know what to ask for. */
+function AccessPanel({role,granted,scope}:{role:string;granted:string[];scope:string}){
+ const all=rolePermissions[role]??(Object.keys(permissionLabels) as Permission[]);
+ const extra=granted.filter(g=>!(all as string[]).includes(g)) as Permission[];
+ return <section className="grid gap-5" aria-label="My access">
+  <div className="bf-panel"><div className="bf-panel-heading"><h2>Projects</h2><span className="bf-tag">{scope?scope.split(',').length:0} assigned</span></div><p className="px-5 py-4 text-sm leading-6 text-muted-foreground">{scope?<>You can see and report bugs in <strong className="text-foreground">{scope}</strong>. Bugs outside these projects never appear here.</>:'No projects are assigned to you yet, so no bugs can be shown. Ask your Admin to add you to a project.'}</p></div>
+  <div className="bf-panel"><div className="bf-panel-heading"><h2>Permissions</h2><span className="bf-tag">{granted.length} of {all.length+extra.length} enabled</span></div>
+   <div className="bf-perm-grid p-4">{[...all,...extra].map(v=>{const on=granted.includes(v);return <div key={v} className="bf-perm" data-on={on}>{on?<CircleCheck size={16}/>:<CircleMinus size={16}/>}<span><strong className="block text-[13px]">{permissionLabels[v]??v}</strong><small className="text-muted-foreground">{on?'Enabled':'Not enabled — ask your Admin'}</small></span></div>;})}</div></div>
  </section>;
 }

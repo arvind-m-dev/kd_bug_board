@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { getMembers } from '@/lib/portal-access.functions';
 import { getBugWorkspace } from '@/lib/bug-workflow.functions';
-import { attentionBugs, DEFAULT_SEVERITIES, PRIORITIES, severityLevel, type BugAccess, type LiveBug } from '@/lib/bug-workflow';
+import { DEFAULT_SEVERITIES, PRIORITIES, severityLevel, type BugAccess, type LiveBug } from '@/lib/bug-workflow';
 import { PriorityBadge, SeverityBadge } from './bug-workspace';
 import { MemberProfile } from './member-profile';
 import { PeriodPicker } from './period-picker';
@@ -17,7 +17,7 @@ import { getOverviewStats } from '@/lib/overview.functions';
 import { periodLabel as describePeriod, viewerTimeZone, type Period } from '@/lib/period';
 
 const admin: BugAccess = { kind: 'admin' };
-const label = (v: string) => v.toLowerCase().replaceAll('_', ' ').replace(/^./, c => c.toUpperCase());
+import { statusLabel as label, statusTone, initials, roleText } from '@/lib/format';
 function useAdminData() {
   const members = useServerFn(getMembers); const bugs = useServerFn(getBugWorkspace);
   return {
@@ -26,7 +26,6 @@ function useAdminData() {
   };
 }
 
-const statusTone = (s: string) => s === 'NEW' || s === 'REOPENED' ? 'danger' : s === 'RESOLVED' || s === 'VERIFIED' ? 'success' : s === 'RECHECK' || s === 'NEEDS_INFORMATION' ? 'warning' : 'info';
 
 /** Five delivery stages, each a group of workflow statuses (closed-without-fix is shown separately). */
 const STAGES = [
@@ -38,8 +37,6 @@ const STAGES = [
 ] as const;
 const CLOSED = ['NOT_A_BUG', 'DUPLICATE', 'WONT_FIX'];
 const OPEN = (s: string) => !['RESOLVED', ...CLOSED].includes(s);
-const initials = (name: string) => name.split(/\s+/).filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase() || '?';
-const roleText = (r: string) => (r === 'qa' ? 'QA' : r === 'other' ? 'Member' : r ? r[0]!.toUpperCase() + r.slice(1) : 'Member');
 function ago(at: string) {
   const m = Math.round((Date.now() - new Date(at).getTime()) / 60000);
   if (m < 60) return `${Math.max(1, m)}m`; const h = Math.round(m / 60); if (h < 24) return `${h}h`; return `${Math.round(h / 24)}d`;
@@ -160,18 +157,6 @@ export function DashboardSummary() {
     </div>
     <Dialog open={profile !== null} onOpenChange={o => { if (!o) setProfile(null); }}><DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto"><DialogHeader><DialogTitle>Member profile</DialogTitle><DialogDescription>Details, permissions and portal controls</DialogDescription></DialogHeader>{profile && <MemberProfile id={profile} onDeleted={() => setProfile(null)} />}</DialogContent></Dialog>
   </>;
-}
-
-export function NotificationBell({ onOpen }: { onOpen: () => void }) {
-  const { bugs } = useAdminData(); const count = attentionBugs(bugs.data?.bugs ?? []).length;
-  return <Button size="icon" variant="ghost" className="relative" aria-label={`Notifications${count ? `: ${count}` : ''}`} title="Notifications" onClick={onOpen}><Bell size={17} />{count > 0 && <span className="bf-badge">{count > 99 ? '99+' : count}</span>}</Button>;
-}
-
-export function NotificationList({ close }: { close: () => void }) {
-  const { bugs } = useAdminData(); const items = attentionBugs(bugs.data?.bugs ?? []);
-  if (bugs.isPending) return <p className="text-sm text-muted-foreground">Loading…</p>;
-  if (!items.length) return <p className="text-sm text-muted-foreground">You’re all caught up — nothing needs your attention.</p>;
-  return <ul className="grid gap-2">{items.slice(0, 20).map(b => <li key={b.id}><Link to="/admin/bugs" search={{ filter: b.status }} onClick={close} className="flex items-start gap-3 rounded-md border p-3 text-xs hover:bg-muted"><span className="font-mono text-[11.5px] text-muted-foreground">{b.code}</span><span className="flex-1"><strong className="block">{b.title}</strong><span className="text-muted-foreground">{label(b.status)}{b.lastChange ? ` · ${b.lastChange.by} · ${new Date(b.lastChange.at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}` : ''}</span></span></Link></li>)}</ul>;
 }
 
 /** Overview metric card: label + icon, headline number with context, share meter and a one-line footnote. */

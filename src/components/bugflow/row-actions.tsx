@@ -9,8 +9,7 @@ import { NOTES_SUGGESTED, PRIORITIES, allowedStatuses, mayVerify, priorityNames,
 import { STATUSES, type Status } from '@/lib/bugflow';
 import { actionError } from './action-feedback';
 
-export const statusLabel = (v: string) => (v === 'RECHECK' ? 'Ready for QA retest' : v.toLowerCase().replaceAll('_', ' ').replace(/^./, c => c.toUpperCase()));
-export const statusTone = (s: string) => ['REOPENED'].includes(s) ? 'danger' : ['RESOLVED'].includes(s) ? 'success' : ['IN_PROGRESS', 'RECHECK', 'NEEDS_INFORMATION'].includes(s) ? 'warning' : ['NEW', 'VALIDATING'].includes(s) ? 'info' : 'neutral';
+import { statusLabel, statusTone } from '@/lib/format';
 const STATUS_HELP: Record<string, string> = {
   NEW: 'Just reported — needs triage', VALIDATING: 'Being checked by QA', VALIDATED: 'Confirmed as a real bug', READY_FOR_ASSIGNMENT: 'Confirmed, waiting for a developer',
   ASSIGNED: 'A developer owns it', IN_PROGRESS: 'Being fixed', RECHECK: 'Fixed — waiting for QA to retest', RESOLVED: 'Fix verified by QA',
