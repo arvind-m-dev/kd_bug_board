@@ -201,6 +201,10 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
       ghost.scale.setScalar(i ? .8 : 1.1); scene.add(ghost); ghosts.push(ghost);
     }
   }
+  // Seeded: Shuffle in the Theme Studio picks a new seed. Randomness 0 keeps every wait and choice at its middle value; 1 is fully random.
+  const rand = seededRandom(knobs.seed * 31 + 7);
+  const chance = () => rand();
+  const random = (min: number, max: number) => min + (max - min) * (0.5 * (1 - knobs.randomness) + rand() * knobs.randomness);
   type Creature = { root: T.Group; limbs: T.Group[]; wings?: T.Group[]; kind: 'bug' | 'spider' | 'bat'; n: number; thread?: T.Mesh; angle: number; motion?: { phase: 'rest' | 'flight' | 'return' | 'crawl'; until: number; retarget: number; surface: number; distance: number; direction: number; velocity: T.Vector3; target: T.Vector3; homeKind: number; seed: number } };
   const creatures: Creature[] = [];
   function bug(index: number, spider = false): Creature {
@@ -227,7 +231,8 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
       root.add(leg); limbs.push(leg);
     }
     ball(root, red, -2, 11, 8.2, .8); ball(root, red, 2, 11, 8.2, .8);
-    root.scale.setScalar(knobs.bugSize);
+    // Sizes vary around the Bug size slider; Randomness widens the spread (0 = all alike).
+    root.scale.setScalar(knobs.bugSize * (spider ? random(.8, 1.2) : random(.65, 1.4)));
     scene.add(root); return { root, limbs, wings, kind: spider ? 'spider' : 'bug', n: index, angle: 0 };
   }
   function bat(n: number): Creature {
@@ -255,10 +260,6 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
     }
     for (let i = 0; i < knobs.bats; i++) creatures.push(bat(i));
   }
-  // Seeded: Shuffle in the Theme Studio picks a new seed. Randomness 0 keeps every wait and choice at its middle value; 1 is fully random.
-  const rand = seededRandom(knobs.seed * 31 + 7);
-  const chance = () => rand();
-  const random = (min: number, max: number) => min + (max - min) * (0.5 * (1 - knobs.randomness) + rand() * knobs.randomness);
   creatures.forEach((c, i) => { c.motion = { phase: c.kind === 'bug' ? 'crawl' : 'rest', until: c.kind === 'bat' && c.n % 2 ? random(.2, 2) : random(5, 13) + i, retarget: 0, surface: i, distance: random(0, 500), direction: chance() < .5 ? -1 : 1, velocity: new T.Vector3(), target: new T.Vector3(), homeKind: i < 7 ? -1 : Math.floor(random(0, 12)), seed: random(0, 100) }; });
   const sleigh = new T.Group(), santaWave = new T.Group(), deerLegs: T.Group[] = [], deerHeads: T.Group[] = [];
   if (season === 'christmas') {
