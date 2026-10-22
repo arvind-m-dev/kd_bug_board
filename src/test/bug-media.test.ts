@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MEDIA_MAX_BYTES, clock, downloadName, formatBytes, mayDeleteMedia, mayUploadMedia, mediaKey, mediaLinkPath, mediaStorageSchema, prepareMediaSchema, providerName, rejectReason, renameMediaSchema, resolveContentType, safeFileName } from '@/lib/bug-media';
+import { MEDIA_MAX_BYTES, MEDIA_MAX_VIDEO_BYTES, clock, downloadName, formatBytes, isClosedForMedia, maxBytesFor, mayDeleteMedia, mayUploadMedia, mediaCleanupSchema, mediaKey, mediaLinkPath, mediaStorageSchema, prepareMediaSchema, providerName, rejectReason, renameMediaSchema, resolveContentType, safeFileName, videoPlan } from '@/lib/bug-media';
 
 const admin = { userId: 'a', role: 'admin', permissions: [] as string[] };
 const reporter = { userId: 'r', role: 'reporter', permissions: ['view', 'report', 'evidence'] };
@@ -17,7 +17,7 @@ describe('media rules', () => {
     expect(resolveContentType('shot.PNG', '')).toBe('image/png'); expect(resolveContentType('a.jpg', 'image/jpg')).toBe('image/jpeg');
     expect(resolveContentType('a.svg', 'image/svg+xml')).toBeNull(); expect(resolveContentType('a.png', 'text/html')).toBeNull();
     expect(rejectReason('IMG_1.heic', 'image/heic', 100)).toMatch(/HEIC/); expect(rejectReason('clip.mov', 'video/quicktime', 100)).toMatch(/MP4/);
-    expect(rejectReason('page.html', 'text/html', 100)).toMatch(/Only PNG/); expect(rejectReason('big.mp4', 'video/mp4', MEDIA_MAX_BYTES + 1)).toMatch(/Too large/);
+    expect(rejectReason('page.html', 'text/html', 100)).toMatch(/Only PNG/); expect(rejectReason('big.mp4', 'video/mp4', MEDIA_MAX_BYTES + 1)).toBeNull(); // recordings are compressed in the browser first
     expect(rejectReason('big.png', 'image/png', MEDIA_MAX_BYTES * 3)).toBeNull(); // images are compressed first
     expect(rejectReason('ok.pdf', 'application/pdf', 10)).toBeNull();
   });
@@ -82,5 +82,26 @@ describe('mediaStorageSchema', () => {
     expect(mediaStorageSchema.safeParse({ source: 'custom', endpoint: 'http://abc.example.com', bucket: 'bugboard-media' }).success).toBe(false);
     expect(mediaStorageSchema.safeParse({ source: 'custom', endpoint: 'https://abc.example.com', bucket: 'Bad Name' }).success).toBe(false);
     expect(mediaStorageSchema.safeParse({ source: 'custom', endpoint: 'https://abc.example.com', bucket: 'ok-bucket' }).success).toBe(true);
+  });
+});
+
+describe('video limits, compression plan and clean-up', () => {
+  it('applies 100 MB to recordings and 25 MB to the rest', () => {
+    expect(maxBytesFor('video/mp4')).toBe(MEDIA_MAX_VIDEO_BYTES); expect(maxBytesFor('image/png')).toBe(MEDIA_MAX_BYTES); expect(maxBytesFor('application/pdf')).toBe(MEDIA_MAX_BYTES);
+    expect(rejectReason('big.mp4', 'video/mp4', 500 * 1024 * 1024)).toBeNull(); // compressed in the browser first
+    expect(rejectReason('huge.mp4', 'video/mp4', 3 * 1024 * 1024 * 1024)).toMatch(/Too large/);
+    expect(rejectReason('big.pdf', 'application/pdf', 30 * 1024 * 1024)).toMatch(/Too large/);
+    expect(prepareMediaSchema.safeParse({ bugId: '1', id: '6f1e2d3c-4b5a-4c6d-8e7f-9a0b1c2d3e4f', name: 'v', contentType: 'video/mp4', size: 90 * 1024 * 1024 }).success).toBe(true);
+    expect(prepareMediaSchema.safeParse({ bugId: '1', id: '6f1e2d3c-4b5a-4c6d-8e7f-9a0b1c2d3e4f', name: 'p', contentType: 'image/png', size: 90 * 1024 * 1024 }).success).toBe(false);
+  });
+  it('plans a bitrate that lands near 80 MB and refuses recordings that cannot fit', () => {
+    const tenMin = videoPlan(600)!; expect(tenMin.videoBitsPerSecond).toBeGreaterThan(900_000); expect(tenMin.estimatedBytes).toBeLessThanOrEqual(MEDIA_MAX_VIDEO_BYTES); expect(tenMin.estimatedBytes).toBeGreaterThan(70 * 1024 * 1024);
+    expect(videoPlan(30)!.videoBitsPerSecond).toBe(2_500_000); // short clips keep quality
+    expect(videoPlan(30 * 60)!.videoBitsPerSecond).toBeGreaterThanOrEqual(350_000);
+    expect(videoPlan(4 * 3600)).toBeNull(); expect(videoPlan(0)).toBeNull(); expect(videoPlan(Number.NaN)).toBeNull();
+  });
+  it('knows which statuses count as closed and which schedules are allowed', () => {
+    expect(isClosedForMedia('RESOLVED')).toBe(true); expect(isClosedForMedia('WONT_FIX')).toBe(true); expect(isClosedForMedia('IN_PROGRESS')).toBe(false); expect(isClosedForMedia('REOPENED')).toBe(false);
+    expect(mediaCleanupSchema.safeParse({ cleanupDays: 30 }).success).toBe(true); expect(mediaCleanupSchema.safeParse({ cleanupDays: 15 }).success).toBe(false);
   });
 });

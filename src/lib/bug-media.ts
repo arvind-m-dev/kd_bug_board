@@ -12,8 +12,16 @@ export const MEDIA_TYPES = {
 export type MediaType = keyof typeof MEDIA_TYPES;
 export type MediaKind = (typeof MEDIA_TYPES)[MediaType]['kind'];
 export const MEDIA_ACCEPT = Object.keys(MEDIA_TYPES) as MediaType[];
-export const MEDIA_MAX_BYTES = 26_214_400; // 25 MB after compression
+export const MEDIA_MAX_BYTES = 26_214_400; // 25 MB after compression (images, PDFs)
+export const MEDIA_MAX_VIDEO_BYTES = 104_857_600; // 100 MB per recording, after browser compression
+export const MEDIA_VIDEO_INPUT_MAX = 2_147_483_648; // a 2 GB recording is still accepted: it is compressed in the browser first
+export const MEDIA_VIDEO_TARGET_BYTES = 80 * 1024 * 1024; // what compression aims for
 export const MEDIA_MAX_FILES = 10; // per bug
+/** Bugs in these statuses count as closed for clean-up (same set the 'open' filter excludes). */
+export const MEDIA_CLOSED_STATUSES = ['RESOLVED', 'DUPLICATE', 'NOT_A_BUG', 'WONT_FIX'] as const;
+export const isClosedForMedia = (status: string) => (MEDIA_CLOSED_STATUSES as readonly string[]).includes(status);
+export const CLEANUP_CHOICES = [0, 7, 30, 90] as const;
+export type CleanupDays = (typeof CLEANUP_CHOICES)[number];
 export const MEDIA_URL_TTL = 600; // seconds a signed view link lasts
 export const MEDIA_PUT_TTL = 900; // seconds a signed upload link lasts
 export const MEDIA_PENDING_MINUTES = 120; // an upload that never finished is forgotten after this
@@ -30,12 +38,25 @@ export const mediaLinkPath = (bugId: string, mediaId?: string) => `/media/${bugI
 export const downloadName = (name: string, contentType: MediaType) => { const ext = MEDIA_TYPES[contentType].ext; return name.toLowerCase().endsWith(`.${ext}`) || (ext === 'jpg' && name.toLowerCase().endsWith('.jpeg')) ? name : `${name}.${ext}`; };
 /** mm:ss for a position in a recording. */
 export const clock = (seconds: number) => { const s = Math.max(0, Math.round(seconds)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
-export type MediaConfig = { enabled: boolean; maxBytes: number; maxFiles: number; accept: string[] };
-export const MEDIA_OFF: MediaConfig = { enabled: false, maxBytes: MEDIA_MAX_BYTES, maxFiles: MEDIA_MAX_FILES, accept: MEDIA_ACCEPT };
+export type MediaConfig = { enabled: boolean; maxBytes: number; maxVideoBytes: number; maxFiles: number; accept: string[] };
+export const MEDIA_OFF: MediaConfig = { enabled: false, maxBytes: MEDIA_MAX_BYTES, maxVideoBytes: MEDIA_MAX_VIDEO_BYTES, maxFiles: MEDIA_MAX_FILES, accept: MEDIA_ACCEPT };
 export const MEDIA_ON: MediaConfig = { ...MEDIA_OFF, enabled: true };
 
 export const isMediaType = (v: string): v is MediaType => v in MEDIA_TYPES;
 export const mediaKind = (t: MediaType): MediaKind => MEDIA_TYPES[t].kind;
+/** The size limit that applies to a file of this type once it is in the bucket. */
+export const maxBytesFor = (t: MediaType) => (mediaKind(t) === 'video' ? MEDIA_MAX_VIDEO_BYTES : MEDIA_MAX_BYTES);
+/**
+ * How to re-encode a recording so it lands near the target size: a bitrate from its duration, clamped to a sane range.
+ * Null when even the lowest acceptable bitrate would still break the limit (the recording is too long: trim or split it).
+ */
+export function videoPlan(durationSeconds: number): { videoBitsPerSecond: number; audioBitsPerSecond: number; estimatedBytes: number } | null {
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) return null;
+  const audio = 64_000; const budget = (MEDIA_VIDEO_TARGET_BYTES * 8) / durationSeconds - audio;
+  const video = Math.round(Math.min(2_500_000, Math.max(350_000, budget)));
+  const estimatedBytes = Math.round(((video + audio) * durationSeconds) / 8);
+  return estimatedBytes > MEDIA_MAX_VIDEO_BYTES ? null : { videoBitsPerSecond: video, audioBitsPerSecond: audio, estimatedBytes };
+}
 /** Object key: numeric bug id + the client-generated uuid + whitelisted extension. The filename never reaches the key. */
 export const mediaKey = (bugId: string, id: string, contentType: MediaType) => `bugs/${bugId}/${id}.${MEDIA_TYPES[contentType].ext}`;
 /** Display name only: no control characters or path separators, no leading dots, at most 140 characters. */
@@ -61,7 +82,8 @@ export function rejectReason(fileName: string, fileType: string, size: number): 
   const type = resolveContentType(fileName, fileType);
   if (!type) return 'Only PNG, JPEG, WebP, GIF, MP4, WebM and PDF files can be attached.';
   if (size <= 0) return 'This file is empty.';
-  if (mediaKind(type) !== 'image' && size > MEDIA_MAX_BYTES) return `Too large (${formatBytes(size)}) — the limit is ${formatBytes(MEDIA_MAX_BYTES)} per file.`;
+  if (mediaKind(type) === 'video' && size > MEDIA_VIDEO_INPUT_MAX) return `Too large (${formatBytes(size)}) — recordings up to ${formatBytes(MEDIA_VIDEO_INPUT_MAX)} can be compressed here; trim or split this one first.`;
+  if (mediaKind(type) === 'pdf' && size > MEDIA_MAX_BYTES) return `Too large (${formatBytes(size)}) — the limit is ${formatBytes(MEDIA_MAX_BYTES)} per PDF.`;
   return null;
 }
 export function formatBytes(n: number) {
@@ -86,14 +108,16 @@ export function mayUploadMedia(actor: Actor, bug: BugLike) {
 export const mayDeleteMedia = (actor: Actor, item: { uploadedById: string }) => actor.role === 'admin' || item.uploadedById === actor.userId;
 
 const id = z.string().uuid(); const bugId = z.string().regex(/^[1-9]\d*$/);
-export const prepareMediaSchema = z.object({ bugId, id, name: z.string().trim().min(1).max(255), contentType: z.enum(MEDIA_ACCEPT as [MediaType, ...MediaType[]]), size: z.number().int().min(1).max(MEDIA_MAX_BYTES), derivedFrom: id.nullable().default(null), atSeconds: z.number().min(0).max(360000).nullable().default(null) }).strict();
+export const prepareMediaSchema = z.object({ bugId, id, name: z.string().trim().min(1).max(255), contentType: z.enum(MEDIA_ACCEPT as [MediaType, ...MediaType[]]), size: z.number().int().min(1).max(MEDIA_MAX_VIDEO_BYTES), derivedFrom: id.nullable().default(null), atSeconds: z.number().min(0).max(360000).nullable().default(null) }).strict().refine(v => v.size <= maxBytesFor(v.contentType), { message: 'This file is larger than the limit for its type.', path: ['size'] });
+export const clearMediaSchema = z.object({ bugId }).strict();
+export const mediaCleanupSchema = z.object({ cleanupDays: z.union([z.literal(0), z.literal(7), z.literal(30), z.literal(90)]) }).strict();
 export const renameMediaSchema = z.object({ id, name: z.string().trim().min(1).max(MEDIA_NAME_MAX) }).strict();
 export const finishMediaSchema = z.object({ id, width: z.number().int().min(1).max(20000).nullable().default(null), height: z.number().int().min(1).max(20000).nullable().default(null) }).strict();
 export const deleteMediaSchema = z.object({ id }).strict();
 export const mediaStatusSchema = z.object({ test: z.boolean().default(false) }).strict();
 export type MediaSource = 'default' | 'custom';
 /** What the Settings card shows: never a secret. */
-export type MediaStatus = { configured: boolean; source: MediaSource | 'none'; defaultAvailable: boolean; canStoreSecrets: boolean; custom: { endpoint: string; bucket: string; region: string; forcePathStyle: boolean; accessKeyIdHint: string } | null; missing: string[]; provider: string; bucket: string; endpointHost: string; files: number; bytes: number; awaitingPurge: number; pending: number; test: { ok: boolean; ms: number; message: string } | null };
+export type MediaStatus = { configured: boolean; source: MediaSource | 'none'; defaultAvailable: boolean; canStoreSecrets: boolean; cleanupDays: CleanupDays; closedFiles: number; closedBytes: number; custom: { endpoint: string; bucket: string; region: string; forcePathStyle: boolean; accessKeyIdHint: string } | null; missing: string[]; provider: string; bucket: string; endpointHost: string; files: number; bytes: number; awaitingPurge: number; pending: number; test: { ok: boolean; ms: number; message: string } | null };
 /** Choosing where files live: the default bucket from the environment, or a bucket the Admin enters here (secret kept encrypted; blank on update keeps the saved one). */
 export const mediaStorageSchema = z.discriminatedUnion('source', [
   z.object({ source: z.literal('default') }).strict(),

@@ -2,7 +2,7 @@ import { neonQuery, neonExecute } from './neon.server';
 import { checkOrigin, requireAdmin } from './portal-access.server';
 import { decryptPortal, encryptPortal } from './portal-crypto.server';
 import { actorFor, bugDetail } from './bug-workflow.server';
-import { MEDIA_MAX_BYTES, MEDIA_MAX_FILES, MEDIA_ON, MEDIA_OFF, MEDIA_PENDING_MINUTES, MEDIA_PUT_TTL, MEDIA_URL_TTL, isMediaType, mayDeleteMedia, mayUploadMedia, mediaKey, mediaKind, providerName, safeFileName, type LibraryItem, type MediaConfig, type MediaItem, type MediaSource, type MediaStatus, type MediaType, type prepareMediaSchema, type finishMediaSchema, type renameMediaSchema, type mediaStorageSchema, downloadName } from './bug-media';
+import { MEDIA_CLOSED_STATUSES, MEDIA_MAX_FILES, maxBytesFor, MEDIA_ON, MEDIA_OFF, MEDIA_PENDING_MINUTES, MEDIA_PUT_TTL, MEDIA_URL_TTL, isMediaType, mayDeleteMedia, mayUploadMedia, mediaKey, mediaKind, providerName, safeFileName, type CleanupDays, type LibraryItem, type MediaConfig, type MediaItem, type MediaSource, type MediaStatus, type MediaType, type prepareMediaSchema, type finishMediaSchema, type renameMediaSchema, type mediaStorageSchema, downloadName } from './bug-media';
 import { formatBugCode } from './bug-workflow';
 import type { BugAccess } from './bug-workflow';
 import type { z } from 'zod';
@@ -18,7 +18,7 @@ function envConfig(): { config: Config | null; missing: string[] } {
   return { config: { endpoint: env('MEDIA_S3_ENDPOINT'), bucket: env('MEDIA_S3_BUCKET'), region: env('MEDIA_S3_REGION') || 'auto', forcePathStyle: env('MEDIA_S3_FORCE_PATH_STYLE') !== '0', accessKeyId: env('MEDIA_S3_ACCESS_KEY_ID'), secretAccessKey: env('MEDIA_S3_SECRET_ACCESS_KEY') }, missing: [] };
 }
 /** What Admin chose in Settings → Media storage; the secret is stored encrypted with BUGFLOW_PORTAL_ENCRYPTION_KEY. */
-type Stored = { source: MediaSource; custom?: { endpoint: string; bucket: string; region: string; forcePathStyle: boolean; accessKeyId: string; secretCiphertext: string } };
+type Stored = { source: MediaSource; custom?: { endpoint: string; bucket: string; region: string; forcePathStyle: boolean; accessKeyId: string; secretCiphertext: string }; cleanupDays?: CleanupDays; cleanupBy?: string };
 async function storedChoice(): Promise<Stored> {
   const { rows } = await neonQuery(`select value from bugflow.settings where key='media_storage'`);
   const v = rows[0]?.['value'] as Stored | undefined;
@@ -40,7 +40,12 @@ export async function mediaConfig(): Promise<Resolved> {
   cached = { at: Date.now(), value }; return value;
 }
 /** What the client needs to know (no secrets): whether uploads are on, and the limits. */
-export const mediaClientConfig = async (): Promise<MediaConfig> => ((await mediaConfig()).config ? MEDIA_ON : MEDIA_OFF);
+export const mediaClientConfig = async (): Promise<MediaConfig> => {
+  const { config, stored } = await mediaConfig(); if (!config) return MEDIA_OFF;
+  // Workspace loads are frequent, so the clean-up schedule gets a cheap, throttled chance to run here (once per 15 minutes per instance).
+  if (stored.cleanupDays && Date.now() - lastAuto > 15 * 60000) await sweep(5).catch(() => undefined);
+  return MEDIA_ON;
+};
 const NOT_CONNECTED = 'Media storage is not connected. Ask your Admin to connect it in Settings.';
 
 let client: { key: string; promise: Promise<import('@aws-sdk/client-s3').S3Client> } | null = null;
@@ -138,11 +143,11 @@ export async function finishUpload(access: BugAccess, data: z.infer<typeof finis
   const key = String(row['key']); const contentType = String(row['content_type']);
   const obj = await head(config, key);
   if (!obj) throw new Error('The file did not arrive in storage. Try the upload again.');
-  const bad = obj.size <= 0 || obj.size > MEDIA_MAX_BYTES || (obj.contentType && obj.contentType.split(';')[0]!.trim() !== contentType) || !isMediaType(contentType);
+  const limit = maxBytesFor(contentType as MediaType); const bad = obj.size <= 0 || obj.size > limit || (obj.contentType && obj.contentType.split(';')[0]!.trim() !== contentType) || !isMediaType(contentType);
   if (bad) {
     await remove(config, key).catch(() => undefined);
     await neonExecute(`update bugflow.bug_media set deleted_at=now(),deleted_by=$2,purged_at=now() where id=$1`, [data.id, actor.userId]);
-    throw new Error(obj.size > MEDIA_MAX_BYTES ? 'The uploaded file is larger than 25 MB and was discarded.' : 'The uploaded file did not match what was announced and was discarded.');
+    throw new Error(obj.size > limit ? `The uploaded file is larger than ${Math.round(limit / 1048576)} MB and was discarded.` : 'The uploaded file did not match what was announced and was discarded.');
   }
   await neonExecute([
     { query: `with u as (update bugflow.bug_media set status='ready',ready_at=now(),size=$6,width=$7,height=$8 where id=$1 and status='pending' and deleted_at is null returning id)
@@ -193,12 +198,47 @@ async function purge(key: string, id: string) {
   try { await remove(config, key); await neonExecute(`update bugflow.bug_media set purged_at=now() where id=$1 and purged_at is null`, [id]); return true; }
   catch { return false; }
 }
-/** Best-effort housekeeping: forgets uploads that never finished and retries object deletions that failed. */
+const CLOSED = `(${MEDIA_CLOSED_STATUSES.map(s => `'${s}'`).join(',')})`;
+/**
+ * Soft-deletes every file on bugs that have been closed for at least `days` days (0 = all closed bugs now), one audit row per bug
+ * in the name of `actorId` (the Admin who asked, or who set the schedule). Returns how many files were removed; objects are purged by the sweep.
+ */
+async function clearClosed(days: number, actorId: string, limit = 200) {
+  const { rows } = await neonExecute(`with victims as (select m.id from bugflow.bug_media m join bugflow.bugs b on b.id=m.bug_id where m.deleted_at is null and b.deleted_at is null and b.status in ${CLOSED} and b.updated_at<now()-make_interval(days=>$1) limit $3),
+    upd as (update bugflow.bug_media set deleted_at=now(),deleted_by=$2 where id in (select id from victims) returning bug_id),
+    audit as (insert into bugflow.activity(id,bug_id,actor_id,action,detail) select gen_random_uuid(),bug_id,$2,'bug.media_cleared',jsonb_build_object('count',count(*),'reason',case when $1=0 then 'manual' else 'auto' end,'days',$1) from upd group by bug_id returning bug_id)
+    select count(*)::int as n from upd`, [days, actorId, limit]);
+  return Number(rows[0]?.['n'] ?? 0);
+}
+let lastAuto = 0;
+/** Best-effort housekeeping: forgets uploads that never finished, applies the clean-up schedule, and retries object deletions that failed. */
 export async function sweep(limit = 10) {
-  const { config } = await mediaConfig(); if (!config) return;
+  const { config, stored } = await mediaConfig(); if (!config) return;
+  if (stored.cleanupDays && stored.cleanupBy && Date.now() - lastAuto > 15 * 60000) { lastAuto = Date.now(); await clearClosed(stored.cleanupDays, stored.cleanupBy).catch(() => 0); }
   const { rows } = await neonQuery(`with stale as (update bugflow.bug_media set deleted_at=now() where status='pending' and deleted_at is null and created_at<now()-interval '${MEDIA_PENDING_MINUTES} minutes' returning id,key)
     select id,key from stale union all (select id,key from bugflow.bug_media where deleted_at is not null and purged_at is null order by deleted_at limit $1)`, [limit]);
   for (const r of rows.slice(0, limit)) await purge(String(r['key']), String(r['id']));
+}
+/** Admin removes every file on one bug at once (offered on resolved and closed bugs); audited as one entry. */
+export async function clearBugMedia(access: BugAccess, bugId: string) {
+  checkOrigin(); const actor = await actorFor(access); if (actor.role !== 'admin') throw new Error('Only Admin can remove all files from a bug at once.');
+  await bugDetail(access, bugId);
+  const { rows } = await neonExecute(`with upd as (update bugflow.bug_media set deleted_at=now(),deleted_by=$2 where bug_id=$1 and deleted_at is null returning id),
+    audit as (insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $3,$1,$2,'bug.media_cleared',jsonb_build_object('count',count(*),'reason','manual') from upd having count(*)>0 returning id)
+    select count(*)::int as n from upd`, [bugId, actor.userId, crypto.randomUUID()]);
+  await sweep(MEDIA_MAX_FILES).catch(() => undefined);
+  return { removed: Number(rows[0]?.['n'] ?? 0) };
+}
+/** Settings → Media storage → Clean-up: files on closed bugs go after this many days (0 = off); "now" removes them straight away. */
+export async function saveMediaCleanup(data: { cleanupDays: CleanupDays } | { now: true }): Promise<MediaStatus> {
+  checkOrigin(); const admin = await requireAdmin(); const current = await storedChoice();
+  if ('now' in data) { const n = await clearClosed(0, admin.userId, 1000); await neonExecute(`insert into bugflow.activity(id,actor_id,action,detail) values($1,$2,'settings.media_cleanup',$3::jsonb)`, [crypto.randomUUID(), admin.userId, JSON.stringify({ now: true, removed: n })]); forgetMediaConfig(); await sweep(50).catch(() => undefined); return mediaStatus(false); }
+  const next: Stored = { ...current, cleanupDays: data.cleanupDays, cleanupBy: admin.userId };
+  await neonExecute([
+    { query: `insert into bugflow.settings(key,value) values('media_storage',$1::jsonb) on conflict (key) do update set value=excluded.value`, params: [JSON.stringify(next)] },
+    { query: `insert into bugflow.activity(id,actor_id,action,detail) values($1,$2,'settings.media_cleanup',$3::jsonb)`, params: [crypto.randomUUID(), admin.userId, JSON.stringify({ days: data.cleanupDays })] },
+  ]);
+  forgetMediaConfig(); return mediaStatus(false);
 }
 /** Soft-deletes every file of a bug (used when the bug itself is deleted) and purges the objects. */
 export async function deleteAllMedia(bugId: string, byUserId: string) {
@@ -208,10 +248,10 @@ export async function deleteAllMedia(bugId: string, byUserId: string) {
 /** Settings → Media storage: configuration, usage from our own rows and, on request, a real round trip to the bucket. */
 export async function mediaStatus(test: boolean): Promise<MediaStatus> {
   await requireAdmin(); if (test) checkOrigin(); const { config, missing, source, defaultAvailable, stored } = await mediaConfig();
-  const { rows } = await neonQuery(`select count(*) filter(where status='ready' and deleted_at is null)::int as files, coalesce(sum(size) filter(where status='ready' and deleted_at is null),0)::bigint as bytes, count(*) filter(where deleted_at is not null and purged_at is null)::int as awaiting, count(*) filter(where status='pending' and deleted_at is null)::int as pending from bugflow.bug_media`);
+  const { rows } = await neonQuery(`select count(*) filter(where m.status='ready' and m.deleted_at is null)::int as files, coalesce(sum(m.size) filter(where m.status='ready' and m.deleted_at is null),0)::bigint as bytes, count(*) filter(where m.deleted_at is not null and m.purged_at is null)::int as awaiting, count(*) filter(where m.status='pending' and m.deleted_at is null)::int as pending, count(*) filter(where m.status='ready' and m.deleted_at is null and b.status in ${CLOSED})::int as closed_files, coalesce(sum(m.size) filter(where m.status='ready' and m.deleted_at is null and b.status in ${CLOSED}),0)::bigint as closed_bytes from bugflow.bug_media m join bugflow.bugs b on b.id=m.bug_id`);
   const r = rows[0] ?? {}; const host = (() => { try { return config ? new URL(config.endpoint).hostname : ''; } catch { return ''; } })();
   const c = stored.custom; const custom = c ? { endpoint: c.endpoint, bucket: c.bucket, region: c.region, forcePathStyle: c.forcePathStyle, accessKeyIdHint: `${c.accessKeyId.slice(0, 4)}…${c.accessKeyId.slice(-2)}` } : null;
-  const base: MediaStatus = { configured: !!config, source, defaultAvailable, canStoreSecrets: !!(process.env['BUGFLOW_PORTAL_ENCRYPTION_KEY'] ?? '').trim(), custom, missing, provider: config ? providerName(config.endpoint) : '', bucket: config?.bucket ?? '', endpointHost: host, files: Number(r['files'] ?? 0), bytes: Number(r['bytes'] ?? 0), awaitingPurge: Number(r['awaiting'] ?? 0), pending: Number(r['pending'] ?? 0), test: null };
+  const base: MediaStatus = { configured: !!config, source, defaultAvailable, cleanupDays: stored.cleanupDays ?? 0, closedFiles: Number(r['closed_files'] ?? 0), closedBytes: Number(r['closed_bytes'] ?? 0), canStoreSecrets: !!(process.env['BUGFLOW_PORTAL_ENCRYPTION_KEY'] ?? '').trim(), custom, missing, provider: config ? providerName(config.endpoint) : '', bucket: config?.bucket ?? '', endpointHost: host, files: Number(r['files'] ?? 0), bytes: Number(r['bytes'] ?? 0), awaitingPurge: Number(r['awaiting'] ?? 0), pending: Number(r['pending'] ?? 0), test: null };
   if (!test || !config) return base;
   const started = Date.now();
   try {
@@ -226,7 +266,7 @@ export async function mediaStatus(test: boolean): Promise<MediaStatus> {
 export async function saveMediaStorage(data: z.infer<typeof mediaStorageSchema>): Promise<MediaStatus> {
   checkOrigin(); const admin = await requireAdmin(); const current = await storedChoice();
   let next: Stored;
-  if (data.source === 'default') next = { source: 'default', ...(current.custom ? { custom: current.custom } : {}) };
+  if (data.source === 'default') next = { ...current, source: 'default' };
   else {
     if (!(process.env['BUGFLOW_PORTAL_ENCRYPTION_KEY'] ?? '').trim()) throw new Error('Set BUGFLOW_PORTAL_ENCRYPTION_KEY first so the secret key can be stored encrypted.');
     // Blank key fields keep what is saved; a new access key ID needs its own secret.
@@ -234,7 +274,7 @@ export async function saveMediaStorage(data: z.infer<typeof mediaStorageSchema>)
     if (data.accessKeyId && data.accessKeyId !== current.custom?.accessKeyId && !data.secretAccessKey) throw new Error('Enter the secret access key that belongs to this access key ID.');
     const secretCiphertext = data.secretAccessKey ? await encryptPortal(data.secretAccessKey) : current.custom?.secretCiphertext ?? '';
     if (!secretCiphertext) throw new Error('Enter the secret access key.');
-    next = { source: 'custom', custom: { endpoint: data.endpoint.replace(/\/+$/, ''), bucket: data.bucket, region: data.region, forcePathStyle: data.forcePathStyle, accessKeyId, secretCiphertext } };
+    next = { ...current, source: 'custom', custom: { endpoint: data.endpoint.replace(/\/+$/, ''), bucket: data.bucket, region: data.region, forcePathStyle: data.forcePathStyle, accessKeyId, secretCiphertext } };
   }
   await neonExecute([
     { query: `insert into bugflow.settings(key,value) values('media_storage',$1::jsonb) on conflict (key) do update set value=excluded.value`, params: [JSON.stringify(next)] },

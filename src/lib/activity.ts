@@ -100,6 +100,7 @@ export function changeText(row: ActivityRow) {
   if (clean(d['assignee'])) parts.push(`Assigned to ${d['assignee']}`);
   if (clean(d['noteTo'])) parts.push(`Note to ${d['noteTo']}`);
   if (clean(d['media'])) parts.push(row.action === 'bug.media_renamed' ? `Renamed ${d['from']} to ${d['media']}` : `${row.action === 'bug.media_deleted' ? 'Removed' : 'Attached'} ${d['media']}`);
+  if (row.action === 'bug.media_cleared' && d['count']) parts.push(`${d['count']} ${Number(d['count']) === 1 ? 'file' : 'files'} removed${d['reason'] === 'auto' ? ` by the clean-up schedule (${d['days']} days after closing)` : ''}`);
   if (clean(d['notes'])) parts.push(d['notes']);
   if (clean(d['title'])) parts.push(d['title']);
   if (clean(d['reason'])) parts.push(d['reason']);

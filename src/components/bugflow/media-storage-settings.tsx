@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { BookOpen, ChevronDown, Cloud, HardDrive, KeyRound, LoaderCircle, PlugZap, Save, Upload } from 'lucide-react';
+import { BookOpen, BrushCleaning, ChevronDown, Cloud, HardDrive, KeyRound, LoaderCircle, PlugZap, Save, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import type { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { getMediaStatus, saveMediaStorage } from '@/lib/bug-media.functions';
-import { STORAGE_PROVIDERS, formatBytes, mediaStorageSchema, type MediaSource, type MediaStatus } from '@/lib/bug-media';
-import { ErrorNotice, actionError } from './action-feedback';
+import { getMediaStatus, saveMediaCleanup, saveMediaStorage } from '@/lib/bug-media.functions';
+import { CLEANUP_CHOICES, STORAGE_PROVIDERS, formatBytes, mediaStorageSchema, type CleanupDays, type MediaSource, type MediaStatus } from '@/lib/bug-media';
+import { ConfirmAction, ErrorNotice, actionError } from './action-feedback';
 
 const VARS = ['MEDIA_S3_ENDPOINT', 'MEDIA_S3_BUCKET', 'MEDIA_S3_ACCESS_KEY_ID', 'MEDIA_S3_SECRET_ACCESS_KEY'];
 const FREE_TIER = 10 * 1024 * 1024 * 1024;
@@ -23,7 +23,9 @@ const fromStatus = (s: MediaStatus | undefined): Form => {
  * a choice between the default bucket from the environment and Admin's own bucket entered here, a real round trip on request, and the setup guide.
  */
 export function MediaStorageCard() {
-  const client = useQueryClient(); const read = useServerFn(getMediaStatus); const save = useServerFn(saveMediaStorage);
+  const client = useQueryClient(); const read = useServerFn(getMediaStatus); const save = useServerFn(saveMediaStorage); const saveCleanup = useServerFn(saveMediaCleanup);
+  const [confirmNow, setConfirmNow] = useState(false);
+  const cleanup = useMutation({ mutationFn: (data: { cleanupDays: CleanupDays } | { now: true }) => saveCleanup({ data }), onSuccess: (r, v) => { client.setQueryData(['media-status'], r); void client.invalidateQueries({ queryKey: ['bug-detail'] }); toast.success('now' in v ? 'Files on closed bugs removed' : r.cleanupDays ? `Files are removed ${r.cleanupDays} days after a bug closes` : 'Automatic clean-up is off'); }, onError: e => toast.error(actionError(e, 'The clean-up setting could not be saved.')) });
   const q = useQuery({ queryKey: ['media-status'], queryFn: () => read({ data: { test: false } }), staleTime: 60000, retry: false });
   const test = useMutation({ mutationFn: () => read({ data: { test: true } }), onSuccess: r => client.setQueryData(['media-status'], r) });
   const s = test.data ?? q.data; const [guide, setGuide] = useState(false);
@@ -77,6 +79,13 @@ export function MediaStorageCard() {
       </form>}
       {choice === 'default' && touched && s.source !== 'default' && <div className="flex flex-wrap items-center gap-2"><Button type="button" size="sm" disabled={storage.isPending} onClick={() => storage.mutate({ source: 'default' })}>{storage.isPending ? <LoaderCircle className="animate-spin" /> : <Save />}Use the default bucket</Button><span className="text-xs text-muted-foreground">Your own bucket details stay saved in case you switch back.</span></div>}
       {!s.configured && s.source !== 'custom' && !s.defaultAvailable && choice === 'default' && <div><p className="mb-2 text-xs text-muted-foreground">The default bucket needs these environment variables from the host:</p><div className="bf-media-missing">{s.missing.map(v => <code key={v}>{v}</code>)}</div></div>}
+      {s.configured && <div className="bf-storage-form" aria-label="Clean-up">
+        <div className="flex flex-wrap items-center gap-3"><span className="inline-flex items-center gap-1 text-sm font-semibold"><BrushCleaning size={15} />Clean-up</span>
+          <span className="text-xs text-muted-foreground">Remove every file from a bug once it has been resolved, a duplicate, not a bug or won't-fix for</span>
+          <div className="bf-mode" role="radiogroup" aria-label="Days after closing">{CLEANUP_CHOICES.map(d => <button key={d} type="button" role="radio" aria-checked={s.cleanupDays === d} disabled={cleanup.isPending} onClick={() => cleanup.mutate({ cleanupDays: d })}>{d === 0 ? 'Never' : `${d} days`}</button>)}</div></div>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">{s.closedFiles > 0 ? <>{s.closedFiles} {s.closedFiles === 1 ? 'file' : 'files'} · {formatBytes(s.closedBytes)} sit on closed bugs right now.<Button type="button" size="sm" variant="outline" disabled={cleanup.isPending} onClick={() => setConfirmNow(true)}>{cleanup.isPending ? <LoaderCircle className="animate-spin" /> : <BrushCleaning />}Remove them now</Button></> : 'No files on closed bugs right now.'} Each removal is audited on the bug; reopening a bug does not bring files back.</div>
+      </div>}
+      <ConfirmAction open={confirmNow} onOpenChange={setConfirmNow} destructive title={`Remove ${s.closedFiles} ${s.closedFiles === 1 ? 'file' : 'files'} from closed bugs?`} description={`${formatBytes(s.closedBytes)} is freed. The files are deleted from storage for everyone; each bug gets an audit entry with your name, date and time.`} confirmLabel="Remove files" onConfirm={async () => { await cleanup.mutateAsync({ now: true }); setConfirmNow(false); }} />
       <div className="flex flex-wrap items-center gap-2">
         {s.configured && <Button size="sm" variant="outline" disabled={test.isPending} onClick={() => test.mutate()}>{test.isPending ? <LoaderCircle className="animate-spin" /> : <PlugZap />}{s.awaitingPurge > 0 ? 'Test connection & purge' : 'Test connection'}</Button>}
         <Button size="sm" variant="ghost" onClick={() => setGuide(g => !g)}><BookOpen />Setup guide<ChevronDown className={showGuide ? 'rotate-180' : ''} /></Button>

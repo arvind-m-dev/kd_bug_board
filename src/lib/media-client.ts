@@ -1,4 +1,4 @@
-import { MEDIA_MAX_BYTES, MEDIA_MAX_EDGE, MEDIA_QUALITY, formatBytes, mediaKind, rejectReason, resolveContentType, safeFileName, type MediaType } from './bug-media';
+import { MEDIA_MAX_EDGE, MEDIA_TYPES, MEDIA_QUALITY, formatBytes, maxBytesFor, mediaKind, rejectReason, resolveContentType, safeFileName, videoPlan, type MediaType } from './bug-media';
 
 /** Browser-only helpers: shrink images before upload and PUT straight to the bucket with progress. */
 export type PreparedFile = { blob: Blob; contentType: MediaType; name: string; size: number; originalSize: number; width: number | null; height: number | null };
@@ -25,13 +25,58 @@ async function compressImage(file: File, type: MediaType): Promise<{ blob: Blob;
   if (!blob || (blob.size >= file.size && scale === 1)) return { ...keep, width: w, height: h };
   return { blob, contentType: out, width: tw, height: th };
 }
-/** Validates, compresses and names one file; returns an error message instead when it cannot be attached. */
-export async function prepareFile(file: File): Promise<{ ok: true; file: PreparedFile } | { ok: false; error: string }> {
+export type VideoProgress = (fraction: number, doneSeconds: number, totalSeconds: number) => void;
+const recorderMime = () => ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'].find(m => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m)) ?? null;
+/**
+ * Re-encodes a recording in the browser at a bitrate chosen from its length, so it lands near 80 MB. Plays it through silently
+ * at normal speed (so it takes as long as the recording runs) and records the stream; no library download, no server work.
+ */
+export async function compressVideo(file: File, onProgress: VideoProgress, signal?: AbortSignal): Promise<{ blob: Blob; contentType: MediaType }> {
+  const mime = recorderMime(); if (!mime) throw new Error('This browser cannot compress recordings. Use Chrome, Edge, Firefox or Safari 15+, or upload a file under 100 MB.');
+  const url = URL.createObjectURL(file); const video = document.createElement('video'); video.src = url; video.preload = 'auto'; video.playsInline = true; video.muted = false; video.volume = 1;
+  const ac = new AudioContext();
+  try {
+    await new Promise<void>((resolve, reject) => { video.onloadedmetadata = () => resolve(); video.onerror = () => reject(new Error('This recording cannot be read by the browser. Export it as MP4 (H.264) and try again.')); });
+    const duration = video.duration; const plan = videoPlan(duration);
+    if (!plan) throw new Error(`This recording runs ${Math.round(duration / 60)} minutes — too long to fit under 100 MB. Trim it to the part that shows the bug, or split it.`);
+    // Audio is routed through an AudioContext so nothing is heard while it still reaches the recorder; the video track comes straight from the element.
+    const dest = ac.createMediaStreamDestination(); ac.createMediaElementSource(video).connect(dest);
+    const capture = (video as HTMLVideoElement & { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream }); const grab = capture.captureStream ?? capture.mozCaptureStream;
+    let stream: MediaStream; let stopDraw = () => {};
+    if (grab) stream = grab.call(video);
+    else { // Safari: draw frames onto a canvas and capture that
+      const c = document.createElement('canvas'); const scale = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight)); c.width = Math.round(video.videoWidth * scale); c.height = Math.round(video.videoHeight * scale);
+      const ctx = c.getContext('2d')!; let raf = 0; const draw = () => { ctx.drawImage(video, 0, 0, c.width, c.height); raf = requestAnimationFrame(draw); }; draw(); stopDraw = () => cancelAnimationFrame(raf);
+      stream = c.captureStream(30);
+    }
+    const out = new MediaStream([...stream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+    const rec = new MediaRecorder(out, { mimeType: mime, videoBitsPerSecond: plan.videoBitsPerSecond, audioBitsPerSecond: plan.audioBitsPerSecond });
+    const chunks: Blob[] = []; rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      const fail = (err: Error) => { try { if (rec.state !== 'inactive') rec.stop(); } catch { /* already stopped */ } video.pause(); reject(err); };
+      signal?.addEventListener('abort', () => fail(new Error('Compression cancelled.')), { once: true });
+      video.ontimeupdate = () => onProgress(Math.min(1, video.currentTime / duration), video.currentTime, duration);
+      video.onended = () => { if (rec.state !== 'inactive') rec.stop(); };
+      rec.onerror = () => fail(new Error('Compression failed in this browser. Try Chrome or upload a shorter recording.'));
+      rec.onstop = () => { stopDraw(); if (signal?.aborted) return; onProgress(1, duration, duration); resolve(new Blob(chunks, { type: mime.split(';')[0]! })); };
+      rec.start(1000);
+      video.play().catch(() => fail(new Error('The recording could not be played for compression.')));
+    });
+    return { blob, contentType: mime.startsWith('video/mp4') ? 'video/mp4' : 'video/webm' };
+  } finally { video.removeAttribute('src'); video.load(); URL.revokeObjectURL(url); void ac.close().catch(() => undefined); }
+}
+/** Validates, compresses and names one file; returns an error message instead when it cannot be attached. Recordings over the limit are compressed first. */
+export async function prepareFile(file: File, video?: { onProgress: VideoProgress; signal?: AbortSignal | undefined }): Promise<{ ok: true; file: PreparedFile } | { ok: false; error: string }> {
   const reason = rejectReason(file.name, file.type, file.size); if (reason) return { ok: false, error: reason };
   const type = resolveContentType(file.name, file.type)!;
-  const r = mediaKind(type) === 'image' ? await compressImage(file, type) : { blob: file as Blob, contentType: type, width: null, height: null };
-  if (r.blob.size > MEDIA_MAX_BYTES) return { ok: false, error: `Still ${formatBytes(r.blob.size)} after compression — the limit is ${formatBytes(MEDIA_MAX_BYTES)}.` };
-  const base = safeFileName(file.name).replace(/\.[^.]+$/, '') || 'file'; const ext = r.contentType === type ? (file.name.match(/\.[^.]+$/)?.[0] ?? '') : r.contentType === 'image/webp' ? '.webp' : '.jpg';
+  let r: { blob: Blob; contentType: MediaType; width: number | null; height: number | null };
+  try {
+    r = mediaKind(type) === 'image' ? await compressImage(file, type)
+      : mediaKind(type) === 'video' && file.size > maxBytesFor(type) ? { ...(await compressVideo(file, video?.onProgress ?? (() => undefined), video?.signal)), width: null, height: null }
+      : { blob: file as Blob, contentType: type, width: null, height: null };
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'The file could not be prepared.' }; }
+  if (r.blob.size > maxBytesFor(r.contentType)) return { ok: false, error: `Still ${formatBytes(r.blob.size)} after compression — the limit is ${formatBytes(maxBytesFor(r.contentType))}.` };
+  const base = safeFileName(file.name).replace(/\.[^.]+$/, '') || 'file'; const ext = r.contentType === type ? (file.name.match(/\.[^.]+$/)?.[0] ?? '') : `.${MEDIA_TYPES[r.contentType].ext}`;
   return { ok: true, file: { blob: r.blob, contentType: r.contentType, name: safeFileName(base + (ext || '')), size: r.blob.size, originalSize: file.size, width: r.width, height: r.height } };
 }
 /** PUT to the signed URL with upload progress and cancel. A status of 0 almost always means the bucket's CORS rule is missing. */

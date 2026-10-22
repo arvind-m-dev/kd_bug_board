@@ -8,15 +8,15 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Progress } from '@/components/ui/progress';
 import { ConfirmAction, actionError } from './action-feedback';
 import { AnnotationEditor, captureFrame, loadImage, type AnnotationSource } from './media-annotate';
-import { deleteMedia, finishMediaUpload, prepareMediaUpload, renameMedia } from '@/lib/bug-media.functions';
-import { MEDIA_NAME_MAX, clock, formatBytes, mayDeleteMedia, mayUploadMedia, mediaLinkPath, type MediaConfig, type MediaItem } from '@/lib/bug-media';
+import { clearBugMedia, deleteMedia, finishMediaUpload, prepareMediaUpload, renameMedia } from '@/lib/bug-media.functions';
+import { MEDIA_NAME_MAX, clock, formatBytes, isClosedForMedia, mayDeleteMedia, mayUploadMedia, mediaLinkPath, type MediaConfig, type MediaItem } from '@/lib/bug-media';
 import { prepareFile, uploadPut, type PreparedFile } from '@/lib/media-client';
 import type { BugAccess, BugActor, LiveBug } from '@/lib/bug-workflow';
 import { timeAgo } from '@/lib/format';
 
 export type UploadMeta = { name?: string; derivedFrom?: string | null; atSeconds?: number | null };
-export type UploadState = { id: string; name: string; label: string; size: number; status: 'preparing' | 'queued' | 'uploading' | 'verifying' | 'done' | 'failed'; progress: number; error?: string | undefined; preview?: string | undefined; file?: PreparedFile | undefined; abort?: AbortController | undefined; derivedFrom: string | null; atSeconds: number | null };
-const label = (u: UploadState) => u.status === 'preparing' ? 'Compressing…' : u.status === 'queued' ? 'Ready to upload' : u.status === 'uploading' ? `Uploading ${Math.round(u.progress * 100)}%` : u.status === 'verifying' ? 'Verifying…' : u.status === 'done' ? 'Attached' : u.error ?? 'Failed';
+export type UploadState = { id: string; name: string; label: string; size: number; status: 'preparing' | 'queued' | 'uploading' | 'verifying' | 'done' | 'failed'; progress: number; note?: string | undefined; error?: string | undefined; preview?: string | undefined; file?: PreparedFile | undefined; abort?: AbortController | undefined; derivedFrom: string | null; atSeconds: number | null };
+const label = (u: UploadState) => u.status === 'preparing' ? (u.note ?? 'Compressing…') : u.status === 'queued' ? 'Ready to upload' : u.status === 'uploading' ? `Uploading ${Math.round(u.progress * 100)}%` : u.status === 'verifying' ? 'Verifying…' : u.status === 'done' ? 'Attached' : u.error ?? 'Failed';
 const baseName = (name: string) => name.replace(/\.[^.]+$/, '') || name;
 
 /** Copies an in-app link to a bug's files (or one file). It opens for whoever is signed in or has their portal open. */
@@ -55,10 +55,10 @@ export function useMediaUpload(access: BugAccess, bugId: string | null) {
     for (const f of files) {
       const id = crypto.randomUUID(); const preview = f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined;
       const start: UploadState = { id, name: f.name, label: meta.name ?? baseName(f.name), size: f.size, status: 'preparing', progress: 0, preview, derivedFrom: meta.derivedFrom ?? null, atSeconds: meta.atSeconds ?? null };
-      setUploads(list => [...list, start]);
-      const r = await prepareFile(f);
+      const abort = new AbortController(); setUploads(list => [...list, { ...start, abort }]);
+      const r = await prepareFile(f, { onProgress: (fraction, done, total) => patch(id, { progress: fraction, note: `Compressing ${clock(done)} of ${clock(total)} · keep this tab open` }), signal: abort.signal });
       if (!r.ok) { patch(id, { status: 'failed', error: r.error }); continue; }
-      const u: UploadState = { ...start, name: r.file.name, size: r.file.size, status: 'queued', file: r.file }; patch(id, { name: u.name, size: u.size, status: 'queued', file: u.file });
+      const u: UploadState = { ...start, name: r.file.name, size: r.file.size, status: 'queued', file: r.file }; patch(id, { name: u.name, size: u.size, status: 'queued', file: u.file, note: f.size > r.file.size * 1.5 ? `Compressed from ${formatBytes(f.size)}` : undefined, progress: 0 });
       if (bugId) void send(u, bugId);
     }
   }
@@ -84,16 +84,16 @@ export function MediaDropZone({ accept, remaining, disabledReason, onFiles, uplo
       <input ref={input} type="file" multiple accept={accept.join(',')} className="sr-only" tabIndex={-1} onChange={e => { take(e.target.files); e.target.value = ''; }} />
       <Upload size={24} />
       <strong className="text-xs">{disabledReason ? 'Media uploads unavailable' : remaining <= 0 ? 'This bug has all 10 files' : 'Drop screenshots, recordings or PDFs here — several at once is fine'}</strong>
-      <span className="text-xs text-muted-foreground">{disabledReason ?? (remaining <= 0 ? 'Remove one to add another' : hint ?? `PNG, JPEG, WebP, GIF, MP4, WebM or PDF · images are compressed automatically · ${remaining} more`)}</span>
+      <span className="text-xs text-muted-foreground">{disabledReason ?? (remaining <= 0 ? 'Remove one to add another' : hint ?? `PNG, JPEG, WebP, GIF, MP4, WebM or PDF · images are shrunk and recordings over 100 MB are compressed in your browser · ${remaining} more`)}</span>
       {!disabledReason && <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={e => { e.stopPropagation(); input.current?.click(); }}><Paperclip />Choose files</Button>}
     </div>
     {uploads.length > 0 && <ul className="bf-upload-queue" aria-live="polite">{uploads.map(u => <li key={u.id} className="bf-upload-row" data-status={u.status}>
       {u.preview ? <img src={u.preview} alt="" /> : <span className="bf-upload-ph">{u.name.toLowerCase().endsWith('.pdf') ? <FileText size={18} /> : <Film size={18} />}</span>}
       <span className="min-w-0">
         {editable(u) ? <input className="bf-upload-name" value={u.label} maxLength={MEDIA_NAME_MAX} placeholder="Name this file" aria-label={`Name for ${u.name}`} onChange={e => onLabel!(u.id, e.target.value)} /> : <strong title={u.name}>{u.label.trim() || u.name}</strong>}
-        <small>{formatBytes(u.size)} · {label(u)}</small>{(u.status === 'uploading' || u.status === 'verifying') && <Progress value={u.progress * 100} className="mt-1 h-1.5" />}
+        <small>{formatBytes(u.size)} · {u.status === 'queued' && u.note ? `${u.note} · ` : ''}{label(u)}</small>{(u.status === 'uploading' || u.status === 'verifying' || (u.status === 'preparing' && u.progress > 0)) && <Progress value={u.progress * 100} className="mt-1 h-1.5" />}
       </span>
-      <span className="flex items-center gap-1">{u.status === 'failed' && u.file && <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onRetry(u.id)}><RefreshCw />Retry</Button>}{(u.status === 'preparing' || u.status === 'uploading' || u.status === 'verifying') ? <LoaderCircle className="animate-spin text-muted-foreground" size={16} /> : u.status === 'done' ? <Check className="text-success" size={16} /> : <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label={`Remove ${u.name} from the queue`} onClick={() => onRemove(u.id)}><X size={14} /></Button>}</span>
+      <span className="flex items-center gap-1">{u.status === 'failed' && u.file && <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onRetry(u.id)}><RefreshCw />Retry</Button>}{u.status === 'preparing' && u.progress > 0 ? <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onRemove(u.id)}><X />Cancel</Button> : (u.status === 'preparing' || u.status === 'uploading' || u.status === 'verifying') ? <LoaderCircle className="animate-spin text-muted-foreground" size={16} /> : u.status === 'done' ? <Check className="text-success" size={16} /> : <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label={`Remove ${u.name} from the queue`} onClick={() => onRemove(u.id)}><X size={14} /></Button>}</span>
     </li>)}</ul>}
   </div>;
 }
@@ -140,8 +140,8 @@ export function MediaLightbox({ items, index, onIndex, onClose, actions, videoRe
 
 /** The "Attachments" card on a bug: gallery with lightbox, rename, mark-up, Open and Remove, plus the drop zone for people who may attach files. */
 export function BugMedia({ access, bug, actor, items, config, readOnly = false, openMediaId }: { access: BugAccess; bug: LiveBug; actor: BugActor; items: MediaItem[]; config: MediaConfig; readOnly?: boolean; openMediaId?: string | undefined }) {
-  const client = useQueryClient(); const remove = useServerFn(deleteMedia); const rename = useServerFn(renameMedia);
-  const [open, setOpen] = useState<number | null>(null); const [removing, setRemoving] = useState<MediaItem | null>(null);
+  const client = useQueryClient(); const remove = useServerFn(deleteMedia); const rename = useServerFn(renameMedia); const clearAll = useServerFn(clearBugMedia);
+  const [open, setOpen] = useState<number | null>(null); const [removing, setRemoving] = useState<MediaItem | null>(null); const [clearing, setClearing] = useState(false);
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null); const [savingName, setSavingName] = useState(false);
   const [markup, setMarkup] = useState<{ source: AnnotationSource; name: string; caption: string; derivedFrom: string; atSeconds: number | null } | null>(null);
   const video = useRef<HTMLVideoElement | null>(null);
@@ -175,7 +175,8 @@ export function BugMedia({ access, bug, actor, items, config, readOnly = false, 
   }
   const remaining = config.maxFiles - items.length - uploader.uploads.filter(u => u.status !== 'failed').length;
   return <section className="bf-rc-card" data-tone="info"><h3 className="bf-section-title"><span className="bf-rc-icon"><Paperclip size={15} /></span>Attachments{items.length > 0 && <span className="bf-tag ml-1">{items.length} of {config.maxFiles}</span>}
-    {items.length > 0 && <Button type="button" variant="ghost" size="sm" className="ml-auto h-7 text-xs" onClick={() => void copyMediaLink(bug.id)}><Link2 />Copy link to all files</Button>}</h3>
+    {items.length > 0 && <span className="ml-auto flex gap-1"><Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => void copyMediaLink(bug.id)}><Link2 />Copy link to all files</Button>{!readOnly && actor.role === 'admin' && isClosedForMedia(bug.status) && <Button type="button" variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => setClearing(true)}><Trash2 />Remove all {items.length} files</Button>}</span>}</h3>
+    {!readOnly && actor.role === 'admin' && isClosedForMedia(bug.status) && items.length > 0 && <p className="text-xs text-muted-foreground">This bug is closed. Its files take {formatBytes(items.reduce((n, m) => n + m.size, 0))} of storage; remove them here, or set a clean-up schedule in Settings → Media storage.</p>}
     {items.length > 0 && <div className="bf-media-grid">{items.map((m, i) => <figure key={m.id} className="bf-media-tile" data-derived={m.derivedFrom ? '' : undefined}>
       <MediaThumb item={m} onOpen={() => setOpen(i)} />
       <figcaption className="bf-media-cap">
@@ -196,6 +197,7 @@ export function BugMedia({ access, bug, actor, items, config, readOnly = false, 
     {markup && <AnnotationEditor source={markup.source} defaultName={markup.name} caption={markup.caption}
       onSave={async (file, name) => { await uploader.add([file], { name, derivedFrom: markup.derivedFrom, atSeconds: markup.atSeconds }); setMarkup(null); setOpen(null); toast.success('Marked-up copy is being attached'); }}
       onClose={() => setMarkup(null)} />}
+    <ConfirmAction open={clearing} onOpenChange={setClearing} destructive title={`Remove all ${items.length} files from ${bug.code}?`} description="Every screenshot, recording and PDF on this bug is removed for everyone and deleted from storage. One audit entry records it with your name, date and time." confirmLabel="Remove all files" onConfirm={async () => { await clearAll({ data: { access, media: { bugId: bug.id } } }); await refresh(); toast.success('All files removed'); setClearing(false); }} />
     <ConfirmAction open={removing !== null} onOpenChange={o => { if (!o) setRemoving(null); }} destructive title={`Remove ${removing?.name ?? 'this file'}?`} description="The file is removed from this bug for everyone and deleted from private storage. The removal is recorded with your name, date and time." confirmLabel="Remove file"
       onConfirm={async () => { if (!removing) return; await remove({ data: { access, media: { id: removing.id } } }); await refresh(); toast.success('File removed'); setRemoving(null); }} />
   </section>;
