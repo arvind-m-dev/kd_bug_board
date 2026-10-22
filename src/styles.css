@@ -1382,3 +1382,9 @@ html[data-motion=off] .bf-surface-effects { display: none; }
 .bf-option-row[data-dragging] { opacity: .4; } .bf-option-row[data-dragging] .bf-grip { cursor: grabbing; }
 .bf-option-row[data-drop]::after { content: ''; position: absolute; left: 0; right: 0; height: 2px; background: var(--primary); border-radius: 2px; pointer-events: none; }
 .bf-option-row[data-drop=before]::after { top: -1px; } .bf-option-row[data-drop=after]::after { bottom: -1px; }
+/* Settings → Appearance card: the Theme Studio button stands out */
+@keyframes bf-cta-glow { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 45%, transparent), 0 6px 18px -8px color-mix(in oklab, var(--brand-2) 70%, transparent); } 50% { box-shadow: 0 0 0 6px color-mix(in oklab, var(--primary) 0%, transparent), 0 8px 22px -8px color-mix(in oklab, var(--brand-2) 80%, transparent); } }
+.bf-studio-cta { position: relative; flex-shrink: 0; padding-inline: 16px; background: linear-gradient(135deg, var(--primary), var(--brand-2)); color: var(--primary-foreground); border: 0; font-weight: 700; letter-spacing: .01em; animation: bf-cta-glow 2.8s ease-in-out infinite; }
+.bf-studio-cta:hover { filter: brightness(1.08); transform: translateY(-1px); } .bf-studio-cta:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+html[data-motion=off] .bf-studio-cta { animation: none; }
+@media (prefers-reduced-motion: reduce) { .bf-studio-cta { animation: none; } }
