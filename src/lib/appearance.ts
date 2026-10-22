@@ -34,6 +34,9 @@ export const PALETTES: Palette[] = [
   { id: 'pumpkin', name: 'Pumpkin', description: 'Bright orange with a violet partner — Halloween’s own.',
     light: { primary: 'oklch(0.6 0.17 50)', primaryForeground: 'oklch(1 0 0)', brand2: 'oklch(0.5 0.2 300)', accent: 'oklch(0.95 0.04 60)' },
     dark: { primary: 'oklch(0.78 0.16 55)', primaryForeground: 'oklch(0.2 0.05 50)', brand2: 'oklch(0.75 0.16 300)', accent: 'oklch(0.33 0.07 300)' } },
+  { id: 'holly', name: 'Holly', description: 'Berry red with a fir-green partner — Christmas’s own.',
+    light: { primary: 'oklch(0.5 0.19 25)', primaryForeground: 'oklch(1 0 0)', brand2: 'oklch(0.45 0.11 150)', accent: 'oklch(0.95 0.03 150)' },
+    dark: { primary: 'oklch(0.72 0.17 25)', primaryForeground: 'oklch(0.2 0.05 25)', brand2: 'oklch(0.78 0.13 150)', accent: 'oklch(0.3 0.05 150)' } },
   { id: 'sunset', name: 'Sunset', description: 'Bright orange with a pink partner — friendly and warm.',
     light: { primary: 'oklch(0.56 0.17 40)', primaryForeground: 'oklch(1 0 0)', brand2: 'oklch(0.6 0.2 350)', accent: 'oklch(0.955 0.035 45)' },
     dark: { primary: 'oklch(0.8 0.14 50)', primaryForeground: 'oklch(0.2 0.04 45)', brand2: 'oklch(0.76 0.16 350)', accent: 'oklch(0.32 0.06 45)' } },
@@ -75,8 +78,10 @@ export const STYLES: Style[] = [
   { id: 'keydemand', name: 'Keydemand', description: 'White cards on cool grey, teal pills and gold counts — the Keydemand product look.', fonts: 'jakarta', palette: 'keydemand' },
   { id: 'sketch', name: 'Pencil sketch', description: 'Graphite on paper with hand-drawn lines; a chalkboard in dark mode.', fonts: 'hand', palette: 'graphite' },
   { id: 'ink', name: 'Ink', description: 'Only black and white — pen-and-ink outlines and hatching; scratchboard in dark mode.', fonts: 'ink', palette: 'graphite', monochrome: true },
-  { id: 'halloween', name: 'Halloween', description: 'Pumpkin and violet, cobwebs, drifting bats and a bug that is very much alive.', fonts: 'spooky', palette: 'pumpkin', decorated: true },
+  { id: 'halloween', name: 'Halloween', description: 'Pumpkin and violet, glowing jack-o’-lanterns, cobwebs, bats and bugs that crawl across the screen.', fonts: 'spooky', palette: 'pumpkin', decorated: true },
   { id: 'winter', name: 'Winter', description: 'Frosted blues and gently falling snow.', fonts: 'festive', palette: 'ocean', decorated: true },
+  { id: 'christmas', name: 'Christmas', description: 'Berry red and fir green, a row of trees, fairy lights along the top and snow when lively.', fonts: 'festive', palette: 'holly', decorated: true },
+  { id: 'autumn', name: 'Autumn', description: 'Warm copper and cream with leaves drifting down when lively.', fonts: 'serif', palette: 'copper', decorated: true },
   { id: 'terminal', name: 'Terminal', description: 'Phosphor green on black with scanlines and a mono face.', fonts: 'mono', palette: 'emerald', decorated: true },
 ];
 export const styleById = (id: string | null | undefined) => STYLES.find(s => s.id === id) ?? STYLES[0]!;

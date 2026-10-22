@@ -119,7 +119,7 @@ export function ThemeStudio(props: Scope) {
           <Seg label="Density" value={draft.density} onChange={v => set({ density: v })} options={[{ value: 'comfortable', label: 'Comfortable' }, { value: 'compact', label: 'Compact' }]} />
         </div>
       </Row>
-      <Row title="Motion" hint="Off stops every animation and decoration. Lively adds the moving parts of decorated styles — bats, snow, the bug that walks.">
+      <Row title="Motion" hint="Off stops every animation and decoration. Lively adds the moving parts of decorated styles — bats and crawling bugs, snow, falling leaves, twinkling lights.">
         <Seg label="Motion" value={draft.motion} onChange={v => set({ motion: v })} options={[{ value: 'off', label: 'Off' }, { value: 'subtle', label: 'Subtle' }, { value: 'lively', label: 'Lively' }]} />
       </Row>
       <Row title="Show or hide" hint="Turn off what you don't need. Nothing here changes what anyone is allowed to see — only what is on screen.">

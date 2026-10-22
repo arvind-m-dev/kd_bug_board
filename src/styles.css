@@ -1232,3 +1232,50 @@ html[data-skin=terminal] .bf-nav-link[data-status=active] { background: color-mi
 .bf-media-guide code { padding: 1px 6px; border-radius: 5px; background: var(--muted); font-size: 11.5px; } .bf-media-guide pre { margin: 6px 0 0; overflow: auto; padding: 10px 12px; border-radius: 8px; background: var(--muted); font-size: 11.5px; line-height: 1.5; }
 .bf-media-missing { display: flex; flex-wrap: wrap; gap: 6px; } .bf-media-missing code { padding: 2px 8px; border-radius: 6px; background: var(--muted); font-size: 11.5px; }
 .text-success { color: var(--success); } .text-warning { color: var(--warning); }
+
+/* ───────────── Seasonal scenes: pumpkins, crawling bugs, trees, lights, leaves ───────────── */
+.bf-scene { position: absolute; right: 28px; bottom: 0; display: flex; align-items: flex-end; gap: 4px; opacity: .92; filter: drop-shadow(0 6px 10px rgb(0 0 0 / .25)); }
+@media (max-width: 760px) { .bf-scene, .bf-moon, .bf-lights, .bf-drift { display: none; } }
+.bf-pumpkin { display: block; transform-origin: 50% 100%; }
+.bf-pumpkin-face { filter: drop-shadow(0 0 4px oklch(.85 .18 80)); }
+@keyframes bf-candle { 0%, 100% { opacity: 1; filter: drop-shadow(0 0 4px oklch(.85 .18 80)); } 30% { opacity: .75; filter: drop-shadow(0 0 2px oklch(.85 .18 80)); } 55% { opacity: .95; filter: drop-shadow(0 0 7px oklch(.9 .18 85)); } 70% { opacity: .7; } }
+.bf-decor[data-lively] .bf-pumpkin-face { animation: bf-candle 2.6s ease-in-out infinite; }
+.bf-decor[data-lively] .bf-pumpkin:nth-child(2) .bf-pumpkin-face { animation-delay: .9s; } .bf-decor[data-lively] .bf-pumpkin:nth-child(3) .bf-pumpkin-face { animation-delay: 1.7s; animation-duration: 3.4s; }
+.bf-moon { position: absolute; top: 18px; left: 262px; color: oklch(.93 .06 90); opacity: 0; filter: drop-shadow(0 0 18px oklch(.9 .1 90 / .6)); }
+.dark .bf-moon { opacity: .85; }
+@keyframes bf-crawl { from { transform: translateX(-70px) rotate(var(--rot, 90deg)); } to { transform: translateX(calc(100vw + 70px)) rotate(var(--rot, 90deg)); } }
+.bf-crawl { position: absolute; left: 0; color: color-mix(in oklab, var(--foreground) 85%, var(--brand-2)); opacity: .8; animation: bf-crawl linear infinite; }
+@keyframes bf-climb { 0% { transform: translateY(100vh) rotate(0deg); } 45% { transform: translateY(40vh) rotate(0deg); } 50% { transform: translateY(40vh) rotate(0deg) translateX(-4px); } 100% { transform: translateY(-80px) rotate(0deg); } }
+.bf-climb { position: absolute; right: 6px; top: 0; color: color-mix(in oklab, var(--foreground) 85%, var(--brand-2)); opacity: .75; animation: bf-climb 90s linear 18s infinite; }
+.bf-still { position: absolute; color: var(--foreground); opacity: .45; }
+:is(.bf-scurry, .bf-crawl, .bf-climb) .bf-mascot-legs-l { animation: bf-legs .35s ease-in-out infinite; }
+:is(.bf-scurry, .bf-crawl, .bf-climb) .bf-mascot-legs-r { animation: bf-legs .35s ease-in-out infinite reverse; }
+:is(.bf-scurry, .bf-crawl, .bf-climb) .bf-mascot-feelers { animation: bf-feelers 1.2s ease-in-out infinite; }
+.bf-trees { gap: 0; right: 20px; } .bf-tree { display: block; margin-right: -14px; }
+@keyframes bf-sparkle { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.8); } }
+.bf-decor[data-lively] .bf-star { transform-origin: 35px 11px; animation: bf-sparkle 1.8s ease-in-out infinite; }
+.bf-decor[data-lively] .bf-tree:nth-child(2) .bf-star { animation-delay: .6s; } .bf-decor[data-lively] .bf-tree:nth-child(3) .bf-star { animation-delay: 1.1s; }
+.bf-drift { position: absolute; left: 236px; right: 0; bottom: -10px; height: 26px; background: #fff; border-radius: 50% 50% 0 0 / 100% 100% 0 0; opacity: .85; box-shadow: 0 -2px 10px rgb(255 255 255 / .6); }
+.dark .bf-drift { opacity: .7; }
+.bf-lights { position: absolute; top: 0; left: 236px; right: 0; height: 36px; width: calc(100% - 236px); overflow: visible; }
+.bf-bulb { filter: drop-shadow(0 0 1.5px currentColor); }
+@keyframes bf-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.bf-decor[data-lively] .bf-bulb { animation: bf-twinkle 2.2s ease-in-out infinite; }
+@keyframes bf-leaffall { 0% { transform: translateY(-30px) translateX(0) rotate(0deg); opacity: 0; } 8% { opacity: .9; } 50% { transform: translateY(50vh) translateX(var(--drift, 0px)) rotate(200deg); } 100% { transform: translateY(105vh) translateX(0) rotate(420deg); opacity: .7; } }
+.bf-leaf { position: absolute; top: 0; display: block; animation: bf-leaffall linear infinite; }
+
+/* ───────────── Christmas: cream and berry, fir-green lines ───────────── */
+html[data-skin=christmas] { --background: oklch(.975 .012 85); --card: oklch(1 0 0); --foreground: oklch(.26 .05 150); --muted: oklch(.94 .015 85); --muted-foreground: oklch(.46 .04 150); --secondary: oklch(.95 .015 85); --border: oklch(.88 .03 150); }
+html[data-skin=christmas].dark { --background: oklch(.17 .035 160); --card: oklch(.22 .04 160); --foreground: oklch(.96 .01 85); --muted: oklch(.27 .04 160); --muted-foreground: oklch(.76 .03 120); --secondary: oklch(.25 .04 160); --border: oklch(.33 .04 160); }
+html[data-skin=christmas] .bf-logo { background: linear-gradient(135deg, var(--primary), var(--brand-2)); box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 20%, transparent); }
+html[data-skin=christmas] .bf-topbar { padding-top: 6px; }
+html[data-skin=christmas] .bf-page-heading h1 { font-weight: 700; letter-spacing: .01em; }
+html[data-skin=christmas] .bf-nav-link[data-status=active] { background: color-mix(in oklab, var(--brand-2) 16%, transparent); }
+html[data-skin=christmas].dark body { background-image: radial-gradient(70% 50% at 50% 100%, color-mix(in oklab, var(--brand-2) 16%, transparent), transparent 70%); background-attachment: fixed; }
+
+/* ───────────── Autumn: cream paper, copper lines ───────────── */
+html[data-skin=autumn] { --background: oklch(.965 .02 75); --card: oklch(.99 .01 80); --foreground: oklch(.28 .05 45); --muted: oklch(.93 .025 75); --muted-foreground: oklch(.48 .05 50); --secondary: oklch(.94 .025 75); --border: oklch(.87 .04 65); }
+html[data-skin=autumn].dark { --background: oklch(.18 .03 45); --card: oklch(.23 .035 45); --foreground: oklch(.95 .02 75); --muted: oklch(.28 .035 45); --muted-foreground: oklch(.75 .04 65); --secondary: oklch(.26 .035 45); --border: oklch(.34 .04 45); }
+html[data-skin=autumn] .bf-logo { background: linear-gradient(135deg, var(--primary), var(--brand-2)); }
+html[data-skin=autumn] .bf-page-heading h1 { letter-spacing: -.005em; }
+html[data-skin=autumn] body { background-image: radial-gradient(50% 35% at 100% 0%, color-mix(in oklab, var(--primary) 10%, transparent), transparent 70%); background-attachment: fixed; }
