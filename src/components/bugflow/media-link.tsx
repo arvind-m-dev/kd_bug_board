@@ -35,7 +35,7 @@ export function MediaLinkPage({ bugId, mediaId }: { bugId: string; mediaId?: str
     return () => { cancelled = true; };
   }, [fetch]);
   const back = state !== 'loading' && state !== 'denied' ? (state.access.kind === 'admin' ? '/admin/bugs' : `/${state.access.type}/${state.access.token}`) : '/';
-  return <div className="min-h-screen bg-background">
+  return <div className="min-h-screen">
     <header className="bf-topbar"><div className="bf-topbar-left"><span className="bf-logo"><BrandMark /></span><strong>Attachment</strong></div><div className="flex items-center gap-2"><Button asChild variant="ghost" size="sm"><Link to={back}><ArrowLeft />{state !== 'loading' && state !== 'denied' && state.access.kind === 'admin' ? 'All bugs' : 'My portal'}</Link></Button><ThemeToggle /></div></header>
     <main className="bf-main">
       {state === 'loading' && <p role="status" className="py-8 text-center text-sm text-muted-foreground">Opening…</p>}
