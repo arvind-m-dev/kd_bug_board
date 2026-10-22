@@ -10,7 +10,7 @@ import type { z } from 'zod';
 /** The only file that talks to the bucket. The SDK is imported lazily so no other server function pays for it. */
 const REQUIRED = ['MEDIA_S3_ENDPOINT', 'MEDIA_S3_BUCKET', 'MEDIA_S3_ACCESS_KEY_ID', 'MEDIA_S3_SECRET_ACCESS_KEY'] as const;
 type Config = { endpoint: string; bucket: string; region: string; forcePathStyle: boolean; accessKeyId: string; secretAccessKey: string };
-/** The bucket from the environment ("default"), if all four variables are set. */
+/** The hosting bucket from the environment (source 'default'): a fallback when Admin has not saved a workspace bucket. */
 function envConfig(): { config: Config | null; missing: string[] } {
   const env = (k: string) => (process.env[k] ?? '').trim();
   const missing = REQUIRED.filter(k => !env(k));
@@ -262,7 +262,7 @@ export async function mediaStatus(test: boolean): Promise<MediaStatus> {
     return { ...again, test: { ok: true, ms: Date.now() - started, message: `Bucket ${config.bucket} answered in ${Date.now() - started} ms.` } };
   } catch (e) { return { ...base, test: { ok: false, ms: Date.now() - started, message: (e as Error).message } }; }
 }
-/** Settings → Media storage: use the default bucket, or save Admin's own bucket (secret encrypted at rest), then test it. */
+/** Settings → Media storage: save the workspace bucket (secret encrypted at rest) and test it, or fall back to the hosting bucket. */
 export async function saveMediaStorage(data: z.infer<typeof mediaStorageSchema>): Promise<MediaStatus> {
   checkOrigin(); const admin = await requireAdmin(); const current = await storedChoice();
   let next: Stored;
@@ -278,7 +278,7 @@ export async function saveMediaStorage(data: z.infer<typeof mediaStorageSchema>)
   }
   await neonExecute([
     { query: `insert into bugflow.settings(key,value) values('media_storage',$1::jsonb) on conflict (key) do update set value=excluded.value`, params: [JSON.stringify(next)] },
-    { query: `insert into bugflow.activity(id,actor_id,action,detail) values($1,$2,'settings.media_storage',$3::jsonb)`, params: [crypto.randomUUID(), admin.userId, JSON.stringify(next.source === 'custom' ? { source: 'own bucket', bucket: next.custom!.bucket, provider: providerName(next.custom!.endpoint) } : { source: 'default bucket' })] },
+    { query: `insert into bugflow.activity(id,actor_id,action,detail) values($1,$2,'settings.media_storage',$3::jsonb)`, params: [crypto.randomUUID(), admin.userId, JSON.stringify(next.source === 'custom' ? { source: 'workspace bucket', bucket: next.custom!.bucket, provider: providerName(next.custom!.endpoint) } : { source: 'hosting bucket' })] },
   ]);
   forgetMediaConfig();
   return mediaStatus(true);

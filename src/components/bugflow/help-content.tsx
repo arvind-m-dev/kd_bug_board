@@ -58,7 +58,7 @@ function MediaGuide({ audience }: { audience: 'admin' | 'portal' }) {
       <h3>Attachments &amp; media</h3>
       {audience === 'admin' ? <ol>
         <li><strong>Get a bucket</strong> (5 minutes, free): Cloudflare R2 → Create bucket (private) → Manage R2 API Tokens → Object Read &amp; Write for that bucket. Copy the endpoint, Access Key ID and Secret.</li>
-        <li><strong>Paste them</strong> into Settings → Media storage → <em>My own bucket</em> (provider, endpoint, bucket, key, secret) and press <em>Save &amp; test</em>. The secret is stored encrypted and never shown again.</li>
+        <li><strong>Paste them</strong> into Settings → Media storage → <em>Workspace bucket</em> (provider, endpoint, bucket, key, secret) and press <em>Save &amp; test</em>. That bucket is the default for every portal. The secret is stored encrypted and never shown again.</li>
         <li><strong>Add the CORS rule</strong> shown in the setup guide to the bucket, so browsers can upload and read.</li>
         <li><strong>Clean-up</strong>: on the same card choose when files on resolved bugs are removed (never / 7 / 30 / 90 days), or remove them now. On any closed bug you can also press <em>Remove all files</em>.</li>
       </ol> : <ol>
