@@ -2,7 +2,7 @@ import { Link, useRouterState, useNavigate } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { useEffect, useState } from 'react';
-import { Bug, ChartPie, LayoutDashboard, UsersRound, ListChecks, FolderKanban, Activity, Settings2, Search, Menu, X, ArrowUpRight, ShieldCheck, Database, CircleHelp, ClipboardCheck, Link2, Plus, Copy, FileDown, RefreshCw, Upload, LockKeyhole, Layers3, Archive, ArchiveRestore, Printer, Palette, ArrowLeft } from 'lucide-react';
+import { Bug, ChartPie, LayoutDashboard, UsersRound, ListChecks, FolderKanban, Activity, Settings2, Search, Menu, X, ArrowUpRight, ShieldCheck, Database, CircleHelp, ClipboardCheck, Link2, Plus, Copy, FileDown, RefreshCw, Upload, LockKeyhole, Layers3, Archive, ArchiveRestore, Printer, Palette, ArrowLeft, FileSpreadsheet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +33,7 @@ import { ACTIVITY_CATEGORIES, ACTIVITY_PERIODS, changeText, viaLabel, type Activ
 import { viewerTimeZone } from '@/lib/period';
 import { toCsv, downloadText, exportName } from '@/lib/export';
 import { HelpContent } from './help-content';
+import { SheetExportLoader } from './bug-sheet-export';
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 
 type View = 'overview'|'bugs'|'users'|'assignments'|'projects'|'activity'|'reports'|'settings'|'appearance'|'notifications';
@@ -71,7 +72,7 @@ export function Workspace({view='overview'}:{view?:View}) {
    <div className="flex items-center gap-10 border-t pt-4"><div className="flex items-center gap-9"><div className="flex items-center gap-3"><span className="bf-avatar">BF</span><div><strong className="block text-xs">Team administration</strong><span className="text-[11.5px] text-muted-foreground">Private access</span></div></div></div><ShieldCheck size={15} className="ml-auto text-muted-foreground"/></div></div>
   </aside>
   <div className="bf-body"><header className="bf-topbar"><div className="bf-topbar-left"><Button variant="ghost" size="icon" className="bf-mobile-menu" aria-label={menu?'Close navigation':'Open navigation'} onClick={()=>setMenu(!menu)}>{menu?<X/>:<Menu/>}</Button><Breadcrumb data-ui="breadcrumb"><BreadcrumbList className="text-xs"><BreadcrumbItem><BreadcrumbLink asChild><Link to="/admin">Workspace</Link></BreadcrumbLink></BreadcrumbItem><BreadcrumbSeparator/><BreadcrumbItem><BreadcrumbPage>{titles[view]}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb></div><div className="bf-topbar-right"><ThemeToggle/><Button size="icon" variant="ghost" aria-label="Search workspace" title="Search workspace (⌘K)" onClick={()=>setDialog('search')}><Search size={17}/></Button><NotificationMenu/><span className="h-5 border-l"/><SignOutButton/></div></header>
-  <main className="bf-main"><div className="bf-page-heading"><div><h1>{titles[view]}</h1><p>{subtitles[view]}</p></div><div className="bf-page-actions">{view==='users'?<Button size="sm" onClick={()=>setDialog('user')}><Plus/>Add member</Button>:view==='projects'?<Button size="sm" onClick={()=>setDialog('project')}><Plus/>New project</Button>:view==='activity'?<>{print}<Button size="sm" variant="outline" onClick={()=>setDialog('export')}><FileDown/>Export report</Button></>:view==='reports'||view==='overview'?print:view==='appearance'?<Button asChild size="sm" variant="outline"><Link to="/admin/settings"><ArrowLeft/>Back to Settings</Link></Button>:null}</div></div>
+  <main className="bf-main"><div className="bf-page-heading"><div><h1>{titles[view]}</h1><p>{subtitles[view]}</p></div><div className="bf-page-actions">{view==='bugs'?<Button size="sm" variant="outline" onClick={()=>setDialog('sheet')}><FileSpreadsheet/>Export sheet</Button>:view==='users'?<Button size="sm" onClick={()=>setDialog('user')}><Plus/>Add member</Button>:view==='projects'?<Button size="sm" onClick={()=>setDialog('project')}><Plus/>New project</Button>:view==='activity'?<>{print}<Button size="sm" variant="outline" onClick={()=>setDialog('export')}><FileDown/>Export report</Button></>:view==='reports'||view==='overview'?print:view==='appearance'?<Button asChild size="sm" variant="outline"><Link to="/admin/settings"><ArrowLeft/>Back to Settings</Link></Button>:null}</div></div>
   <AdminAccess showAccount={false}>
    {view==='overview'?<DashboardSummary/>:view==='bugs'?<AdminBugs/>:view==='users'?<UsersView/>:view==='assignments'?<AdminBugs assignmentsOnly/>:view==='projects'?<ProjectsView onDialog={setDialog}/>:view==='activity'?<ActivityView/>:view==='reports'?<TeamReports/>:view==='settings'?<SettingsView onAddMember={()=>setDialog('user')}/>:view==='appearance'?<div className="bf-settings"><AppearanceSettings/></div>:<NotificationsPage/>}
   </AdminAccess><footer className="bf-footer"><span>Futurist Global Bug Board <span className="mx-1">·</span> Every bug. One place.</span><span className="flex items-center gap-2"><ShieldCheck size={12}/>Private portals · Shared records</span></footer></main></div>
@@ -107,12 +108,13 @@ function SettingsView({onAddMember}:{onAddMember:()=>void}){return <div classNam
   <div className="bf-panel"><div className="bf-panel-heading"><h2>Workflow defaults</h2><span className="bf-tag">READ ONLY</span></div><div className="bf-setting-row"><Bug size={21} className="text-primary"/><div><h3>Permanent bug IDs</h3><p>BF-000001 · generated safely on submission and never reused.</p></div></div><div className="bf-setting-row"><ClipboardCheck size={21} className="text-info"/><div><h3>QA-controlled resolution</h3><p>New → validation → assignment → in progress → recheck → resolved. Only successful QA verification resolves a fix.</p></div></div><div className="bf-setting-row"><Upload size={21} className="text-primary"/><div><h3>Private evidence retention</h3><p>Evidence is retained after resolution. Deletion is manual, confirmed, and audited.</p></div></div></div></div>;
 }
 function WorkspaceDialog({kind,close}:{kind:string|null;close:()=>void}) {
- const title=kind==='user'?'Create a portal':kind==='project'?'New project':kind==='export'?'Export activity report':kind==='search'?'Search workspace':'Help & support';
- const description=kind==='user'?'Set up a person and their restricted workspace.':kind==='project'?'Organize bugs by application and module.':kind==='export'?'Download or copy the change history for a period.':kind==='search'?'Find a bug or a team member anywhere in the workspace.':'How the Futurist Global Bug Board works';
+ const title=kind==='user'?'Create a portal':kind==='project'?'New project':kind==='export'?'Export activity report':kind==='sheet'?'Export bugs as a sheet':kind==='search'?'Search workspace':'Help & support';
+ const description=kind==='user'?'Set up a person and their restricted workspace.':kind==='project'?'Organize bugs by application and module.':kind==='sheet'?'An .xlsx in the team\'s bug sheet layout, with colours, dropdowns and links.':kind==='export'?'Download or copy the change history for a period.':kind==='search'?'Find a bug or a team member anywhere in the workspace.':'How the Futurist Global Bug Board works';
  return <Dialog open={kind!==null} onOpenChange={o=>{if(!o)close();}}><DialogContent className="max-h-[85vh] overflow-y-auto"><DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader>
  {kind==='user'?<AdminAccess showAccount={false}><CollaboratorOnboarding/></AdminAccess>
  :kind==='project'?<NewProjectForm close={close}/>
  :kind==='export'?<ActivityExport close={close}/>
+ :kind==='sheet'?<SheetExportLoader access={{kind:'admin'}} close={close}/>
  :kind==='search'?<QuickSearch close={close}/>
  :<HelpContent audience="admin" onNavigate={close}/>}
  </DialogContent></Dialog>;
@@ -181,3 +183,4 @@ function AppearanceLinkCard(){
  const {workspace}=useTheme();const style=styleById(workspace.style);const palette=workspace.palette==='custom'?`Custom ${workspace.accent??''}`.trim():paletteById(workspace.palette).name;
  return <div className="bf-panel mb-6"><div className="bf-setting-row"><span className="bf-stat-icon bf-tone-info"><Palette size={19}/></span><div><h3>Appearance &amp; themes</h3><p>Colour palette, style (including the seasonal ones), fonts, shape, motion and what is shown. Save for the main panel or for every portal.<br/>In use: <strong>{style.name}</strong> · {palette}{workspace.membersMayCustomize?' · members may choose their own theme':''}</p></div><Button asChild size="sm" className="bf-studio-cta"><Link to="/admin/settings/appearance"><Palette/>Open Theme Studio</Link></Button></div></div>;
 }
+

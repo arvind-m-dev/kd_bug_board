@@ -1,7 +1,7 @@
 import { neonQuery, neonExecute } from './neon.server';
 import { requireAdmin, checkOrigin } from './portal-access.server';
 import { hashToken } from './portal-access';
-import { formatBugCode, statusPath, mayUpdateStatus, mayVerify, type BugAccess, type BugActor, type LiveBug, type BugWorkspaceData, type BugChange, type reportSchema, type BugEdit, mayEditBug, cleanOptions, type DropdownOptions } from './bug-workflow';
+import { formatBugCode, statusPath, mayUpdateStatus, mayVerify, type BugAccess, type BugActor, type LiveBug, type BugWorkspaceData, type BugChange, type reportSchema, type BugEdit, mayEditBug, cleanOptions, type DropdownOptions,type ExportBug} from './bug-workflow';
 import type { z } from 'zod';
 import type { Status } from './bugflow';
 
@@ -83,4 +83,14 @@ export async function deleteBugReport(id:string,reason:string){
  if(!results[0]?.rows.length)throw new Error('This bug was already deleted.');
  await (await import('./bug-media.server')).deleteAllMedia(id,admin.userId).catch(()=>undefined);
  return {deleted:true};
+}
+
+/** Every bug in the actor's scope (newest first, up to 2000) with the latest developer and QA comment and the ids of its attachments — for the spreadsheet export. */
+export async function exportBugs(access:BugAccess,filter:{projectId:string|null;includeClosed:boolean}):Promise<ExportBug[]>{
+ const actor=await actorFor(access);if(!actor.permissions.includes('view'))throw new Error('This portal does not have permission to view bugs.');
+ const params:unknown[]=[actor.portalId,actor.userId,actor.role==='qa'||actor.permissions.includes('view_all'),filter.projectId];
+ const closed=filter.includeClosed?'':" and b.status not in ('RESOLVED','DUPLICATE','NOT_A_BUG','WONT_FIX')";
+ const comment=(types:string)=>`(select c.content from bugflow.comments c where c.bug_id=b.id and exists(select 1 from bugflow.portals px where px.user_id=c.actor_id and px.type in (${types})) order by c.created_at desc limit 1)`;
+ const {rows}=await neonQuery(`select ${columns},${comment("'developer'")} as dev_comment,${comment("'qa','admin'")} as qa_comment,coalesce((select jsonb_agg(m.id order by m.created_at) from bugflow.bug_media m where m.bug_id=b.id and m.status='ready' and m.deleted_at is null),'[]'::jsonb) as media_ids ${joins} where ${scope(actor)} and ($4::uuid is null or b.project_id=$4::uuid)${closed} order by b.created_at,b.id limit 2000`,params);
+ return rows.map(r=>({...parseBug(r,actor.permissions.includes('evidence')),devComment:r['dev_comment']==null?'':String(r['dev_comment']),qaComment:r['qa_comment']==null?'':String(r['qa_comment']),mediaIds:Array.isArray(r['media_ids'])?(r['media_ids'] as unknown[]).map(String):[]}));
 }

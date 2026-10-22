@@ -33,6 +33,8 @@ export const DEFAULT_DEVICES=['Chrome · Desktop','Safari · Desktop','Firefox �
 export const DEFAULT_OPTIONS:DropdownOptions={modules:[],environments:['Development','Staging','Production'],devices:DEFAULT_DEVICES,severities:DEFAULT_SEVERITIES};
 export function cleanOptions(v:unknown):DropdownOptions{const r=optionsSchema.safeParse(v);if(!r.success)return DEFAULT_OPTIONS;const u=(a:string[])=>[...new Set(a)];const severities=u(r.data.severities);return {modules:u(r.data.modules),environments:u(r.data.environments),devices:u(r.data.devices),severities:severities.length?severities:DEFAULT_SEVERITIES};}
 export type BugActor = {userId:string;portalId:string;name:string;role:Role;permissions:string[]};
+/** A bug as exported to a spreadsheet: the live bug plus the latest comments and attachment ids. */
+export type ExportBug = LiveBug & {devComment:string;qaComment:string;mediaIds:string[]};
 export type LiveBug = {id:string;code:string;title:string;projectId:string;project:string;reporterId:string;reporter:string;assigneeId:string|null;assignee:string;assignees?:{id:string;name:string}[];status:Status;priority:string;severity:string;description:string;expected:string;actual:string;browserDevice:string;environment:string;fixNotes:string;createdAt:string;updatedAt:string;version:string;steps:string[];evidenceUrls:string[];module:string;lastChange:LastChange;statusNote?:StatusNote};
 /** The reason recorded when the bug moved into its current status (e.g. why it was reopened). */
 export type StatusNote = {by:string;at:string;notes:string}|null;

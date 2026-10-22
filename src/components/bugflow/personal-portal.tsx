@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { useNavigate } from '@tanstack/react-router';
-import { Bug, ShieldCheck, LockKeyhole, Menu, X, CircleHelp, FolderKanban, CalendarDays, Hash, CircleCheck, CircleMinus, Palette, Images, type LucideIcon } from 'lucide-react';
+import { Bug, ShieldCheck, LockKeyhole, Menu, X, CircleHelp, FolderKanban, CalendarDays, Hash, CircleCheck, CircleMinus, Palette, Images, FileSpreadsheet, type LucideIcon } from 'lucide-react';
 import { MediaLibrary } from './media-library';
+import { SheetExportLoader } from './bug-sheet-export';
 import { rememberPortal } from './media-link';
 import { ThemeToggle, useTheme } from './theme-toggle';
 import { ThemeStudio } from './appearance-settings';
@@ -29,7 +30,7 @@ const TABS:{id:Tab;label:string;icon:LucideIcon}[]=[{id:'bugs',label:'My bugs',i
 
 export function PersonalPortal({token,type}:{token:string;type:'reporter'|'qa'|'developer'|'member'}){
  const client=useQueryClient();const acknowledge=useServerFn(dismissWelcome);const welcome=useMutation({mutationFn:acknowledge,onSuccess:()=>client.invalidateQueries({queryKey:['personal-portal']})});const read=useServerFn(getMemberPortal);
- const [tab,setTab]=useState<Tab>('bugs');const [menu,setMenu]=useState(false);const [focus,setFocus]=useState<Focus>({filter:'all',label:'All bugs'});
+ const [tab,setTab]=useState<Tab>('bugs');const [sheet,setSheet]=useState(false);const [menu,setMenu]=useState(false);const [focus,setFocus]=useState<Focus>({filter:'all',label:'All bugs'});
  const navigate=useNavigate();
  // Retry transient failures; a missing portal (null) is final and is not retried.
  const portal=useQuery({queryKey:['personal-portal',type,token],queryFn:()=>read({data:{token,type}}),retry:2,retryDelay:n=>1000*2**n,refetchOnWindowFocus:true,refetchInterval:45000,refetchIntervalInBackground:true,staleTime:0,gcTime:0});
@@ -62,7 +63,7 @@ export function PersonalPortal({token,type}:{token:string;type:'reporter'|'qa'|'
      <div><span className="bf-portal-role">{role}{p.scope?` · ${p.scope}`:''}</span><h1>Hi {first}</h1><p>{roleGuide(p.role)}</p></div>
      <dl className="bf-portal-meta"><div><dt><Hash size={12}/>Member ID</dt><dd className="font-mono">{p.memberCode}</dd></div><div><dt><CalendarDays size={12}/>Member since</dt><dd>{new Date(p.since).toLocaleDateString('en-GB',{dateStyle:'medium'})}</dd></div><div><dt><ShieldCheck size={12}/>Permissions</dt><dd>{p.permissions.length}</dd></div></dl>
     </section>
-    {tab==='bugs'&&<><PortalFocus access={access} role={p.role} permissions={p.permissions} focus={focus.filter} onFocus={setFocus}/><BugWorkspace key={focus.filter} access={access} initialFilter={focus.filter} initialFilterLabel={focus.label}/></>}
+    {tab==='bugs'&&<><div className="mb-3 flex justify-end"><Button size="sm" variant="outline" onClick={()=>setSheet(true)}><FileSpreadsheet/>Export sheet</Button></div><Dialog open={sheet} onOpenChange={setSheet}><DialogContent><DialogHeader><DialogTitle>Export my bugs as a sheet</DialogTitle><DialogDescription>An .xlsx in the team's bug sheet layout, with colours, dropdowns and links. Only bugs you can see are included.</DialogDescription></DialogHeader><SheetExportLoader access={access} close={()=>setSheet(false)}/></DialogContent></Dialog><PortalFocus access={access} role={p.role} permissions={p.permissions} focus={focus.filter} onFocus={setFocus}/><BugWorkspace key={focus.filter} access={access} initialFilter={focus.filter} initialFilterLabel={focus.label}/></>}
     {tab==='media'&&<MediaLibrary access={access}/>}
     {tab==='access'&&<AccessPanel role={p.role} granted={p.permissions} scope={p.scope}/>}
     {tab==='theme'&&<div className="bf-panel p-5"><ThemeStudio scope="portal" token={token} type={type}/></div>}
