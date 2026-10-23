@@ -111,7 +111,8 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
   }
   // A gnarled side tree is the bats' actual home, with branch-tip roosts in local space.
   const hauntedTree = new T.Group();
-  const roosts = [new T.Vector3(-86, 226, 7), new T.Vector3(-46, 170, 12)];
+  // Points that lie on the branches drawn below, so up to twelve bats each get their own perch.
+  const roosts = [[-86, 226, 7], [-46, 170, 12], [-107, 235, 6], [-89, 198, 8], [-66, 179, 10], [-79, 165, 9], [-47, 252, 8], [-53, 283, 6], [21, 258, 8], [30, 237, 9], [-24, 289, 10], [-40, 232, 9]].map(([x, y, z]) => new T.Vector3(x!, y!, z!));
   if (season === 'halloween') {
     const wood = mat(0x674439, .86);
     const branch = (points: number[][], radius: number) => {
@@ -260,7 +261,7 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
     }
     for (let i = 0; i < knobs.bats; i++) creatures.push(bat(i));
   }
-  creatures.forEach((c, i) => { c.motion = { phase: c.kind === 'bug' ? 'crawl' : 'rest', until: c.kind === 'bat' && c.n % 2 ? random(.2, 2) : random(5, 13) + i, retarget: 0, surface: i, distance: random(0, 500), direction: chance() < .5 ? -1 : 1, velocity: new T.Vector3(), target: new T.Vector3(), homeKind: i < 7 ? -1 : Math.floor(random(0, 12)), seed: random(0, 100) }; });
+  creatures.forEach((c, i) => { c.motion = { phase: c.kind === 'bug' ? 'crawl' : 'rest', until: c.kind === 'bat' && c.n % 2 ? random(.2, 2) : random(5, 13) + c.n, retarget: 0, surface: i, distance: random(0, 500), direction: chance() < .5 ? -1 : 1, velocity: new T.Vector3(), target: new T.Vector3(), homeKind: -1, seed: random(0, 100) }; });
   const sleigh = new T.Group(), santaWave = new T.Group(), deerLegs: T.Group[] = [], deerHeads: T.Group[] = [];
   if (season === 'christmas') {
     const santa = new T.Group(); santa.position.set(-90, 0, 0);
@@ -315,14 +316,15 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
   const dummy = new T.Object3D();
   let width = innerWidth, height = innerHeight, edges: LandingEdge[] = [], rects: DOMRect[] = [];
   let sidebarRight = 236, headerBottom = 65;
-  let measured = -Infinity, time = 0, last = 0, frame = 0, disposed = false;
+  let measured = -Infinity, time = 0, last = 0, frame = 0, disposed = false, contextLost = false;
+  let dirty = true, paintedKey = '', lastPaint = 0;
   let pointer = { x: -1000, y: -1000 };
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const resize = () => {
-    width = innerWidth; height = innerHeight; camera.right = width; camera.top = height; camera.updateProjectionMatrix(); renderer.setSize(width, height); measured = -Infinity;
+    width = innerWidth; height = innerHeight; camera.right = width; camera.top = height; camera.updateProjectionMatrix(); renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); renderer.setSize(width, height); measured = -Infinity; dirty = true;
   };
-  const invalidate = () => { measured = -Infinity; };
-  const move = (e: PointerEvent) => { pointer = { x: e.clientX, y: e.clientY }; };
+  const invalidate = () => { measured = -Infinity; dirty = true; };
+  const move = (e: PointerEvent) => { pointer = { x: e.clientX, y: e.clientY }; dirty = true; };
   const down = (event: PointerEvent) => {
     // React to a click through the canvas without intercepting the real control underneath it.
     for (const c of creatures) {
@@ -376,7 +378,7 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
     m.retarget = time + 8;
   }
   function draw(now: number) {
-    if (disposed) return;
+    if (disposed || contextLost) return;
     frame = requestAnimationFrame(draw);
     if (document.hidden) { last = now; return; }
     if (now - last < (lively && !reduced.matches ? 32 : 100)) return;
@@ -386,7 +388,13 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
     if (now - measured > 650) { measure(); measured = now; }
     const busy = !!document.getSelection()?.toString() || !!document.querySelector('[role="dialog"], [role="alertdialog"], [role="listbox"]');
     host.style.opacity = busy ? '0' : '1';
-    if (busy) return;
+    if (busy) { dirty = true; return; }
+    if (!moving) {
+      // Nothing animates: repaint only after a resize, scroll, pointer move or layout change.
+      const key = `${width}x${height}:${Math.round(headerBottom)}:${Math.round(sidebarRight)}`;
+      if (!dirty && key === paintedKey && now - lastPaint < 5000) return;
+      dirty = false; paintedKey = key; lastPaint = now;
+    }
     groves.forEach((g, i) => {
       g.position.set(width - 55, 0, 0); g.scale.setScalar(width < 760 ? .55 : 1);
       g.rotation.z = moving ? Math.sin(time * .8 + i) * .018 : 0;
@@ -422,6 +430,12 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
       c.root.visible = !compact || c.n === 0;
       if (c.kind === 'bug') {
         const m = c.motion!;
+        if (!moving) {
+          // Still scenes: beetles rest in a row at the foot of the tree and pumpkins instead of sitting on card borders over text.
+          const sz = knobs.bugSize; c.root.position.set(width - 70 * sz - c.n * 28 * sz, 12 * sz, 20); c.root.rotation.set(0, 0, Math.PI / 2 + (c.n % 2 ? .25 : -.2));
+          c.wings?.forEach(w => { w.visible = false; });
+          return;
+        }
         if (m.phase === 'crawl') {
           const point = crawlerPoint(c);
           if (!point) { c.root.visible = false; return; }
@@ -441,17 +455,14 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
         const drop = 48 + (moving ? (Math.sin(time * .35 + j * 2) + 1) * 48 : j * 28);
         c.root.position.set(x + Math.sin(time * 1.2 + j) * 7, height - headerBottom - drop, 24);
         c.root.rotation.z = Math.sin(time * 1.2 + j) * .08;
+        if (!moving && j >= 2) c.root.visible = false; // spiders three and four hang mid-page, so they only appear while moving
         const sway = c.root.position.x - x;
         c.thread!.position.set(x + sway / 2, height - headerBottom - drop / 2, 23); c.thread!.scale.y = Math.hypot(drop, sway); c.thread!.rotation.z = Math.atan2(sway, drop); c.thread!.visible = c.root.visible;
       } else {
         const j = c.n, m = c.motion!;
         const scale = (width < 760 ? .46 : .65) + (m.seed % 30) / 100;
-        let perch: T.Vector3;
-        if (m.homeKind < 0) perch = hauntedTree.localToWorld(roosts[j % roosts.length]!.clone());
-        else {
-          const r = rects[m.homeKind % Math.max(1, rects.length)];
-          perch = r ? new T.Vector3(r.left + Math.min(r.width - 24, 25 + m.seed / 100 * Math.max(1, r.width - 50)), height - r.top, 25) : new T.Vector3(sidebarRight + 80 + j * 75, height - headerBottom, 25);
-        }
+        // Bats only ever rest on the haunted tree, so a resting bat never covers card or table text; flights cross the page briefly.
+        const perch = hauntedTree.localToWorld(roosts[j % roosts.length]!.clone());
         const home = perch.clone().add(new T.Vector3(0, -20 * scale, 7));
         c.root.visible = j < Math.min(knobs.bats, compact ? 3 : width < 1200 ? 7 : 12);
         c.root.scale.setScalar(scale);
@@ -461,12 +472,13 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
           c.limbs.forEach((wing, k) => { wing.rotation.y = (k ? -1 : 1) * (1.35 - Math.max(0, 1 - near / 180) * .4); wing.rotation.z = 0; });
           if (moving && (time > m.until || near < 100)) { m.phase = 'flight'; m.until = time + random(10, 20); m.retarget = 0; }
         } else {
-          if (m.phase === 'flight' && time > m.until) { m.phase = 'return'; m.homeKind = chance() < .35 ? -1 : Math.floor(chance() * Math.max(1, rects.length)); }
+          if (m.phase === 'flight' && time > m.until) m.phase = 'return';
           if (m.phase === 'return') m.target.copy(home);
           else if (time > m.retarget || c.root.position.distanceTo(m.target) < 40) {
             // Independent waypoints sometimes leave the viewport, then lead the bat back to a new roost.
             const outside = chance() < .35;
-            m.target.set(outside ? (chance() < .5 ? -100 : width + 100) : random(sidebarRight + 40, Math.max(sidebarRight + 50, width - 50)), random(90, Math.max(100, height - 90)), random(30, 75));
+            const anywhere = (min: number, max: number) => min + (max - min) * chance();
+            m.target.set(outside ? (chance() < .5 ? -100 : width + 100) : anywhere(sidebarRight + 40, Math.max(sidebarRight + 50, width - 50)), anywhere(90, Math.max(100, height - 90)), anywhere(30, 75));
             m.retarget = time + random(3, 6);
           }
           const distance = fly(c, dt, (m.phase === 'return' ? 80 : 110) + m.seed * .8);
@@ -499,13 +511,16 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
   resize();
   window.addEventListener('resize', resize); window.addEventListener('scroll', invalidate, true);
   window.addEventListener('pointermove', move, { passive: true }); window.addEventListener('pointerdown', down, { passive: true });
-  const lost = (e: Event) => { e.preventDefault(); host.dataset['ready'] = ''; host.style.display = 'none'; };
+  // Losing the GPU context shows the CSS scenery and pauses the loop; three.js rebuilds its state on restore and we resume.
+  const lost = (e: Event) => { e.preventDefault(); contextLost = true; cancelAnimationFrame(frame); host.dataset['ready'] = ''; host.style.display = 'none'; };
+  const restored = () => { if (disposed) return; contextLost = false; host.style.display = ''; host.dataset['ready'] = 'true'; measured = -Infinity; dirty = true; last = 0; frame = requestAnimationFrame(draw); };
   renderer.domElement.addEventListener('webglcontextlost', lost);
+  renderer.domElement.addEventListener('webglcontextrestored', restored);
   frame = requestAnimationFrame(draw);
   return () => {
     disposed = true; cancelAnimationFrame(frame);
     window.removeEventListener('resize', resize); window.removeEventListener('scroll', invalidate, true); window.removeEventListener('pointermove', move); window.removeEventListener('pointerdown', down);
-    renderer.domElement.removeEventListener('webglcontextlost', lost);
+    renderer.domElement.removeEventListener('webglcontextlost', lost); renderer.domElement.removeEventListener('webglcontextrestored', restored);
     shadowTexture.dispose(); geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); flakes.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
   };
 }

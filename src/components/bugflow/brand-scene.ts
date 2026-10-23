@@ -30,12 +30,13 @@ export function createBrandScene(host: HTMLElement, motion: string) {
   }
   host.append(renderer.domElement);
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  let frame = 0, last = 0, pitch = -.15, yaw = -.3;
+  let frame = 0, last = 0, pitch = -.15, yaw = -.3, settled = false;
   const move = (e: PointerEvent) => { const r = host.getBoundingClientRect(); const x = e.clientX - r.left - r.width / 2, y = e.clientY - r.top - r.height / 2; if (Math.hypot(x, y) < 140) { yaw = Math.max(-.7, Math.min(.7, x / 120)); pitch = Math.max(-.5, Math.min(.5, y / 160)); } else { yaw = -.3; pitch = -.15; } };
   const draw = (now: number) => {
     frame = requestAnimationFrame(draw);
     if (document.hidden || now - last < 45) return; last = now;
     const moving = motion !== 'off' && !reduced.matches;
+    if (!moving && Math.abs(-.3 - model.rotation.y) < 1e-4 && Math.abs(-.15 - model.rotation.x) < 1e-4) { if (settled) return; settled = true; } else settled = false;
     model.rotation.y += ((moving ? yaw + Math.sin(now / 1900) * .08 : -.3) - model.rotation.y) * .12;
     model.rotation.x += ((moving ? pitch : -.15) - model.rotation.x) * .12;
     legs.forEach((leg, i) => { leg.position.z = moving && motion === 'lively' ? Math.sin(now / 120 + i * Math.PI) * .6 : 0; });

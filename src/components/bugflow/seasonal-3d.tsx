@@ -22,7 +22,6 @@ export function Seasonal3D({ season, lively, scene }: { season: string; lively: 
     if (!target) return;
     let cancelled = false;
     let dispose: (() => void) | undefined;
-    setAvailable(false);
     import('./seasonal-scene').then(({ createSeasonalScene }) => {
       if (cancelled) return;
       try {
@@ -30,7 +29,7 @@ export function Seasonal3D({ season, lively, scene }: { season: string; lively: 
         setAvailable(true);
       } catch {
         // Existing CSS scenery remains available on devices without WebGL.
-        target.replaceChildren();
+        target.replaceChildren(); setAvailable(false);
       }
     }).catch(() => { /* keep the CSS fallback */ });
     return () => { cancelled = true; dispose?.(); };
