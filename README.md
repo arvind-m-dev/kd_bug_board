@@ -36,3 +36,17 @@ Schema changes live in versioned SQL files under [`database/`](database/), appli
 - `npm run dev` – dev server (loads `.env.local`)
 - `npm run build` – production build
 - `npm test` – unit tests
+
+## AI access (MCP)
+
+BugFlow is a [Model Context Protocol](https://modelcontextprotocol.io) server, so any MCP client (Claude Code, Claude.ai, Cursor, VS Code, ChatGPT) can read and report bugs.
+
+- **Endpoint**: `/api/mcp` (also `/mcp`), Streamable HTTP, stateless. CORS-open; the token is the credential.
+- **Auth**: a Bearer **AI token**. Each token belongs to one panel — the Admin panel or a member panel — and inherits exactly that panel's permissions and project scope, so an AI can never see or do more than that person. Tokens are stored only as a SHA-256 hash (`bugflow.ai_tokens`, migration `016`) and are revocable at any time.
+- **Create a token**: Admin in Settings → AI access (for the Admin panel or any member panel); a member in their portal → AI access tab (their own panel). The secret is shown once.
+- **Tools**: `whoami`, `list_projects`, `list_bugs`, `get_bug`, `report_bug`, `update_bug_status`, `comment_bug`, and `assign_bug` (panels with the assign permission). There is no delete tool.
+- **Connect from Claude Code**:
+  ```
+  claude mcp add --transport http bugflow https://<your-app>/api/mcp --header "Authorization: Bearer <token>"
+  ```
+  Cursor and VS Code take the same URL and header. No new environment variables are required.

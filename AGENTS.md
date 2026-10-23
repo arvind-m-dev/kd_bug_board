@@ -19,3 +19,5 @@
 - Shared report validation derives omitted titles and actual results from the submitted description; contextual facts remain empty to avoid invented data.
 - Expanded bug rows reuse the shared report presentation and scoped detail query; inline assignment uses the existing authorized audited mutation.
 - Settings uses the shared scoped workspace query for option and assignee management; member creation invalidates member, workspace and detail queries so eligible assignment choices refresh immediately.
+
+- An MCP server at `/api/mcp` lets any AI client read and report bugs using a Bearer AI token scoped to one panel (Admin or a member); tokens are hashed in `bugflow.ai_tokens`, resolved by the `'ai'` access kind through the same scoped server functions as the app, and `checkOrigin` no-ops outside the Start request runtime because MCP calls carry no cookie. No delete tool is exposed.
