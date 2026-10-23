@@ -1,10 +1,42 @@
-import { createServerFn } from '@tanstack/react-start';
-import { z } from 'zod';
-import { editMemberSchema,memberActionSchema } from './member-management';
-import { portalReadSchema } from './portal-access';
-import { portalAppearanceSchema } from './appearance';
-export const getMemberProfile=createServerFn({method:'POST'}).validator((v:unknown)=>z.object({id:z.string().uuid()}).strict().parse(v)).handler(async({data})=>{const s=await import('./member-management.server');const a=await import('./portal-access.server');return a.databaseCall(()=>s.memberProfile(data.id));});
-export const saveMemberProfile=createServerFn({method:'POST'}).validator((v:unknown)=>editMemberSchema.parse(v)).handler(async({data})=>{const s=await import('./member-management.server');const a=await import('./portal-access.server');return a.databaseCall(()=>s.editMember(data));});
-export const changeMember=createServerFn({method:'POST'}).validator((v:unknown)=>memberActionSchema.parse(v)).handler(async({data})=>{const s=await import('./member-management.server');const a=await import('./portal-access.server');return a.databaseCall(()=>s.memberAction(data));});
-export const dismissWelcome=createServerFn({method:'POST'}).validator((v:unknown)=>portalReadSchema.parse(v)).handler(async({data})=>{const s=await import('./member-management.server');const a=await import('./portal-access.server');return a.databaseCall(()=>s.acknowledgeWelcome(data));});
-export const savePortalAppearance=createServerFn({method:'POST'}).validator((v:unknown)=>portalReadSchema.extend({appearance:portalAppearanceSchema.nullable()}).strict().parse(v)).handler(async({data})=>{const s=await import('./member-management.server');const a=await import('./portal-access.server');return a.databaseCall(()=>s.savePortalAppearance(data));});
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { editMemberSchema, memberActionSchema } from "./member-management";
+import { portalReadSchema } from "./portal-access";
+import { portalAppearanceSchema } from "./appearance";
+export const getMemberProfile = createServerFn({ method: "POST" })
+  .validator((v: unknown) => z.object({ id: z.string().uuid() }).strict().parse(v))
+  .handler(async ({ data }) => {
+    const s = await import("./member-management.server");
+    const a = await import("./portal-access.server");
+    return a.databaseCall(() => s.memberProfile(data.id));
+  });
+export const saveMemberProfile = createServerFn({ method: "POST" })
+  .validator((v: unknown) => editMemberSchema.parse(v))
+  .handler(async ({ data }) => {
+    const s = await import("./member-management.server");
+    const a = await import("./portal-access.server");
+    return a.databaseCall(() => s.editMember(data));
+  });
+export const changeMember = createServerFn({ method: "POST" })
+  .validator((v: unknown) => memberActionSchema.parse(v))
+  .handler(async ({ data }) => {
+    const s = await import("./member-management.server");
+    const a = await import("./portal-access.server");
+    return a.databaseCall(() => s.memberAction(data));
+  });
+export const dismissWelcome = createServerFn({ method: "POST" })
+  .validator((v: unknown) => portalReadSchema.parse(v))
+  .handler(async ({ data }) => {
+    const s = await import("./member-management.server");
+    const a = await import("./portal-access.server");
+    return a.databaseCall(() => s.acknowledgeWelcome(data));
+  });
+export const savePortalAppearance = createServerFn({ method: "POST" })
+  .validator((v: unknown) =>
+    portalReadSchema.extend({ appearance: portalAppearanceSchema.nullable() }).strict().parse(v),
+  )
+  .handler(async ({ data }) => {
+    const s = await import("./member-management.server");
+    const a = await import("./portal-access.server");
+    return a.databaseCall(() => s.savePortalAppearance(data));
+  });

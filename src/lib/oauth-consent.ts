@@ -1,8 +1,18 @@
 /** Self-contained consent page for the OAuth authorize step. No app bundle: inline HTML/CSS/JS, dark by default, escapes all input. */
-const esc = (v: string) => v.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-export function consentPage(p: { clientName: string; params: Record<string, string>; error?: string }) {
-  const hidden = Object.entries(p.params).map(([k, v]) => `<input type="hidden" name="${esc(k)}" value="${esc(v)}">`).join('');
-  const who = p.clientName ? esc(p.clientName) : 'An AI client';
+const esc = (v: string) =>
+  v.replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
+  );
+export function consentPage(p: {
+  clientName: string;
+  params: Record<string, string>;
+  error?: string;
+}) {
+  const hidden = Object.entries(p.params)
+    .map(([k, v]) => `<input type="hidden" name="${esc(k)}" value="${esc(v)}">`)
+    .join("");
+  const who = p.clientName ? esc(p.clientName) : "An AI client";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connect to Bug Board</title>
 <style>
 :root{color-scheme:dark;--bg:#13111c;--card:#1d1b2a;--line:#312e45;--fg:#eceaf5;--mut:#a7a3c0;--pri:#8b7cf6;--err:#f1707a}
@@ -19,7 +29,7 @@ button.go:hover{filter:brightness(1.08)}.err{background:color-mix(in oklab,var(-
 .hide{display:none}.foot{margin-top:16px;font-size:11.5px;color:var(--mut);text-align:center}
 </style></head><body><form class="card" method="post" action="/api/oauth/authorize">
 <h1>Connect to Bug Board</h1><p class="sub">${who} wants to read and report bugs on your behalf. Sign in to approve, or close this window to deny.</p>
-${p.error ? `<div class="err">${esc(p.error)}</div>` : ''}
+${p.error ? `<div class="err">${esc(p.error)}</div>` : ""}
 ${hidden}
 <div class="tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-m="admin">Admin</button><button type="button" role="tab" aria-selected="false" data-m="portal">Member portal</button></div>
 <input type="hidden" name="login_kind" value="admin">
@@ -39,5 +49,12 @@ document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function
 }
 /** Pulls the token+type out of a pasted portal URL like https://host/member/<64hex>. */
 export function parsePortalUrl(url: string): { token: string; type: string } | null {
-  try { const m = new URL(url.trim()).pathname.match(/^\/(reporter|qa|developer|member)\/([a-f0-9]{64})\/?$/); return m ? { type: m[1]!, token: m[2]! } : null; } catch { return null; }
+  try {
+    const m = new URL(url.trim()).pathname.match(
+      /^\/(reporter|qa|developer|member)\/([a-f0-9]{64})\/?$/,
+    );
+    return m ? { type: m[1]!, token: m[2]! } : null;
+  } catch {
+    return null;
+  }
 }

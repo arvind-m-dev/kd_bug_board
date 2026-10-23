@@ -1,63 +1,499 @@
-import { useEffect,useState } from 'react';
-import { useQuery,useQueryClient } from '@tanstack/react-query';
-import { useServerFn } from '@tanstack/react-start';
-import { Search,Copy,UserRound,RefreshCw,ExternalLink,Power,PowerOff,Trash2,Check,KeyRound } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription } from '@/components/ui/dialog';
-import { getMembers,manageMemberPortal } from '@/lib/portal-access.functions';
-import { changeMember } from '@/lib/member-management.functions';
-import { ErrorNotice,ConfirmAction,actionError } from './action-feedback';
-import { MemberProfile } from './member-profile';
-import { ThemedSelect } from './themed-select';
-import { toast } from 'sonner';
-import { refreshPeople } from '@/lib/refresh-people';
-import { Presence } from './presence';
-const PAGE=10;
-type Pending={id:string;name:string;action:'deactivate'|'activate'|'delete'};
-const copyText:Record<Pending['action'],{title:string;desc:string;label:string}>={deactivate:{title:'Deactivate member?',desc:'Their private portal stops working immediately. You can activate them again later.',label:'Deactivate'},activate:{title:'Activate member?',desc:'Their private portal link works again.',label:'Activate'},delete:{title:'Delete member?',desc:'The member is removed and their portal stops working. Bugs they reported or worked on keep their history.',label:'Delete member'}};
-export function MemberPortals({initialSearch=''}:{initialSearch?:string}={}){const fetch=useServerFn(getMembers);const change=useServerFn(changeMember);const client=useQueryClient();const members=useQuery({queryKey:['members'],queryFn:()=>fetch(),retry:false,staleTime:5000,refetchInterval:10000});const [search,setSearch]=useState(initialSearch);const [role,setRole]=useState('all');const [state,setState]=useState('all');const [id,setId]=useState<string|null>(null);const [error,setError]=useState('');const [page,setPage]=useState(0);const [pending,setPending]=useState<Pending|null>(null);
- const rows=(members.data??[]).filter(m=>(role==='all'||m.role===role)&&(state==='all'||(state==='active'?m.active:!m.active))&&`${m.name} ${m.email} ${m.id}`.toLowerCase().includes(search.toLowerCase()));
- const pageCount=Math.max(1,Math.ceil(rows.length/PAGE));const current=Math.min(page,pageCount-1);const visible=rows.slice(current*PAGE,current*PAGE+PAGE);
- async function portalPath(id:string){const r=await change({data:{id,action:'copy'}});return window.location.origin+r.path;}
- async function copyLink(id:string){setError('');try{await navigator.clipboard.writeText(await portalPath(id));toast.success('Private portal link copied');}catch(e){setError(actionError(e,'Portal link could not be copied.'));}}
- async function openPortal(id:string){setError('');const w=window.open('about:blank','_blank');if(w)w.opener=null;try{const url=new URL(await portalPath(id),window.location.origin).href;if(w)w.location.href=url;else toast('Your browser blocked the new tab',{description:'Use the link to open the portal.',action:{label:'Open portal',onClick:()=>{window.location.assign(url);}}});}catch(e){w?.close();setError(actionError(e,'Portal could not be opened.'));}}
- async function confirm(){if(!pending)return;
-  // Flip the row straight away; roll back if the server refuses.
-  type Row=NonNullable<typeof members.data>[number];const before=client.getQueryData<Row[]>(['members']);const on=pending.action==='activate';
-  if(before)client.setQueryData<Row[]>(['members'],pending.action==='delete'?before.filter(m=>m.id!==pending.id):before.map(m=>m.id===pending.id?{...m,userActive:on,active:on,online:on&&m.online}:m));
-  try{await change({data:{id:pending.id,action:pending.action}});}catch(e){if(before)client.setQueryData(['members'],before);throw e;}
-  await refreshPeople(client);toast.success(pending.action==='delete'?`${pending.name} deleted`:pending.action==='activate'?`${pending.name} activated`:`${pending.name} deactivated`);}
- const filter=(fn:(v:string)=>void)=>(v:string)=>{fn(v);setPage(0);};
- return <><div className="bf-toolbar"><div className="bf-search"><Search/><Input aria-label="Search users" placeholder="Search name, email or member ID…" value={search} onChange={e=>{setSearch(e.target.value);setPage(0);}}/></div>
- <ThemedSelect label="Filter by portal role" value={role} onChange={filter(setRole)} options={[{value:'all',label:'All roles'},{value:'tester',label:'Tester'},{value:'developer',label:'Developer'},{value:'qa',label:'QA'},{value:'other',label:'Other'}]}/>
- <ThemedSelect label="Filter by member access" value={state} onChange={filter(setState)} options={[{value:'all',label:'All access'},{value:'active',label:'Active'},{value:'inactive',label:'Inactive'}]}/>
- <Button variant="outline" size="icon" title="Refresh members" aria-label="Refresh members" onClick={()=>{void members.refetch();}}><RefreshCw className={members.isFetching?'animate-spin':''}/></Button></div>{error&&<ErrorNotice message={error}/>}
- <div className="bf-table-wrap bf-sticky-table rounded-md border"><table className="bf-table bf-member-table"><thead><tr>{['Member','Role','Access','Portal link','Actions'].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{visible.map(m=><tr key={m.id}><td><button type="button" className="flex items-center gap-3 text-left" onClick={()=>setId(m.id)} title={`Open ${m.name}’s profile`}><span className="bf-avatar">{m.name.slice(0,2).toUpperCase()}</span><span><strong className="bf-person-link block">{m.name}</strong><span className="block whitespace-nowrap font-mono text-[11.5px] text-muted-foreground" title={m.id}>ID · {m.id.slice(0,8)}<Presence className="ml-2" online={m.online} lastSeen={m.lastSeen}/></span></span></button></td><td>{m.role==='qa'?'QA':<span className="capitalize">{m.role}</span>}</td><td><span className="bf-status-pill" data-tone={m.active?'success':m.userActive?'warning':'neutral'}><span className="bf-dot"/>{!m.userActive?'Deactivated':m.active?'Active':'Revoked / expired'}</span></td>
- <td><div className="flex gap-1">{m.active&&m.copyable?<><Button variant="outline" size="sm" className="h-7 text-xs" onClick={()=>{void openPortal(m.id);}} aria-label={`Open portal for ${m.name}`}><ExternalLink size={13}/>Open</Button><Button variant="outline" size="sm" className="h-7 text-xs" onClick={()=>{void copyLink(m.id);}} aria-label={`Copy portal for ${m.name}`}><Copy size={13}/>Copy</Button></>:m.userActive?<ReplaceLinkButton id={m.id} name={m.name} label/>:<span className="px-2 text-xs text-muted-foreground">Unavailable</span>}</div></td>
- <td><div className="flex gap-1"><Button variant="ghost" size="icon" title="Open profile" aria-label={`Open profile for ${m.name}`} onClick={()=>setId(m.id)}><UserRound size={16}/></Button>{m.userActive&&<ReplaceLinkButton id={m.id} name={m.name}/>}{m.userActive?<Button variant="ghost" size="icon" title="Deactivate" aria-label={`Deactivate ${m.name}`} onClick={()=>setPending({id:m.id,name:m.name,action:'deactivate'})}><PowerOff size={16} className="text-warning"/></Button>:<Button variant="ghost" size="icon" title="Activate" aria-label={`Activate ${m.name}`} onClick={()=>setPending({id:m.id,name:m.name,action:'activate'})}><Power size={16} className="text-success"/></Button>}<Button variant="ghost" size="icon" title="Delete" aria-label={`Delete ${m.name}`} onClick={()=>setPending({id:m.id,name:m.name,action:'delete'})}><Trash2 size={16} className="text-destructive"/></Button></div></td></tr>)}</tbody></table>{members.isPending?<p className="p-8 text-sm">Loading members…</p>:members.isError?<ErrorNotice message="Members could not be loaded." onRetry={()=>{void members.refetch();}}/>:rows.length===0?<div className="bf-empty"><h3>No members found</h3></div>:null}</div>
- <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><span>Showing {rows.length?current*PAGE+1:0}–{Math.min(rows.length,(current+1)*PAGE)} of {rows.length} members</span><div className="flex items-center gap-2"><Button variant="outline" size="sm" disabled={current===0} onClick={()=>setPage(current-1)}>Previous</Button><span>Page {current+1} / {pageCount}</span><Button variant="outline" size="sm" disabled={current>=pageCount-1} onClick={()=>setPage(current+1)}>Next</Button></div></div>
- <ConfirmAction open={pending!==null} onOpenChange={o=>{if(!o)setPending(null);}} title={pending?copyText[pending.action].title:''} description={pending?`${pending.name}: ${copyText[pending.action].desc}`:''} confirmLabel={pending?copyText[pending.action].label:''} onConfirm={confirm} destructive={pending?.action==='delete'}/>
- <Dialog open={id!==null} onOpenChange={open=>{if(!open)setId(null);}}><DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto"><DialogHeader><DialogTitle>Member profile</DialogTitle><DialogDescription>Details, permissions and portal controls</DialogDescription></DialogHeader>{id&&<MemberProfile id={id} onDeleted={()=>setId(null)}/>}</DialogContent></Dialog></>;
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  Search,
+  Copy,
+  UserRound,
+  RefreshCw,
+  ExternalLink,
+  Power,
+  PowerOff,
+  Trash2,
+  Check,
+  KeyRound,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { getMembers, manageMemberPortal } from "@/lib/portal-access.functions";
+import { changeMember } from "@/lib/member-management.functions";
+import { ErrorNotice, ConfirmAction, actionError } from "./action-feedback";
+import { MemberProfile } from "./member-profile";
+import { ThemedSelect } from "./themed-select";
+import { toast } from "sonner";
+import { refreshPeople } from "@/lib/refresh-people";
+import { Presence } from "./presence";
+const PAGE = 10;
+type Pending = { id: string; name: string; action: "deactivate" | "activate" | "delete" };
+const copyText: Record<Pending["action"], { title: string; desc: string; label: string }> = {
+  deactivate: {
+    title: "Deactivate member?",
+    desc: "Their private portal stops working immediately. You can activate them again later.",
+    label: "Deactivate",
+  },
+  activate: {
+    title: "Activate member?",
+    desc: "Their private portal link works again.",
+    label: "Activate",
+  },
+  delete: {
+    title: "Delete member?",
+    desc: "The member is removed and their portal stops working. Bugs they reported or worked on keep their history.",
+    label: "Delete member",
+  },
+};
+export function MemberPortals({ initialSearch = "" }: { initialSearch?: string } = {}) {
+  const fetch = useServerFn(getMembers);
+  const change = useServerFn(changeMember);
+  const client = useQueryClient();
+  const members = useQuery({
+    queryKey: ["members"],
+    queryFn: () => fetch(),
+    retry: false,
+    staleTime: 5000,
+    refetchInterval: 10000,
+  });
+  const [search, setSearch] = useState(initialSearch);
+  const [role, setRole] = useState("all");
+  const [state, setState] = useState("all");
+  const [id, setId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [page, setPage] = useState(0);
+  const [pending, setPending] = useState<Pending | null>(null);
+  const rows = (members.data ?? []).filter(
+    (m) =>
+      (role === "all" || m.role === role) &&
+      (state === "all" || (state === "active" ? m.active : !m.active)) &&
+      `${m.name} ${m.email} ${m.id}`.toLowerCase().includes(search.toLowerCase()),
+  );
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE));
+  const current = Math.min(page, pageCount - 1);
+  const visible = rows.slice(current * PAGE, current * PAGE + PAGE);
+  async function portalPath(id: string) {
+    const r = await change({ data: { id, action: "copy" } });
+    return window.location.origin + r.path;
+  }
+  async function copyLink(id: string) {
+    setError("");
+    try {
+      await navigator.clipboard.writeText(await portalPath(id));
+      toast.success("Private portal link copied");
+    } catch (e) {
+      setError(actionError(e, "Portal link could not be copied."));
+    }
+  }
+  async function openPortal(id: string) {
+    setError("");
+    const w = window.open("about:blank", "_blank");
+    if (w) w.opener = null;
+    try {
+      const url = new URL(await portalPath(id), window.location.origin).href;
+      if (w) w.location.href = url;
+      else
+        toast("Your browser blocked the new tab", {
+          description: "Use the link to open the portal.",
+          action: {
+            label: "Open portal",
+            onClick: () => {
+              window.location.assign(url);
+            },
+          },
+        });
+    } catch (e) {
+      w?.close();
+      setError(actionError(e, "Portal could not be opened."));
+    }
+  }
+  async function confirm() {
+    if (!pending) return;
+    // Flip the row straight away; roll back if the server refuses.
+    type Row = NonNullable<typeof members.data>[number];
+    const before = client.getQueryData<Row[]>(["members"]);
+    const on = pending.action === "activate";
+    if (before)
+      client.setQueryData<Row[]>(
+        ["members"],
+        pending.action === "delete"
+          ? before.filter((m) => m.id !== pending.id)
+          : before.map((m) =>
+              m.id === pending.id
+                ? { ...m, userActive: on, active: on, online: on && m.online }
+                : m,
+            ),
+      );
+    try {
+      await change({ data: { id: pending.id, action: pending.action } });
+    } catch (e) {
+      if (before) client.setQueryData(["members"], before);
+      throw e;
+    }
+    await refreshPeople(client);
+    toast.success(
+      pending.action === "delete"
+        ? `${pending.name} deleted`
+        : pending.action === "activate"
+          ? `${pending.name} activated`
+          : `${pending.name} deactivated`,
+    );
+  }
+  const filter = (fn: (v: string) => void) => (v: string) => {
+    fn(v);
+    setPage(0);
+  };
+  return (
+    <>
+      <div className="bf-toolbar">
+        <div className="bf-search">
+          <Search />
+          <Input
+            aria-label="Search users"
+            placeholder="Search name, email or member ID…"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(0);
+            }}
+          />
+        </div>
+        <ThemedSelect
+          label="Filter by portal role"
+          value={role}
+          onChange={filter(setRole)}
+          options={[
+            { value: "all", label: "All roles" },
+            { value: "tester", label: "Tester" },
+            { value: "developer", label: "Developer" },
+            { value: "qa", label: "QA" },
+            { value: "other", label: "Other" },
+          ]}
+        />
+        <ThemedSelect
+          label="Filter by member access"
+          value={state}
+          onChange={filter(setState)}
+          options={[
+            { value: "all", label: "All access" },
+            { value: "active", label: "Active" },
+            { value: "inactive", label: "Inactive" },
+          ]}
+        />
+        <Button
+          variant="outline"
+          size="icon"
+          title="Refresh members"
+          aria-label="Refresh members"
+          onClick={() => {
+            void members.refetch();
+          }}
+        >
+          <RefreshCw className={members.isFetching ? "animate-spin" : ""} />
+        </Button>
+      </div>
+      {error && <ErrorNotice message={error} />}
+      <div className="bf-table-wrap bf-sticky-table rounded-md border">
+        <table className="bf-table bf-member-table">
+          <thead>
+            <tr>
+              {["Member", "Role", "Access", "Portal link", "Actions"].map((h) => (
+                <th key={h}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((m) => (
+              <tr key={m.id}>
+                <td>
+                  <button
+                    type="button"
+                    className="flex items-center gap-3 text-left"
+                    onClick={() => setId(m.id)}
+                    title={`Open ${m.name}’s profile`}
+                  >
+                    <span className="bf-avatar">{m.name.slice(0, 2).toUpperCase()}</span>
+                    <span>
+                      <strong className="bf-person-link block">{m.name}</strong>
+                      <span
+                        className="block whitespace-nowrap font-mono text-[11.5px] text-muted-foreground"
+                        title={m.id}
+                      >
+                        ID · {m.id.slice(0, 8)}
+                        <Presence className="ml-2" online={m.online} lastSeen={m.lastSeen} />
+                      </span>
+                    </span>
+                  </button>
+                </td>
+                <td>{m.role === "qa" ? "QA" : <span className="capitalize">{m.role}</span>}</td>
+                <td>
+                  <span
+                    className="bf-status-pill"
+                    data-tone={m.active ? "success" : m.userActive ? "warning" : "neutral"}
+                  >
+                    <span className="bf-dot" />
+                    {!m.userActive ? "Deactivated" : m.active ? "Active" : "Revoked / expired"}
+                  </span>
+                </td>
+                <td>
+                  <div className="flex gap-1">
+                    {m.active && m.copyable ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => {
+                            void openPortal(m.id);
+                          }}
+                          aria-label={`Open portal for ${m.name}`}
+                        >
+                          <ExternalLink size={13} />
+                          Open
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => {
+                            void copyLink(m.id);
+                          }}
+                          aria-label={`Copy portal for ${m.name}`}
+                        >
+                          <Copy size={13} />
+                          Copy
+                        </Button>
+                      </>
+                    ) : m.userActive ? (
+                      <ReplaceLinkButton id={m.id} name={m.name} label />
+                    ) : (
+                      <span className="px-2 text-xs text-muted-foreground">Unavailable</span>
+                    )}
+                  </div>
+                </td>
+                <td>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Open profile"
+                      aria-label={`Open profile for ${m.name}`}
+                      onClick={() => setId(m.id)}
+                    >
+                      <UserRound size={16} />
+                    </Button>
+                    {m.userActive && <ReplaceLinkButton id={m.id} name={m.name} />}
+                    {m.userActive ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Deactivate"
+                        aria-label={`Deactivate ${m.name}`}
+                        onClick={() => setPending({ id: m.id, name: m.name, action: "deactivate" })}
+                      >
+                        <PowerOff size={16} className="text-warning" />
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Activate"
+                        aria-label={`Activate ${m.name}`}
+                        onClick={() => setPending({ id: m.id, name: m.name, action: "activate" })}
+                      >
+                        <Power size={16} className="text-success" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Delete"
+                      aria-label={`Delete ${m.name}`}
+                      onClick={() => setPending({ id: m.id, name: m.name, action: "delete" })}
+                    >
+                      <Trash2 size={16} className="text-destructive" />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {members.isPending ? (
+          <p className="p-8 text-sm">Loading members…</p>
+        ) : members.isError ? (
+          <ErrorNotice
+            message="Members could not be loaded."
+            onRetry={() => {
+              void members.refetch();
+            }}
+          />
+        ) : rows.length === 0 ? (
+          <div className="bf-empty">
+            <h3>No members found</h3>
+          </div>
+        ) : null}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>
+          Showing {rows.length ? current * PAGE + 1 : 0}–
+          {Math.min(rows.length, (current + 1) * PAGE)} of {rows.length} members
+        </span>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={current === 0}
+            onClick={() => setPage(current - 1)}
+          >
+            Previous
+          </Button>
+          <span>
+            Page {current + 1} / {pageCount}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={current >= pageCount - 1}
+            onClick={() => setPage(current + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+      <ConfirmAction
+        open={pending !== null}
+        onOpenChange={(o) => {
+          if (!o) setPending(null);
+        }}
+        title={pending ? copyText[pending.action].title : ""}
+        description={pending ? `${pending.name}: ${copyText[pending.action].desc}` : ""}
+        confirmLabel={pending ? copyText[pending.action].label : ""}
+        onConfirm={confirm}
+        destructive={pending?.action === "delete"}
+      />
+      <Dialog
+        open={id !== null}
+        onOpenChange={(open) => {
+          if (!open) setId(null);
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Member profile</DialogTitle>
+            <DialogDescription>Details, permissions and portal controls</DialogDescription>
+          </DialogHeader>
+          {id && <MemberProfile id={id} onDeleted={() => setId(null)} />}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }
 
 /** Replace a member's portal link in two clicks (arm, then confirm); the new link is copied automatically. */
-function ReplaceLinkButton({id,name,label=false}:{id:string;name:string;label?:boolean}){
- const replace=useServerFn(manageMemberPortal);const client=useQueryClient();
- const [armed,setArmed]=useState(false);const [busy,setBusy]=useState(false);
- useEffect(()=>{if(!armed)return;const t=setTimeout(()=>setArmed(false),4000);return()=>clearTimeout(t);},[armed]);
- async function run(){
-  setBusy(true);setArmed(false);
-  try{
-   const r=await replace({data:{id,regenerate:true}});const url=window.location.origin+r.path;
-   await refreshPeople(client);
-   try{await navigator.clipboard.writeText(url);toast.success(`New link for ${name} copied`,{description:'The old link no longer works. Paste the new one to them.'});}
-   catch{toast.success(`New link created for ${name}`,{description:'Use Copy to share it. The old link no longer works.'});}
-  }catch(e){toast.error(actionError(e,'The link could not be replaced.'));}
-  finally{setBusy(false);}
- }
- // Same footprint in both states, so nothing around it moves; the hint floats above without taking space.
- const confirmHint=armed&&<span className="bf-armed-hint" role="status">Click again to replace</span>;
- if(label)return <span className="relative inline-flex">{confirmHint}<Button variant="outline" size="sm" className="bf-replace-btn h-7 text-xs" data-armed={armed||undefined} disabled={busy} onClick={()=>armed?void run():setArmed(true)} onBlur={()=>setArmed(false)} title="Create a new link (the old one stops working)" aria-label={armed?`Confirm replacing the portal link for ${name}`:`Replace portal link for ${name}`}><KeyRound size={13} className={busy?'animate-pulse':''}/>{armed?'Confirm?':'Replace link'}</Button></span>;
- return <span className="relative inline-flex">{confirmHint}<Button variant="ghost" size="icon" className="bf-replace-icon" data-armed={armed||undefined} disabled={busy} title={armed?'Click again to replace':'Replace link — new link is copied, old one stops working'} aria-label={armed?`Confirm replacing the portal link for ${name}`:`Replace portal link for ${name}`} onClick={()=>armed?void run():setArmed(true)} onBlur={()=>setArmed(false)}>{armed?<Check size={16}/>:<KeyRound size={16} className={busy?'animate-pulse text-primary':'text-primary'}/>}</Button></span>;
+function ReplaceLinkButton({
+  id,
+  name,
+  label = false,
+}: {
+  id: string;
+  name: string;
+  label?: boolean;
+}) {
+  const replace = useServerFn(manageMemberPortal);
+  const client = useQueryClient();
+  const [armed, setArmed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+  async function run() {
+    setBusy(true);
+    setArmed(false);
+    try {
+      const r = await replace({ data: { id, regenerate: true } });
+      const url = window.location.origin + r.path;
+      await refreshPeople(client);
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success(`New link for ${name} copied`, {
+          description: "The old link no longer works. Paste the new one to them.",
+        });
+      } catch {
+        toast.success(`New link created for ${name}`, {
+          description: "Use Copy to share it. The old link no longer works.",
+        });
+      }
+    } catch (e) {
+      toast.error(actionError(e, "The link could not be replaced."));
+    } finally {
+      setBusy(false);
+    }
+  }
+  // Same footprint in both states, so nothing around it moves; the hint floats above without taking space.
+  const confirmHint = armed && (
+    <span className="bf-armed-hint" role="status">
+      Click again to replace
+    </span>
+  );
+  if (label)
+    return (
+      <span className="relative inline-flex">
+        {confirmHint}
+        <Button
+          variant="outline"
+          size="sm"
+          className="bf-replace-btn h-7 text-xs"
+          data-armed={armed || undefined}
+          disabled={busy}
+          onClick={() => (armed ? void run() : setArmed(true))}
+          onBlur={() => setArmed(false)}
+          title="Create a new link (the old one stops working)"
+          aria-label={
+            armed
+              ? `Confirm replacing the portal link for ${name}`
+              : `Replace portal link for ${name}`
+          }
+        >
+          <KeyRound size={13} className={busy ? "animate-pulse" : ""} />
+          {armed ? "Confirm?" : "Replace link"}
+        </Button>
+      </span>
+    );
+  return (
+    <span className="relative inline-flex">
+      {confirmHint}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="bf-replace-icon"
+        data-armed={armed || undefined}
+        disabled={busy}
+        title={
+          armed
+            ? "Click again to replace"
+            : "Replace link — new link is copied, old one stops working"
+        }
+        aria-label={
+          armed
+            ? `Confirm replacing the portal link for ${name}`
+            : `Replace portal link for ${name}`
+        }
+        onClick={() => (armed ? void run() : setArmed(true))}
+        onBlur={() => setArmed(false)}
+      >
+        {armed ? (
+          <Check size={16} />
+        ) : (
+          <KeyRound size={16} className={busy ? "animate-pulse text-primary" : "text-primary"} />
+        )}
+      </Button>
+    </span>
+  );
 }

@@ -12,10 +12,10 @@ import { type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
-import { ThemeProvider } from '@/components/bugflow/theme-toggle';
-import { Decorations } from '@/components/bugflow/decorations';
-import { TopProgress } from '@/components/bugflow/loading';
-import { THEME_BOOT_SCRIPT } from '@/lib/appearance';
+import { ThemeProvider } from "@/components/bugflow/theme-toggle";
+import { Decorations } from "@/components/bugflow/decorations";
+import { TopProgress } from "@/components/bugflow/loading";
+import { THEME_BOOT_SCRIPT } from "@/lib/appearance";
 import { Button } from "@/components/ui/button";
 
 function NotFoundComponent() {
@@ -28,7 +28,9 @@ function NotFoundComponent() {
           The page you're looking for doesn't exist or has been moved.
         </p>
         <div className="mt-6">
-          <Button asChild><Link to="/">Back to workspace</Link></Button>
+          <Button asChild>
+            <Link to="/">Back to workspace</Link>
+          </Button>
         </div>
       </div>
     </div>
@@ -57,7 +59,9 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
           >
             Try again
           </Button>
-          <Button variant="outline" asChild><Link to="/">Back to workspace</Link></Button>
+          <Button variant="outline" asChild>
+            <Link to="/">Back to workspace</Link>
+          </Button>
         </div>
       </div>
     </div>
@@ -70,14 +74,24 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Futurist Global Bug Board · Issue control" },
-      { name: "description", content: "Futurist Global Bug Board manual QA and bug tracking workspace." },
+      {
+        name: "description",
+        content: "Futurist Global Bug Board manual QA and bug tracking workspace.",
+      },
       { property: "og:title", content: "Futurist Global Bug Board" },
-      { property: "og:description", content: "Report, assign and verify bugs in one shared QA workspace for Futurist Global teams." },
+      {
+        property: "og:description",
+        content:
+          "Report, assign and verify bugs in one shared QA workspace for Futurist Global teams.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Patrick+Hand&family=Caveat:wght@600;700&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Patrick+Hand&family=Caveat:wght@600;700&display=swap",
+      },
       {
         rel: "stylesheet",
         href: appCss,
@@ -113,12 +127,14 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
-    <QueryClientProvider client={queryClient}><ThemeProvider>
-      <TopProgress />
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
-      <Toaster />
-      <Decorations />
-    </ThemeProvider></QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <TopProgress />
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+        <Toaster />
+        <Decorations />
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }

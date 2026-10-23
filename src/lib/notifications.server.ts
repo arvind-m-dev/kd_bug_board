@@ -1,6 +1,6 @@
-import { neonQuery, neonExecute } from './neon.server';
-import { requireAdmin, checkOrigin } from './portal-access.server';
-import { NOTIFICATION_DAYS, type NotificationItem } from './notifications';
+import { neonQuery, neonExecute } from "./neon.server";
+import { requireAdmin, checkOrigin } from "./portal-access.server";
+import { NOTIFICATION_DAYS, type NotificationItem } from "./notifications";
 
 export async function listNotifications(limit: number) {
   const admin = await requireAdmin();
@@ -10,21 +10,36 @@ export async function listNotifications(limit: number) {
      from bugflow.activity a cross join st join bugflow.users u on u.id=a.actor_id left join bugflow.bugs b on b.id=a.bug_id
      where a.created_at>now()-make_interval(days=>$2) and a.created_at>st.c
      order by a.created_at desc,a.id desc limit $3`,
-    [admin.userId, NOTIFICATION_DAYS, limit]);
-  const items: NotificationItem[] = rows.map(r => ({
-    id: String(r['id']), action: String(r['action']), bugId: r['bug_id'] ? String(r['bug_id']) : null,
-    title: r['title'] ? String(r['title']) : '', actor: String(r['actor']), at: String(r['at']), unread: Boolean(r['unread']),
-    status: typeof (r['detail'] as Record<string, unknown> | null)?.['status'] === 'string' ? String((r['detail'] as Record<string, unknown>)['status']) : '',
+    [admin.userId, NOTIFICATION_DAYS, limit],
+  );
+  const items: NotificationItem[] = rows.map((r) => ({
+    id: String(r["id"]),
+    action: String(r["action"]),
+    bugId: r["bug_id"] ? String(r["bug_id"]) : null,
+    title: r["title"] ? String(r["title"]) : "",
+    actor: String(r["actor"]),
+    at: String(r["at"]),
+    unread: Boolean(r["unread"]),
+    status:
+      typeof (r["detail"] as Record<string, unknown> | null)?.["status"] === "string"
+        ? String((r["detail"] as Record<string, unknown>)["status"])
+        : "",
   }));
-  return { items, total: Number(rows[0]?.['total'] ?? 0), unread: Number(rows[0]?.['unread_total'] ?? 0) };
+  return {
+    items,
+    total: Number(rows[0]?.["total"] ?? 0),
+    unread: Number(rows[0]?.["unread_total"] ?? 0),
+  };
 }
 
-export async function markNotifications(kind: 'read' | 'clear') {
-  checkOrigin(); const admin = await requireAdmin();
+export async function markNotifications(kind: "read" | "clear") {
+  checkOrigin();
+  const admin = await requireAdmin();
   await neonExecute(
-    kind === 'read'
+    kind === "read"
       ? `insert into bugflow.notification_state(user_id,read_at) values($1,now()) on conflict (user_id) do update set read_at=now()`
       : `insert into bugflow.notification_state(user_id,read_at,cleared_at) values($1,now(),now()) on conflict (user_id) do update set read_at=now(),cleared_at=now()`,
-    [admin.userId]);
+    [admin.userId],
+  );
   return { ok: true };
 }

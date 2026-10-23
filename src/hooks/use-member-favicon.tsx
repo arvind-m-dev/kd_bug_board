@@ -9,7 +9,8 @@ export function memberHue(code: string) {
 
 export function memberInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
-  const letters = parts.length > 1 ? parts[0]![0]! + parts[parts.length - 1]![0]! : (parts[0] ?? "?").slice(0, 2);
+  const letters =
+    parts.length > 1 ? parts[0]![0]! + parts[parts.length - 1]![0]! : (parts[0] ?? "?").slice(0, 2);
   return letters.toUpperCase();
 }
 
@@ -20,7 +21,8 @@ export const PANEL_BADGES: Record<string, { letter: string; color: string; label
   developer: { letter: "D", color: "#4f6bed", label: "Developer portal" },
   member: { letter: "M", color: "#7c5cd6", label: "Member portal" },
 };
-export const panelLabel = (panel: string | undefined) => (panel && PANEL_BADGES[panel]?.label) || "Portal";
+export const panelLabel = (panel: string | undefined) =>
+  (panel && PANEL_BADGES[panel]?.label) || "Portal";
 
 const safe = (s: string) => s.replace(/[<>&"]/g, "");
 
@@ -50,17 +52,28 @@ export function useMemberFavicon(member: { name: string; code: string; panel?: s
       for (const l of document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"]')) {
         if (l.href === href) continue;
         if (!previous.has(l)) previous.set(l, [l.getAttribute("href") ?? "", l.type] as const);
-        l.href = href; l.type = "image/svg+xml";
+        l.href = href;
+        l.type = "image/svg+xml";
       }
     };
     apply();
     const observer = new MutationObserver(apply);
-    observer.observe(document.head, { childList: true, subtree: true, attributes: true, attributeFilter: ["href"] });
+    observer.observe(document.head, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["href"],
+    });
     const title = document.title;
     document.title = `${name} · ${panelLabel(panel)} · Futurist Global Bug Board`;
     return () => {
       observer.disconnect();
-      for (const [l, [h, t]] of previous) { if (l.isConnected) { l.setAttribute("href", h); l.type = t; } }
+      for (const [l, [h, t]] of previous) {
+        if (l.isConnected) {
+          l.setAttribute("href", h);
+          l.type = t;
+        }
+      }
       document.title = title;
     };
   }, [name, code, panel]);

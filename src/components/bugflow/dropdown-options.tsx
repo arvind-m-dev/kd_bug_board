@@ -1,56 +1,475 @@
-import { useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useServerFn } from '@tanstack/react-start';
-import { Plus, X, Save, LoaderCircle, Pencil, Check, UsersRound, SlidersHorizontal, Trash2, GripVertical } from 'lucide-react';
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { getBugWorkspace, saveOptions } from '@/lib/bug-workflow.functions';
-import { DEFAULT_OPTIONS, severityLevel, type DropdownOptions } from '@/lib/bug-workflow';
-import { ConfirmAction, ErrorNotice, actionError } from './action-feedback';
-import { changeMember } from '@/lib/member-management.functions';
-import { restoreFromTrash } from '@/lib/trash.functions';
-import { moveToTrashToast } from './trash-bin';
-import { Link } from '@tanstack/react-router';
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  Plus,
+  X,
+  Save,
+  LoaderCircle,
+  Pencil,
+  Check,
+  UsersRound,
+  SlidersHorizontal,
+  Trash2,
+  GripVertical,
+} from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { getBugWorkspace, saveOptions } from "@/lib/bug-workflow.functions";
+import { DEFAULT_OPTIONS, severityLevel, type DropdownOptions } from "@/lib/bug-workflow";
+import { ConfirmAction, ErrorNotice, actionError } from "./action-feedback";
+import { changeMember } from "@/lib/member-management.functions";
+import { restoreFromTrash } from "@/lib/trash.functions";
+import { moveToTrashToast } from "./trash-bin";
+import { Link } from "@tanstack/react-router";
 
-const groups: { key: keyof DropdownOptions; title: string; hint: string; max?: number; min?: number }[] = [
-  { key: 'severities', title: 'Severity levels', hint: 'Most severe first — colours follow this order. Drag the grip to arrange.', max: 12, min: 1 },
-  { key: 'modules', title: 'Modules / pages', hint: 'Shown in the “Module or page” dropdown.' },
-  { key: 'environments', title: 'Environments', hint: 'Shown in the “Environment” dropdown.' },
-  { key: 'devices', title: 'Browsers / devices', hint: 'Shown in the “Browser / device” dropdown.' },
+const groups: {
+  key: keyof DropdownOptions;
+  title: string;
+  hint: string;
+  max?: number;
+  min?: number;
+}[] = [
+  {
+    key: "severities",
+    title: "Severity levels",
+    hint: "Most severe first — colours follow this order. Drag the grip to arrange.",
+    max: 12,
+    min: 1,
+  },
+  { key: "modules", title: "Modules / pages", hint: "Shown in the “Module or page” dropdown." },
+  { key: "environments", title: "Environments", hint: "Shown in the “Environment” dropdown." },
+  {
+    key: "devices",
+    title: "Browsers / devices",
+    hint: "Shown in the “Browser / device” dropdown.",
+  },
 ];
 
 export function DropdownOptionsEditor({ onAddMember }: { onAddMember: () => void }) {
-  const fetch = useServerFn(getBugWorkspace); const save = useServerFn(saveOptions); const client = useQueryClient();
-  const change = useServerFn(changeMember); const restoreMember = useServerFn(restoreFromTrash); const [removing, setRemoving] = useState<{ id: string; name: string; rect: DOMRect | null } | null>(null);
-  const q = useQuery({ queryKey: ['bug-workspace', { kind: 'admin' }, undefined], queryFn: () => fetch({ data: { access: { kind: 'admin' } } }), retry: false, staleTime: 10000, refetchInterval: 20000 });
-  const [draft, setDraft] = useState<DropdownOptions>(DEFAULT_OPTIONS); const [entry, setEntry] = useState<Record<string, string>>({}); const [dirty, setDirty] = useState(false);
-  const [editing, setEditing] = useState<{ key: keyof DropdownOptions; value: string } | null>(null);
-  const [replacement, setReplacement] = useState('');
+  const fetch = useServerFn(getBugWorkspace);
+  const save = useServerFn(saveOptions);
+  const client = useQueryClient();
+  const change = useServerFn(changeMember);
+  const restoreMember = useServerFn(restoreFromTrash);
+  const [removing, setRemoving] = useState<{
+    id: string;
+    name: string;
+    rect: DOMRect | null;
+  } | null>(null);
+  const q = useQuery({
+    queryKey: ["bug-workspace", { kind: "admin" }, undefined],
+    queryFn: () => fetch({ data: { access: { kind: "admin" } } }),
+    retry: false,
+    staleTime: 10000,
+    refetchInterval: 20000,
+  });
+  const [draft, setDraft] = useState<DropdownOptions>(DEFAULT_OPTIONS);
+  const [entry, setEntry] = useState<Record<string, string>>({});
+  const [dirty, setDirty] = useState(false);
+  const [editing, setEditing] = useState<{ key: keyof DropdownOptions; value: string } | null>(
+    null,
+  );
+  const [replacement, setReplacement] = useState("");
   // Drag to arrange: native drag events for the mouse, arrow keys on the grip for the keyboard.
   const [drag, setDrag] = useState<{ key: keyof DropdownOptions; value: string } | null>(null);
   const [over, setOver] = useState<{ value: string; after: boolean } | null>(null);
-  const moveTo = (k: keyof DropdownOptions, value: string, target: string, after: boolean) => { if (value === target) return; const list = draft[k].filter(x => x !== value); const i = list.indexOf(target) + (after ? 1 : 0); list.splice(i, 0, value); update(k, list); };
-  const nudge = (k: keyof DropdownOptions, value: string, by: -1 | 1) => { const list = [...draft[k]]; const i = list.indexOf(value); const j = i + by; if (j < 0 || j >= list.length) return; [list[i], list[j]] = [list[j]!, list[i]!]; update(k, list); };
-  useEffect(() => { if (q.data && !dirty) setDraft(q.data.options); }, [q.data, dirty]);
-  const m = useMutation({ mutationFn: (o: DropdownOptions) => save({ data: o }), onSuccess: async () => { setDirty(false); await client.invalidateQueries({ queryKey: ['bug-workspace'] }); toast.success('Dropdown options saved'); } });
-  const update = (k: keyof DropdownOptions, list: string[]) => { setDraft(d => ({ ...d, [k]: list })); setDirty(true); };
-  const add = (k: keyof DropdownOptions) => { const v = (entry[k] ?? '').trim(); if (!v || draft[k].includes(v)) return; update(k, [...draft[k], v]); setEntry(e => ({ ...e, [k]: '' })); };
-  const rename = () => { const value = replacement.trim(); if (!editing || !value || (value !== editing.value && draft[editing.key].includes(value))) return; update(editing.key, draft[editing.key].map(item => item === editing.value ? value : item)); setEditing(null); };
-  return <section className="bf-settings-section">
-    <div className="bf-settings-heading"><div className="flex items-center gap-3"><span className="bf-stat-icon bf-tone-teal"><SlidersHorizontal size={18}/></span><div><h2>Dropdown options</h2><span className="text-xs text-muted-foreground">{dirty ? 'Unsaved changes' : 'Report fields & assignment choices'}</span></div></div><div className="flex flex-wrap gap-2">{dirty && <Button variant="ghost" size="sm" disabled={m.isPending} onClick={()=>{setDraft(q.data?.options??DEFAULT_OPTIONS);setDirty(false);setEditing(null);}}>Discard</Button>}<Button size="sm" disabled={!q.data || !dirty || m.isPending || !!editing} onClick={() => m.mutate(draft)}>{m.isPending ? <LoaderCircle className="animate-spin" /> : <Save />}Save options</Button></div></div>
-    {q.isError && <ErrorNotice message={actionError(q.error, 'Options could not be loaded.')} onRetry={() => q.refetch()} />}
-    {m.isError && <ErrorNotice message={actionError(m.error, 'Options could not be saved.')} />}
-    {q.isPending ? <p className="py-5 text-sm text-muted-foreground">Loading options…</p> : q.data && <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">{groups.map(g => <div key={g.key} className="bf-option-group">
-      <div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold">{g.title}</h3><span className="bf-tag">{draft[g.key].length}/{g.max ?? 50}</span></div><p className="mt-1 text-xs text-muted-foreground">{g.hint}</p>
-      <ul className="bf-option-list">{draft[g.key].map(v => <li key={v} className="bf-option-row" draggable={!m.isPending && !editing} data-dragging={drag?.key===g.key&&drag.value===v||undefined} data-drop={drag?.key===g.key&&over?.value===v?(over.after?'after':'before'):undefined} onDragStart={e=>{setDrag({key:g.key,value:v});e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',v);}} onDragOver={e=>{if(drag?.key!==g.key)return;e.preventDefault();e.dataTransfer.dropEffect='move';const r=e.currentTarget.getBoundingClientRect();setOver({value:v,after:e.clientY>r.top+r.height/2});}} onDragLeave={()=>setOver(o=>o?.value===v?null:o)} onDrop={e=>{e.preventDefault();if(drag?.key===g.key&&over)moveTo(g.key,drag.value,v,over.after);setDrag(null);setOver(null);}} onDragEnd={()=>{setDrag(null);setOver(null);}}><button type="button" className="bf-grip" aria-label={`Drag to arrange ${v}; arrow keys move it`} title="Drag to arrange · ↑ ↓ keys" disabled={m.isPending} onKeyDown={e=>{if(e.key==='ArrowUp'){e.preventDefault();nudge(g.key,v,-1);}if(e.key==='ArrowDown'){e.preventDefault();nudge(g.key,v,1);}}}><GripVertical size={14}/></button>{editing?.key===g.key&&editing.value===v ? <><Input autoFocus aria-label={`Rename ${v}`} value={replacement} maxLength={80} onChange={e=>setReplacement(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();rename();}if(e.key==='Escape')setEditing(null);}}/><Button size="icon" variant="ghost" aria-label={`Confirm rename ${v}`} title="Save name" disabled={!replacement.trim()||(replacement.trim()!==v&&draft[g.key].includes(replacement.trim()))} onClick={rename}><Check size={14}/></Button><Button size="icon" variant="ghost" aria-label="Cancel rename" title="Cancel" onClick={()=>setEditing(null)}><X size={14}/></Button></> : <>{g.key==='severities'?<span className="bf-sev min-w-0 flex-1" data-sev={severityLevel(v,draft.severities)}><span className="bf-sev-bars" aria-hidden="true"><i/><i/><i/></span>{v}</span>:<span className="min-w-0 flex-1 break-words">{v}</span>}<Button size="icon" variant="ghost" aria-label={`Edit ${v}`} title={`Edit ${v}`} disabled={m.isPending} onClick={()=>{setEditing({key:g.key,value:v});setReplacement(v);}}><Pencil size={13}/></Button><Button size="icon" variant="ghost" aria-label={`Remove ${v}`} title={`Remove ${v}`} disabled={m.isPending||draft[g.key].length<=(g.min??0)} onClick={() => update(g.key, draft[g.key].filter(x => x !== v))}><X size={14}/></Button></>}</li>)}{!draft[g.key].length && <li className="py-5 text-xs text-muted-foreground">No saved choices</li>}</ul>
-      <div className="flex gap-2"><Input aria-label={`New ${g.title}`} placeholder="New option" maxLength={80} disabled={m.isPending||draft[g.key].length>=(g.max??50)} value={entry[g.key] ?? ''} onChange={e => setEntry(x => ({ ...x, [g.key]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(g.key); } }} /><Button size="icon" variant="outline" aria-label={`Add ${g.title}`} title={`Add ${g.title}`} disabled={m.isPending||!entry[g.key]?.trim()||draft[g.key].includes(entry[g.key]?.trim()??'')||draft[g.key].length>=(g.max??50)} onClick={() => add(g.key)}><Plus /></Button></div>
-    </div>)}</div>}
-    <div className="bf-settings-fixed"><span className="text-xs font-medium">Workflow choices · Fixed</span><div className="flex flex-wrap gap-2"><span className="bf-tag">Priority · P0–P5</span><span className="bf-tag">Status · Bug lifecycle</span></div></div>
-    <div className="bf-settings-heading mt-6"><div className="flex items-center gap-3"><span className="bf-stat-icon bf-tone-info"><UsersRound size={18}/></span><div><h2>Assign to</h2><span className="text-xs text-muted-foreground">Active members · {q.data?.developers.length??'—'}</span></div></div><Button size="sm" variant="outline" onClick={onAddMember}><Plus/>Add member</Button></div>
-    {q.data && <div className="bf-assignee-directory">{q.data.developers.map(member=><div className="flex min-w-0 items-center gap-3 py-3" key={member.id}><span className="bf-avatar">{member.name.slice(0,2).toUpperCase()}</span><div className="min-w-0"><p className="break-words text-sm font-medium">{member.name}</p><span className="text-xs capitalize text-muted-foreground">{member.role} · {member.id.slice(0,8)}</span></div><Button size="icon" variant="ghost" className="ml-auto shrink-0 text-destructive" aria-label={`Delete ${member.name}`} title="Delete member" onClick={e=>setRemoving({id:member.id,name:member.name,rect:(e.currentTarget.parentElement as HTMLElement|null)?.getBoundingClientRect()??null})}><Trash2 size={15}/></Button></div>)}{!q.data.developers.length&&<p className="py-4 text-sm text-muted-foreground">No active members yet.</p>}</div>}
-    <ConfirmAction open={removing!==null} onOpenChange={o=>{if(!o)setRemoving(null);}} destructive title={`Move ${removing?.name ?? 'this member'} to the Trash?`} description="Every portal link they have stops working immediately and they leave this list. Bugs they reported or fixed, and their history, stay under their name. You can restore them from Trash for 30 days." confirmLabel="Move to Trash"
-      onConfirm={async()=>{if(!removing)return;const {id,name,rect}=removing;const refresh=()=>Promise.all(['bug-workspace','members','workspace','trash'].map(k=>client.invalidateQueries({queryKey:[k]})));try{await change({data:{id,action:'delete'}});await refresh();moveToTrashToast({title:'Moved to Trash',label:name,detail:'Undo brings them back deactivated; activate them and replace their link.',source:rect,onUndo:async()=>{await restoreMember({data:{kind:'member',id}});await refresh();}});setRemoving(null);}catch(e){toast.error(actionError(e,'The member could not be deleted.'));}}}/>
-    <div className="flex flex-wrap justify-between gap-3 pt-4 text-xs text-muted-foreground"><span>New members appear automatically for projects they can access.</span><Button asChild variant="link" size="sm"><Link to="/admin/users">Manage members & permissions</Link></Button></div>
-  </section>;
+  const moveTo = (k: keyof DropdownOptions, value: string, target: string, after: boolean) => {
+    if (value === target) return;
+    const list = draft[k].filter((x) => x !== value);
+    const i = list.indexOf(target) + (after ? 1 : 0);
+    list.splice(i, 0, value);
+    update(k, list);
+  };
+  const nudge = (k: keyof DropdownOptions, value: string, by: -1 | 1) => {
+    const list = [...draft[k]];
+    const i = list.indexOf(value);
+    const j = i + by;
+    if (j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j]!, list[i]!];
+    update(k, list);
+  };
+  useEffect(() => {
+    if (q.data && !dirty) setDraft(q.data.options);
+  }, [q.data, dirty]);
+  const m = useMutation({
+    mutationFn: (o: DropdownOptions) => save({ data: o }),
+    onSuccess: async () => {
+      setDirty(false);
+      await client.invalidateQueries({ queryKey: ["bug-workspace"] });
+      toast.success("Dropdown options saved");
+    },
+  });
+  const update = (k: keyof DropdownOptions, list: string[]) => {
+    setDraft((d) => ({ ...d, [k]: list }));
+    setDirty(true);
+  };
+  const add = (k: keyof DropdownOptions) => {
+    const v = (entry[k] ?? "").trim();
+    if (!v || draft[k].includes(v)) return;
+    update(k, [...draft[k], v]);
+    setEntry((e) => ({ ...e, [k]: "" }));
+  };
+  const rename = () => {
+    const value = replacement.trim();
+    if (!editing || !value || (value !== editing.value && draft[editing.key].includes(value)))
+      return;
+    update(
+      editing.key,
+      draft[editing.key].map((item) => (item === editing.value ? value : item)),
+    );
+    setEditing(null);
+  };
+  return (
+    <section className="bf-settings-section">
+      <div className="bf-settings-heading">
+        <div className="flex items-center gap-3">
+          <span className="bf-stat-icon bf-tone-teal">
+            <SlidersHorizontal size={18} />
+          </span>
+          <div>
+            <h2>Dropdown options</h2>
+            <span className="text-xs text-muted-foreground">
+              {dirty ? "Unsaved changes" : "Report fields & assignment choices"}
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {dirty && (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={m.isPending}
+              onClick={() => {
+                setDraft(q.data?.options ?? DEFAULT_OPTIONS);
+                setDirty(false);
+                setEditing(null);
+              }}
+            >
+              Discard
+            </Button>
+          )}
+          <Button
+            size="sm"
+            disabled={!q.data || !dirty || m.isPending || !!editing}
+            onClick={() => m.mutate(draft)}
+          >
+            {m.isPending ? <LoaderCircle className="animate-spin" /> : <Save />}Save options
+          </Button>
+        </div>
+      </div>
+      {q.isError && (
+        <ErrorNotice
+          message={actionError(q.error, "Options could not be loaded.")}
+          onRetry={() => q.refetch()}
+        />
+      )}
+      {m.isError && <ErrorNotice message={actionError(m.error, "Options could not be saved.")} />}
+      {q.isPending ? (
+        <p className="py-5 text-sm text-muted-foreground">Loading options…</p>
+      ) : (
+        q.data && (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {groups.map((g) => (
+              <div key={g.key} className="bf-option-group">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">{g.title}</h3>
+                  <span className="bf-tag">
+                    {draft[g.key].length}/{g.max ?? 50}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{g.hint}</p>
+                <ul className="bf-option-list">
+                  {draft[g.key].map((v) => (
+                    <li
+                      key={v}
+                      className="bf-option-row"
+                      draggable={!m.isPending && !editing}
+                      data-dragging={(drag?.key === g.key && drag.value === v) || undefined}
+                      data-drop={
+                        drag?.key === g.key && over?.value === v
+                          ? over.after
+                            ? "after"
+                            : "before"
+                          : undefined
+                      }
+                      onDragStart={(e) => {
+                        setDrag({ key: g.key, value: v });
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", v);
+                      }}
+                      onDragOver={(e) => {
+                        if (drag?.key !== g.key) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        const r = e.currentTarget.getBoundingClientRect();
+                        setOver({ value: v, after: e.clientY > r.top + r.height / 2 });
+                      }}
+                      onDragLeave={() => setOver((o) => (o?.value === v ? null : o))}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (drag?.key === g.key && over) moveTo(g.key, drag.value, v, over.after);
+                        setDrag(null);
+                        setOver(null);
+                      }}
+                      onDragEnd={() => {
+                        setDrag(null);
+                        setOver(null);
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="bf-grip"
+                        aria-label={`Drag to arrange ${v}; arrow keys move it`}
+                        title="Drag to arrange · ↑ ↓ keys"
+                        disabled={m.isPending}
+                        onKeyDown={(e) => {
+                          if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            nudge(g.key, v, -1);
+                          }
+                          if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            nudge(g.key, v, 1);
+                          }
+                        }}
+                      >
+                        <GripVertical size={14} />
+                      </button>
+                      {editing?.key === g.key && editing.value === v ? (
+                        <>
+                          <Input
+                            autoFocus
+                            aria-label={`Rename ${v}`}
+                            value={replacement}
+                            maxLength={80}
+                            onChange={(e) => setReplacement(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                rename();
+                              }
+                              if (e.key === "Escape") setEditing(null);
+                            }}
+                          />
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Confirm rename ${v}`}
+                            title="Save name"
+                            disabled={
+                              !replacement.trim() ||
+                              (replacement.trim() !== v &&
+                                draft[g.key].includes(replacement.trim()))
+                            }
+                            onClick={rename}
+                          >
+                            <Check size={14} />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label="Cancel rename"
+                            title="Cancel"
+                            onClick={() => setEditing(null)}
+                          >
+                            <X size={14} />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          {g.key === "severities" ? (
+                            <span
+                              className="bf-sev min-w-0 flex-1"
+                              data-sev={severityLevel(v, draft.severities)}
+                            >
+                              <span className="bf-sev-bars" aria-hidden="true">
+                                <i />
+                                <i />
+                                <i />
+                              </span>
+                              {v}
+                            </span>
+                          ) : (
+                            <span className="min-w-0 flex-1 break-words">{v}</span>
+                          )}
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Edit ${v}`}
+                            title={`Edit ${v}`}
+                            disabled={m.isPending}
+                            onClick={() => {
+                              setEditing({ key: g.key, value: v });
+                              setReplacement(v);
+                            }}
+                          >
+                            <Pencil size={13} />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Remove ${v}`}
+                            title={`Remove ${v}`}
+                            disabled={m.isPending || draft[g.key].length <= (g.min ?? 0)}
+                            onClick={() =>
+                              update(
+                                g.key,
+                                draft[g.key].filter((x) => x !== v),
+                              )
+                            }
+                          >
+                            <X size={14} />
+                          </Button>
+                        </>
+                      )}
+                    </li>
+                  ))}
+                  {!draft[g.key].length && (
+                    <li className="py-5 text-xs text-muted-foreground">No saved choices</li>
+                  )}
+                </ul>
+                <div className="flex gap-2">
+                  <Input
+                    aria-label={`New ${g.title}`}
+                    placeholder="New option"
+                    maxLength={80}
+                    disabled={m.isPending || draft[g.key].length >= (g.max ?? 50)}
+                    value={entry[g.key] ?? ""}
+                    onChange={(e) => setEntry((x) => ({ ...x, [g.key]: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        add(g.key);
+                      }
+                    }}
+                  />
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    aria-label={`Add ${g.title}`}
+                    title={`Add ${g.title}`}
+                    disabled={
+                      m.isPending ||
+                      !entry[g.key]?.trim() ||
+                      draft[g.key].includes(entry[g.key]?.trim() ?? "") ||
+                      draft[g.key].length >= (g.max ?? 50)
+                    }
+                    onClick={() => add(g.key)}
+                  >
+                    <Plus />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+      <div className="bf-settings-fixed">
+        <span className="text-xs font-medium">Workflow choices · Fixed</span>
+        <div className="flex flex-wrap gap-2">
+          <span className="bf-tag">Priority · P0–P5</span>
+          <span className="bf-tag">Status · Bug lifecycle</span>
+        </div>
+      </div>
+      <div className="bf-settings-heading mt-6">
+        <div className="flex items-center gap-3">
+          <span className="bf-stat-icon bf-tone-info">
+            <UsersRound size={18} />
+          </span>
+          <div>
+            <h2>Assign to</h2>
+            <span className="text-xs text-muted-foreground">
+              Active members · {q.data?.developers.length ?? "—"}
+            </span>
+          </div>
+        </div>
+        <Button size="sm" variant="outline" onClick={onAddMember}>
+          <Plus />
+          Add member
+        </Button>
+      </div>
+      {q.data && (
+        <div className="bf-assignee-directory">
+          {q.data.developers.map((member) => (
+            <div className="flex min-w-0 items-center gap-3 py-3" key={member.id}>
+              <span className="bf-avatar">{member.name.slice(0, 2).toUpperCase()}</span>
+              <div className="min-w-0">
+                <p className="break-words text-sm font-medium">{member.name}</p>
+                <span className="text-xs capitalize text-muted-foreground">
+                  {member.role} · {member.id.slice(0, 8)}
+                </span>
+              </div>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="ml-auto shrink-0 text-destructive"
+                aria-label={`Delete ${member.name}`}
+                title="Delete member"
+                onClick={(e) =>
+                  setRemoving({
+                    id: member.id,
+                    name: member.name,
+                    rect:
+                      (
+                        e.currentTarget.parentElement as HTMLElement | null
+                      )?.getBoundingClientRect() ?? null,
+                  })
+                }
+              >
+                <Trash2 size={15} />
+              </Button>
+            </div>
+          ))}
+          {!q.data.developers.length && (
+            <p className="py-4 text-sm text-muted-foreground">No active members yet.</p>
+          )}
+        </div>
+      )}
+      <ConfirmAction
+        open={removing !== null}
+        onOpenChange={(o) => {
+          if (!o) setRemoving(null);
+        }}
+        destructive
+        title={`Move ${removing?.name ?? "this member"} to the Trash?`}
+        description="Every portal link they have stops working immediately and they leave this list. Bugs they reported or fixed, and their history, stay under their name. You can restore them from Trash for 30 days."
+        confirmLabel="Move to Trash"
+        onConfirm={async () => {
+          if (!removing) return;
+          const { id, name, rect } = removing;
+          const refresh = () =>
+            Promise.all(
+              ["bug-workspace", "members", "workspace", "trash"].map((k) =>
+                client.invalidateQueries({ queryKey: [k] }),
+              ),
+            );
+          try {
+            await change({ data: { id, action: "delete" } });
+            await refresh();
+            moveToTrashToast({
+              title: "Moved to Trash",
+              label: name,
+              detail: "Undo brings them back deactivated; activate them and replace their link.",
+              source: rect,
+              onUndo: async () => {
+                await restoreMember({ data: { kind: "member", id } });
+                await refresh();
+              },
+            });
+            setRemoving(null);
+          } catch (e) {
+            toast.error(actionError(e, "The member could not be deleted."));
+          }
+        }}
+      />
+      <div className="flex flex-wrap justify-between gap-3 pt-4 text-xs text-muted-foreground">
+        <span>New members appear automatically for projects they can access.</span>
+        <Button asChild variant="link" size="sm">
+          <Link to="/admin/users">Manage members & permissions</Link>
+        </Button>
+      </div>
+    </section>
+  );
 }
