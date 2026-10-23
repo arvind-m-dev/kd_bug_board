@@ -11,6 +11,36 @@ import { PRIORITIES, formatBugCode, type BugAccess } from './bug-workflow';
  */
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }] });
 const fail = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
+// Compact, low-token renderings: fields are named once (a header line for lists, short labels for detail) instead of
+// repeated JSON keys per row, so an AI reads and understands a lot of bugs for a fraction of the tokens.
+const ymd = (iso: string) => (iso || '').slice(0, 10);
+const oneLine = (v: string, max = 140) => { const t = (v || '').replace(/\s+/g, ' ').trim(); return t.length > max ? t.slice(0, max - 1) + '\u2026' : t; };
+type Row = { id: string; code: string; title: string; status: string; priority: string; severity: string; project: string; reporter: string; assignee: string; createdAt: string };
+function bugsTable(rows: Row[], total: number): string {
+  if (!rows.length) return 'No bugs match.';
+  // Pipe-separated, columns named once. id = numeric id for get_bug/update tools.
+  const head = 'id | code | status | pri | sev | project | assignee | title';
+  const body = rows.map(b => [b.id, b.code, b.status, b.priority, b.severity, oneLine(b.project, 28), oneLine(b.assignee, 24), oneLine(b.title, 90)].join(' | ')).join('\n');
+  const more = total > rows.length ? `\n(${rows.length} of ${total}; narrow with query/status/projectId or raise limit)` : '';
+  return `${rows.length} bug(s). Columns: ${head}\n${body}${more}`;
+}
+function bugDetailText(b: { id: string; code: string; title: string; status: string; priority: string; severity: string; project: string; module: string; reporter: string; assignee: string; assignees?: { id: string; name: string }[]; description: string; steps: string[]; expected: string; actual: string; environment: string; browserDevice: string; fixNotes: string; version: string; createdAt: string; updatedAt: string; evidenceUrls: string[] }, media: { name: string; kind: string; url: string | null }[], events: { actor: string; action: string; createdAt: string; detail: Record<string, string> }[]): string {
+  const lines: string[] = [];
+  lines.push(`${b.code} [${b.status}] ${b.priority}/${b.severity}  ${b.project}${b.module ? ` \u203a ${b.module}` : ''}`);
+  lines.push(`title: ${b.title}`);
+  lines.push(`reporter: ${b.reporter}  assignee: ${b.assignees?.length ? b.assignees.map(a => a.name).join(', ') : b.assignee}`);
+  lines.push(`id: ${b.id}  version: ${b.version}  created: ${ymd(b.createdAt)}  updated: ${ymd(b.updatedAt)}`);
+  if (b.environment || b.browserDevice) lines.push(`env: ${[b.environment, b.browserDevice].filter(Boolean).join(' / ')}`);
+  lines.push(`description: ${oneLine(b.description, 600)}`);
+  if (b.steps.length) lines.push('steps:\n' + b.steps.map((st, i) => `  ${i + 1}. ${oneLine(st, 200)}`).join('\n'));
+  if (b.expected) lines.push(`expected: ${oneLine(b.expected, 300)}`);
+  if (b.actual) lines.push(`actual: ${oneLine(b.actual, 300)}`);
+  if (b.fixNotes) lines.push(`fix notes: ${oneLine(b.fixNotes, 300)}`);
+  const links = [...b.evidenceUrls, ...media.filter(m => m.url).map(m => `${m.name} (${m.kind}): ${m.url}`)];
+  if (links.length) lines.push('attachments:\n' + links.map(l => `  ${l}`).join('\n'));
+  if (events.length) lines.push('history (newest first):\n' + events.slice(0, 12).map(e => `  ${ymd(e.createdAt)} ${e.actor}: ${e.action.replace('bug.', '')}${Object.keys(e.detail).length ? ' ' + oneLine(Object.values(e.detail).join(' '), 90) : ''}`).join('\n'));
+  return lines.join('\n');
+}
 
 /** Builds the server for one AI token; all tools act as that token's panel. */
 async function serverFor(access: BugAccess) {
@@ -19,11 +49,12 @@ async function serverFor(access: BugAccess) {
   const can = (p: string) => actor.permissions.includes(p);
   const server = new McpServer({ name: 'bugflow', version: '1.0.0' }, { instructions: `You are connected to the Futurist Global Bug Board as ${actor.name} (${actor.role} panel). You may only see and change bugs this panel is allowed to. Report bugs with clear steps; one bug per report. Use get_bug before changing a bug so you have its current id and version.` });
 
-  server.registerTool('whoami', { title: 'Who am I', description: 'The panel this token acts as, and what it may do.' }, async () => text({ name: actor.name, role: actor.role, permissions: actor.permissions }));
+  server.registerTool('whoami', { title: 'Who am I', description: 'The panel this token acts as, and what it may do.' }, async () => text(`You act as ${actor.name} on the ${actor.role} panel. Permissions: ${actor.permissions.join(', ')}.`));
 
   server.registerTool('list_projects', { title: 'List projects', description: 'Projects this panel can file bugs against, with their id and name.' }, async () => {
     const ws = await bw.workspaceData(access);
-    return text({ projects: ws.projects, severities: ws.options.severities, priorities: [...PRIORITIES] });
+    const lines = ['Projects (id | name):', ...ws.projects.map(p => `${p.id} | ${p.name}`), `severities: ${ws.options.severities.join(', ')}`, `priorities: ${PRIORITIES.join(', ')}`];
+    return text(lines.join('\n'));
   });
 
   server.registerTool('list_bugs', {
@@ -35,7 +66,7 @@ async function serverFor(access: BugAccess) {
     if (status) bugs = bugs.filter(b => b.status.toLowerCase() === status.toLowerCase());
     if (query) { const q = query.toLowerCase(); bugs = bugs.filter(b => `${b.code} ${b.title} ${b.reporter} ${b.assignee} ${b.project}`.toLowerCase().includes(q)); }
     const rows = bugs.slice(0, limit ?? 50).map(b => ({ id: b.id, code: b.code, title: b.title, status: b.status, priority: b.priority, severity: b.severity, project: b.project, reporter: b.reporter, assignee: b.assignee, createdAt: b.createdAt }));
-    return text({ count: rows.length, total: bugs.length, bugs: rows });
+    return text(bugsTable(rows, bugs.length));
   });
 
   server.registerTool('get_bug', {
@@ -48,7 +79,7 @@ async function serverFor(access: BugAccess) {
     try {
       const d = await bw.bugDetail(access, numeric);
       const b = d.bug;
-      return text({ id: b.id, code: b.code, title: b.title, status: b.status, priority: b.priority, severity: b.severity, project: b.project, module: b.module, reporter: b.reporter, assignee: b.assignee, assignees: b.assignees, description: b.description, steps: b.steps, expected: b.expected, actual: b.actual, environment: b.environment, browserDevice: b.browserDevice, fixNotes: b.fixNotes, version: b.version, createdAt: b.createdAt, updatedAt: b.updatedAt, attachments: d.media.map(m => ({ name: m.name, kind: m.kind, url: m.url })), evidenceUrls: b.evidenceUrls, history: d.events.map(e => ({ by: e.actor, action: e.action, at: e.createdAt, detail: e.detail })) });
+      return text(bugDetailText(b, d.media.map(m => ({ name: m.name, kind: m.kind, url: m.url })), d.events.map(e => ({ actor: e.actor, action: e.action, createdAt: e.createdAt, detail: e.detail }))));
     } catch (e) { return fail(e instanceof Error ? e.message : 'This bug could not be read.'); }
   });
 
@@ -66,7 +97,7 @@ async function serverFor(access: BugAccess) {
       const { reportSchema } = await import('./bug-workflow');
       const data = reportSchema.parse({ requestId: crypto.randomUUID(), projectId: input.projectId, title: input.title ?? '', description: input.description, steps: input.steps, expected: input.expected ?? '', actual: input.actual ?? '', priority: input.priority ?? 'P3', severity: input.severity ?? 'Medium', module: input.module ?? '', environment: input.environment ?? '', browserDevice: input.browserDevice ?? '', evidenceUrls: [] });
       const r = await bw.reportBug(access, data);
-      return text({ created: true, id: r.id, code: r.code, message: `Reported ${r.code}.` });
+      return text(`Reported ${r.code} (id ${r.id}).`);
     } catch (e) { return fail(e instanceof Error ? e.message : 'The bug could not be reported.'); }
   });
 
