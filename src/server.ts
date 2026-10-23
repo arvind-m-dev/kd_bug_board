@@ -88,9 +88,11 @@ export default {
         const { handleMcpRequest } = await import('./lib/mcp.server');
         return mcpCors(await handleMcpRequest(request));
       }
-      if (mcpPath === '/.well-known/oauth-protected-resource' || mcpPath === '/.well-known/oauth-protected-resource/api/mcp') {
-        const origin = new URL(request.url).origin;
-        return mcpCors(Response.json({ resource: `${origin}/api/mcp`, authorization_servers: [], bearer_methods_supported: ['header'] }));
+      // OAuth 2.1 (register, authorize, token, discovery) so claude.ai / ChatGPT connectors can sign in.
+      if (mcpPath.startsWith('/api/oauth/') || mcpPath.startsWith('/.well-known/oauth-')) {
+        const { handleOauth } = await import('./lib/oauth-routes.server');
+        const oauth = await handleOauth(request);
+        if (oauth) return mcpCors(oauth);
       }
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
