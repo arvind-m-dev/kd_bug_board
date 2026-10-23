@@ -70,6 +70,23 @@ describe("seasonal choreography", () => {
     expect(a(0)).toEqual(a(0));
     expect(a(2)).not.toEqual(b(2));
   });
+  it("varies its itinerary: some visits only fly over, some hop between ledges", () => {
+    let seed = 3;
+    const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const journey = createSleighJourney(random);
+    let previous = journey(0).phase,
+      flyovers = 0,
+      hops = 0;
+    for (let i = 0; i < 200000; i++) {
+      const pose = journey(0.05);
+      if (previous === "approach" && pose.phase === "takeoff") flyovers++;
+      if (previous === "graze" && pose.phase === "landing") hops++;
+      if (pose.phase === "walk" || pose.phase === "graze") expect(pose.y).toBe(0);
+      previous = pose.phase;
+    }
+    expect(flyovers).toBeGreaterThan(0);
+    expect(hops).toBeGreaterThan(0);
+  });
   it("has smooth, bounded gusts with quiet intervals and stronger bursts", () => {
     const samples = Array.from({ length: 1000 }, (_, i) => seasonalWind(i * 0.05));
     expect(Math.min(...samples)).toBeLessThan(0);

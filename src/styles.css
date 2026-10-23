@@ -278,7 +278,7 @@
   .bf-topbar { gap: 6px; } .bf-topbar-left { min-width: 0; flex: 1; } .bf-topbar-left ol { flex-wrap: nowrap; } .bf-topbar-left li:first-of-type, .bf-topbar-left li:first-of-type + li { display: none; } .bf-topbar-left [aria-current=page], .bf-topbar-left [data-ui=breadcrumb] span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .bf-topbar-right { gap: 2px; flex: none; } .bf-topbar-right > span.border-l { display: none; } .bf-topbar-right > span.border-l + button { font-size: 0; gap: 0; padding: 0 8px; } }
 /* Phones and tablets: the 3D seasonal scene is laid out for wide screens and would sit on top of the cards. */
-@media(max-width:768px) { .bf-seasonal-3d, .bf-seasonal-gifts { display: none; } }
+@media(max-width:768px) { .bf-seasonal-3d, .bf-seasonal-front, .bf-seasonal-gifts { display: none; } }
 /* The page itself never scrolls sideways at any width: clip (not hidden) keeps sticky bars working, and scrollers inside, like tables, are unaffected. */
 html, body { overflow-x: clip; }
 /* Phones: lists flow with the page instead of scrolling inside a fixed box that slices a row. */
@@ -1507,10 +1507,13 @@ html[data-motion=off] .bf-surface-effects { display: none; }
 
 /* A transparent, lit WebGL diorama. Every layer is inert and below dialogs. */
 .bf-seasonal-3d { position: fixed; inset: 0; z-index: -1; pointer-events: none !important; user-select: none; overflow: hidden; contain: strict; transition: opacity .18s ease; } /* behind panels and text: the scene lives in the page background and margins */
+/* Scenery and creature layer: above panels, sidebar and topbar, below controls (37), the bin (40) and dialogs (50); never takes clicks. */
+.bf-seasonal-front { position: fixed; inset: 0; z-index: 36; pointer-events: none !important; user-select: none; overflow: hidden; contain: strict; transition: opacity .18s ease; }
+.bf-seasonal-front canvas { display: block; pointer-events: none !important; width: 100%; height: 100%; }
 .bf-seasonal-3d canvas { display: block; pointer-events: none !important; width: 100%; height: 100%; }
 body:has(.bf-seasonal-3d[data-ready=true]) :is(.bf-surface-bug, .bf-spider, .bf-bat, .bf-scurry, .bf-still, .bf-trees, .bf-sleigh, .bf-snow, .bf-snowman, .bf-gust-snow, .bf-leaf, .bf-pumpkins, .bf-web, .bf-ghost, .bf-crawl, .bf-climb) { display: none; }
-html[data-motion=off] .bf-seasonal-3d { display: none; }
-@media print { .bf-seasonal-3d, .bf-surface-effects, .bf-decor { display: none !important; } }
+html[data-motion=off] :is(.bf-seasonal-3d, .bf-seasonal-front) { display: none; }
+@media print { .bf-seasonal-3d, .bf-seasonal-front, .bf-surface-effects, .bf-decor { display: none !important; } }
 /* Dropdown options: drag to arrange */
 .bf-option-row { position: relative; }
 .bf-option-row[draggable=true] { cursor: default; }

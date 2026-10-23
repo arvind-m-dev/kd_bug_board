@@ -21,17 +21,42 @@ export function createSleighJourney(
   const between = (a: number, b: number) => a + random() * (b - a);
   let bend = between(-0.25, 0.25),
     depthBend = between(-0.35, 0.04);
+  // Random weaves on each flight: extra swerves and dips that still start and end exactly on the leg's joins.
+  const weave = () => ({
+    x: between(-0.09, 0.09),
+    y: between(-0.07, 0.07),
+    nx: 2 + Math.floor(random() * 3),
+    ny: 2 + Math.floor(random() * 3),
+    shift: between(0, Math.PI * 2),
+  });
+  let wobble = weave(),
+    hopped = false;
+  // A perch is a UI ledge (or the ground) to land on.
+  const perchAt = () => {
+    const perch = landing?.();
+    walkTo = perch?.walkTo;
+    return { x: perch?.x ?? between(0.35, 0.57), y: perch?.y ?? 0, depth: 0 };
+  };
   let yaw = 0,
     pitch = 0,
     bank = 0;
   const next = () => {
     from = to;
-    if (phase === "approach") {
+    if (phase === "approach" && random() < 0.3) {
+      // Sometimes it only flies over and leaves without landing.
+      phase = "takeoff";
+      duration = between(6, 10);
+      to = { x: random() < 0.5 ? -0.25 : 1.25, y: between(0.55, 0.9), depth: -1.8 };
+    } else if (phase === "approach") {
       phase = "landing";
       duration = between(6, 9);
-      const perch = landing?.();
-      walkTo = perch?.walkTo;
-      to = { x: perch?.x ?? between(0.35, 0.57), y: perch?.y ?? 0, depth: 0 };
+      to = perchAt();
+    } else if (phase === "graze" && !hopped && random() > 0.68) {
+      hopped = true;
+      // Or hops over to another card before leaving.
+      phase = "landing";
+      duration = between(4, 7);
+      to = perchAt();
     } else if (phase === "landing") {
       phase = "walk";
       duration = between(4, 7);
@@ -50,13 +75,15 @@ export function createSleighJourney(
       to = { ...from };
     } else {
       phase = "approach";
+      hopped = false;
       duration = between(9, 14);
       // Turn around while out of view, then re-enter through the edge we left.
       from = { ...from };
       to = { x: between(0.38, 0.63), y: between(0.45, 0.7), depth: between(0.05, 0.18) };
     }
-    bend = between(-0.18, 0.18);
+    bend = between(-0.28, 0.28);
     depthBend = between(-0.35, 0.04);
+    wobble = weave();
   };
   return (dt: number) => {
     elapsed += Math.max(0, dt);
@@ -70,9 +97,18 @@ export function createSleighJourney(
     // A bowed 3D curve, with zero positional offset at each join.
     const point = (u: number): Pose => {
       const arc = flight ? Math.sin(Math.PI * u) ** 2 : 0;
+      const sway = flight ? Math.sin(Math.PI * u) : 0;
       return {
-        x: from.x + (to.x - from.x) * u + bend * arc,
-        y: from.y + (to.y - from.y) * u + (flight ? 0.12 * arc : 0),
+        x:
+          from.x +
+          (to.x - from.x) * u +
+          bend * arc +
+          wobble.x * sway * Math.sin(wobble.nx * Math.PI * u + wobble.shift),
+        y:
+          from.y +
+          (to.y - from.y) * u +
+          (flight ? 0.12 * arc : 0) +
+          wobble.y * sway * Math.sin(wobble.ny * Math.PI * u),
         depth: from.depth + (to.depth - from.depth) * u + depthBend * arc,
       };
     };

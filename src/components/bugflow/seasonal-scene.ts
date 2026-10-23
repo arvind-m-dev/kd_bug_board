@@ -27,8 +27,26 @@ export function createSeasonalScene(
   renderer.outputColorSpace = T.SRGBColorSpace;
   host.style.display = "";
   host.append(renderer.domElement);
+  // Scenery and creatures render on a second click-through canvas above the UI, so bugs, spiders and bats crawl
+  // over cards and hang from controls instead of hiding behind them. Only the sky stays in the background canvas.
+  const CREATURES = 1;
+  const front = document.createElement("div");
+  front.className = "bf-seasonal-front";
+  front.setAttribute("aria-hidden", "true");
+  front.inert = true;
+  const frontRenderer = new T.WebGLRenderer({
+    alpha: true,
+    antialias: true,
+    powerPreference: "low-power",
+  });
+  frontRenderer.setClearColor(0x000000, 0);
+  frontRenderer.outputColorSpace = T.SRGBColorSpace;
+  front.append(frontRenderer.domElement);
+  document.body.append(front);
   const scene = new T.Scene();
   const sky = createSeasonalSky(scene, season);
+  // Only the sky stays behind the UI; everything added after it moves to the front canvas below.
+  const backdrop = new Set(scene.children);
   const landscape = createSeasonalLandscape(scene, season);
   const camera = new T.OrthographicCamera(0, innerWidth, innerHeight, 0, 0.1, 3000);
   camera.position.z = 1000;
@@ -38,6 +56,7 @@ export function createSeasonalScene(
   const rim = new T.DirectionalLight(0x92bfff, 2);
   rim.position.set(500, 150, -50);
   scene.add(ambient, key, rim);
+  for (const light of [ambient, key, rim]) light.layers.enableAll();
   const materials = new Set<T.Material>();
   const geometries = new Set<T.BufferGeometry>();
   const mat = (color: number, roughness = 0.65, metalness = 0) => {
@@ -695,7 +714,8 @@ export function createSeasonalScene(
     return {
       x: x / width,
       y: Math.max(0, (height - landingRect.top - 5) / Math.max(100, height - headerBottom - 130)),
-      walkTo: Math.min(right, x + 45) / width,
+      // Walk left or right along the ledge at random.
+      walkTo: (Math.random() < 0.5 ? Math.max(left, x - 45) : Math.min(right, x + 45)) / width,
     };
   });
   const deerBodies: T.Group[] = [];
@@ -873,6 +893,8 @@ export function createSeasonalScene(
     camera.updateProjectionMatrix();
     renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
     renderer.setSize(width, height);
+    frontRenderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    frontRenderer.setSize(width, height);
     measured = -Infinity;
     dirty = true;
   };
@@ -1035,7 +1057,7 @@ export function createSeasonalScene(
     const busy =
       !!document.getSelection()?.toString() ||
       !!document.querySelector('[role="dialog"], [role="alertdialog"], [role="listbox"]');
-    host.style.opacity = busy ? "0" : "1";
+    host.style.opacity = front.style.opacity = busy ? "0" : "1";
     if (busy) {
       dirty = true;
       return;
@@ -1179,11 +1201,11 @@ export function createSeasonalScene(
         const j = c.n,
           m = c.motion!;
         const scale = (width < 760 ? 0.46 : 0.65) + (m.seed % 30) / 100;
-        // Two of every three bats favor the tree; the others explore UI ledges.
-        if (j % 3 === 2 && m.homeKind < 0 && uiRoosts.length)
+        // One bat in three favors the tree; the others hang from UI ledges anywhere on the page.
+        if (j % 3 !== 0 && m.homeKind < 0 && uiRoosts.length)
           m.homeKind = Math.floor(chance() * uiRoosts.length);
         const uiPerch =
-          j % 3 === 2 && uiRoosts.length ? uiRoosts[m.homeKind % uiRoosts.length] : undefined;
+          j % 3 !== 0 && uiRoosts.length ? uiRoosts[m.homeKind % uiRoosts.length] : undefined;
         const perch = uiPerch
           ? new T.Vector3(uiPerch.x, height - uiPerch.y, 28)
           : hauntedTree.localToWorld(roosts[j % roosts.length]!.clone());
@@ -1204,7 +1226,7 @@ export function createSeasonalScene(
             m.phase = "flight";
             m.until = time + random(10, 20);
             m.retarget = 0;
-            if (j % 3 === 2 && uiRoosts.length) m.homeKind = Math.floor(chance() * uiRoosts.length);
+            if (j % 3 !== 0 && uiRoosts.length) m.homeKind = Math.floor(chance() * uiRoosts.length);
           }
         } else {
           if (m.phase === "flight" && time > m.until) {
@@ -1220,7 +1242,7 @@ export function createSeasonalScene(
                 ? chance() < 0.5
                   ? -100
                   : width + 100
-                : anywhere(sidebarRight + 40, Math.max(sidebarRight + 50, width - 50)),
+                : anywhere(40, Math.max(50, width - 50)),
               anywhere(90, Math.max(100, height - 90)),
               anywhere(30, 75),
             );
@@ -1362,8 +1384,15 @@ export function createSeasonalScene(
         flakes.setMatrixAt(i, dummy.matrix);
       });
     flakes.instanceMatrix.needsUpdate = true;
+    camera.layers.set(0);
     renderer.render(scene, camera);
+    camera.layers.set(CREATURES);
+    frontRenderer.render(scene, camera);
   }
+  // Trees, ground, mountains, webs, snow and creatures render above the UI on the click-through canvas.
+  for (const child of scene.children)
+    if (!backdrop.has(child) && !(child instanceof T.Light))
+      child.traverse((o) => o.layers.set(CREATURES));
   resize();
   window.addEventListener("resize", resize);
   window.addEventListener("scroll", invalidate, true);
@@ -1375,12 +1404,12 @@ export function createSeasonalScene(
     contextLost = true;
     cancelAnimationFrame(frame);
     host.dataset["ready"] = "";
-    host.style.display = "none";
+    host.style.display = front.style.display = "none";
   };
   const restored = () => {
     if (disposed) return;
     contextLost = false;
-    host.style.display = "";
+    host.style.display = front.style.display = "";
     host.dataset["ready"] = "true";
     measured = -Infinity;
     dirty = true;
@@ -1389,6 +1418,8 @@ export function createSeasonalScene(
   };
   renderer.domElement.addEventListener("webglcontextlost", lost);
   renderer.domElement.addEventListener("webglcontextrestored", restored);
+  frontRenderer.domElement.addEventListener("webglcontextlost", lost);
+  frontRenderer.domElement.addEventListener("webglcontextrestored", restored);
   frame = requestAnimationFrame(draw);
   return () => {
     disposed = true;
@@ -1409,5 +1440,8 @@ export function createSeasonalScene(
     renderer.dispose();
     renderer.forceContextLoss();
     renderer.domElement.remove();
+    frontRenderer.dispose();
+    frontRenderer.forceContextLoss();
+    front.remove();
   };
 }
