@@ -23,8 +23,8 @@ function TokenReveal({ value, onDone }: { value: NewAiToken; onDone: () => void 
   return <div className="bf-token-reveal">
     <strong className="text-sm">Your new AI token{value.label ? ` (${value.label})` : ''}</strong>
     <p className="text-xs text-muted-foreground">Copy it now — it is shown only once. Paste it into your AI client as the Bearer token or MCP token.</p>
-    <div className="bf-token-secret"><code>{value.secret}</code><Button type="button" size="icon" variant="outline" className="h-8 w-8 shrink-0" aria-label="Copy token" onClick={() => void copy()}>{copied ? <Check className="text-success" size={15} /> : <Copy size={15} />}</Button></div>
-    <Button type="button" size="sm" variant="ghost" className="justify-self-start" onClick={onDone}>Done</Button>
+    <div className="bf-token-secret"><code>{value.secret}</code><Button type="button" size="icon" variant="outline" className="h-8 w-8 shrink-0" aria-label="Copy token" title="Copy the token — it is shown only once" onClick={() => void copy()}>{copied ? <Check className="text-success" size={15} /> : <Copy size={15} />}</Button></div>
+    <Button type="button" size="sm" variant="ghost" className="justify-self-start" title="Hide the token now that you have copied it" onClick={onDone}>Done</Button>
   </div>;
 }
 
@@ -56,7 +56,7 @@ export function AiTokens({ scope, members = [] }: { scope: Scope; members?: Memb
     {isAdmin && <McpControls mcpUrl={mcpUrl} />}
     <div className="bf-setting-row"><span className="bf-stat-icon bf-tone-info"><Bot size={19} /></span><div><h3>AI access (MCP)</h3>
       <p>Let an AI client — Claude, Cursor, VS Code, ChatGPT — read and report bugs {isAdmin ? 'as any panel' : 'for you'}. Each token carries {isAdmin ? "that panel's" : 'your'} permissions and project scope, and can be revoked any time.</p></div>
-      <Button type="button" size="sm" variant="ghost" onClick={() => setGuide(g => !g)}><BookOpen />How to connect<ChevronDown className={guide ? 'rotate-180' : ''} /></Button></div>
+      <Button type="button" size="sm" variant="ghost" title="Show the steps to connect an AI client to this workspace" onClick={() => setGuide(g => !g)}><BookOpen />How to connect<ChevronDown className={guide ? 'rotate-180' : ''} /></Button></div>
     {guide && <div className="bf-media-guide"><ol>
       <li><strong>Endpoint</strong>: <code>{mcpUrl}</code> (Streamable HTTP).</li>
       <li><strong>Create a token</strong> below and copy it.</li>
@@ -68,13 +68,13 @@ export function AiTokens({ scope, members = [] }: { scope: Scope; members?: Memb
       {isAdmin && <label className="grid gap-1 text-xs"><span className="font-semibold">Panel this token acts as</span>
         <ThemedSelect label="Panel" value={target} onChange={setTarget} options={[{ value: 'admin', label: 'Admin panel (full access)' }, ...members.map(m => ({ value: m.id, label: `${m.name} · ${m.type} panel` }))]} /></label>}
       <label className="grid min-w-0 flex-1 gap-1 text-xs"><span className="font-semibold">Label (optional)</span><Input value={label} maxLength={60} placeholder="e.g. Claude on my laptop" onChange={e => setLabel(e.target.value)} /></label>
-      <Button type="submit" size="sm" disabled={create.isPending}>{create.isPending ? <LoaderCircle className="animate-spin" /> : <Plus />}Create token</Button>
+      <Button type="submit" size="sm" disabled={create.isPending} title="Create a new AI token for the chosen panel; the secret is shown once">{create.isPending ? <LoaderCircle className="animate-spin" /> : <Plus />}Create token</Button>
     </form>}
     {q.isError && <ErrorNotice message={actionError(q.error, 'Tokens could not be loaded.')} onRetry={() => { void q.refetch(); }} />}
     {q.data && q.data.length > 0 && <ul className="bf-token-list">{q.data.map(t => <li key={t.id}>
       <span className="bf-stat-icon bf-tone-neutral"><KeyRound size={15} /></span>
       <span className="min-w-0"><strong className="block truncate text-sm">{t.label || 'AI token'}</strong><small className="block text-xs text-muted-foreground">{isAdmin ? `${t.scopeLabel} · ` : ''}created {timeAgo(t.createdAt)}{t.lastUsedAt ? ` · last used ${timeAgo(t.lastUsedAt)}` : ' · never used'}</small></span>
-      <Button type="button" size="sm" variant="ghost" className="text-destructive" onClick={() => setRevoking(t)}><Trash2 />Revoke</Button>
+      <Button type="button" size="sm" variant="ghost" className="text-destructive" title="Revoke this token; any AI client using it loses access immediately" onClick={() => setRevoking(t)}><Trash2 />Revoke</Button>
     </li>)}</ul>}
     {q.data && q.data.length === 0 && !fresh && <p className="px-1 text-xs text-muted-foreground">No AI tokens yet.</p>}
     <ConfirmAction open={revoking !== null} onOpenChange={o => { if (!o) setRevoking(null); }} destructive title={`Revoke ${revoking?.label || 'this token'}?`} description="Any AI client using this token loses access immediately. This cannot be undone; create a new token if you need access again." confirmLabel="Revoke token"
@@ -93,8 +93,8 @@ function McpControls({ mcpUrl }: { mcpUrl: string }) {
   const set = (patch: Partial<{ enabled: boolean; oauth: boolean }>) => m.mutate({ ...cfg, ...patch });
   const copy = async () => { try { await navigator.clipboard.writeText(mcpUrl); setCopied(true); toast.success('Endpoint copied'); window.setTimeout(() => setCopied(false), 1500); } catch { toast.error('Copy failed.'); } };
   return <div className="bf-mcp-controls">
-    <div className="bf-mcp-endpoint"><span className="text-xs text-muted-foreground">Connect AI clients to</span><code>{mcpUrl}</code><Button type="button" size="icon" variant="outline" className="h-8 w-8 shrink-0" aria-label="Copy endpoint" onClick={() => void copy()}>{copied ? <Check className="text-success" size={15} /> : <Copy size={15} />}</Button></div>
-    <label className="bf-switch-row"><span className="text-sm">AI access (MCP) is on<small className="block text-xs text-muted-foreground">Off: no AI client can read or report bugs, and every token stops working.</small></span><Switch checked={cfg.enabled} disabled={m.isPending} onCheckedChange={v => set({ enabled: v })} aria-label="AI access on" /></label>
-    <label className="bf-switch-row" data-disabled={!cfg.enabled || undefined}><span className="text-sm">App connectors (OAuth)<small className="block text-xs text-muted-foreground">On: claude.ai and ChatGPT can connect by signing in, no pasted token. Off: paste a token instead.</small></span><Switch checked={cfg.oauth} disabled={m.isPending || !cfg.enabled} onCheckedChange={v => set({ oauth: v })} aria-label="App connectors on" /></label>
+    <div className="bf-mcp-endpoint"><span className="text-xs text-muted-foreground">Connect AI clients to</span><code>{mcpUrl}</code><Button type="button" size="icon" variant="outline" className="h-8 w-8 shrink-0" aria-label="Copy endpoint" title="Copy the MCP endpoint URL to paste into an AI client" onClick={() => void copy()}>{copied ? <Check className="text-success" size={15} /> : <Copy size={15} />}</Button></div>
+    <label className="bf-switch-row"><span className="text-sm">AI access (MCP) is on<small className="block text-xs text-muted-foreground">Off: no AI client can read or report bugs, and every token stops working.</small></span><Switch checked={cfg.enabled} disabled={m.isPending} onCheckedChange={v => set({ enabled: v })} aria-label="AI access on" title="Turn the whole MCP endpoint on or off. Off: no AI client works and every token stops." /></label>
+    <label className="bf-switch-row" data-disabled={!cfg.enabled || undefined}><span className="text-sm">App connectors (OAuth)<small className="block text-xs text-muted-foreground">On: claude.ai and ChatGPT can connect by signing in, no pasted token. Off: paste a token instead.</small></span><Switch checked={cfg.oauth} disabled={m.isPending || !cfg.enabled} onCheckedChange={v => set({ oauth: v })} aria-label="App connectors on" title="Let claude.ai and ChatGPT connect by signing in (OAuth). Off: paste a token instead." /></label>
   </div>;
 }
