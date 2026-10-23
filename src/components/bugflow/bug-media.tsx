@@ -280,6 +280,20 @@ export function MediaDropZone({
       );
     onFiles(files.slice(0, Math.max(0, remaining)));
   };
+  // Paste a screenshot or file from the clipboard anywhere on the page; text pastes are left alone.
+  useEffect(() => {
+    if (disabled) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const files = Array.from(e.clipboardData?.files ?? []);
+      if (!files.length) return;
+      e.preventDefault();
+      const dt = new DataTransfer();
+      for (const f of files) dt.items.add(f);
+      take(dt.files);
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, [disabled, take]);
   const editable = (u: UploadState) =>
     !!onLabel && (u.status === "preparing" || u.status === "queued" || u.status === "failed");
   return (
@@ -326,7 +340,7 @@ export function MediaDropZone({
             ? "Media uploads unavailable"
             : remaining <= 0
               ? "This bug has all 10 files"
-              : "Drop screenshots, recordings or PDFs here — several at once is fine"}
+              : "Drop or paste screenshots, recordings or PDFs here — several at once is fine"}
         </strong>
         <span className="text-xs text-muted-foreground">
           {disabledReason ??

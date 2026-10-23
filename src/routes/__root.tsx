@@ -15,6 +15,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/bugflow/theme-toggle";
 import { Decorations } from "@/components/bugflow/decorations";
 import { ScrollHints } from "@/components/bugflow/scroll-hints";
+import { BackToTop } from "@/components/bugflow/back-to-top";
 import { TopProgress } from "@/components/bugflow/loading";
 import { THEME_BOOT_SCRIPT } from "@/lib/appearance";
 import { Button } from "@/components/ui/button";
@@ -136,6 +137,7 @@ function RootComponent() {
         <Toaster />
         <Decorations />
         <ScrollHints />
+        <BackToTop />
       </ThemeProvider>
     </QueryClientProvider>
   );

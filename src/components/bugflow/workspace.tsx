@@ -1178,8 +1178,20 @@ function QuickSearch({ close }: { close: () => void }) {
     void navigate({ to: "/admin/bugs", search: { q: q.trim() } });
     close();
   };
+  // ↑ ↓ move focus through the results (and back to the input); Enter activates the focused one.
+  const onKeys = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    const items = Array.from(e.currentTarget.querySelectorAll<HTMLElement>("[data-result]"));
+    if (!items.length) return;
+    e.preventDefault();
+    const i = items.indexOf(document.activeElement as HTMLElement);
+    const next =
+      e.key === "ArrowDown" ? (i < 0 ? 0 : Math.min(items.length - 1, i + 1)) : i <= 0 ? -1 : i - 1;
+    if (next < 0) e.currentTarget.querySelector("input")?.focus();
+    else items[next]?.focus();
+  };
   return (
-    <>
+    <div className="grid gap-3" onKeyDown={onKeys}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -1196,11 +1208,15 @@ function QuickSearch({ close }: { close: () => void }) {
           autoFocus
         />
       </form>
+      <p className="-mt-2 px-1 text-[11px] text-muted-foreground">
+        <kbd>↑</kbd> <kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>Esc</kbd> close
+      </p>
       {text ? (
         <div className="grid gap-1">
           {bugHits.map((b) => (
             <Button
               key={b.id}
+              data-result
               variant="ghost"
               className="h-auto w-full min-w-0 justify-start py-2"
               onClick={() => {
@@ -1220,6 +1236,7 @@ function QuickSearch({ close }: { close: () => void }) {
           {memberHits.map((m) => (
             <Button
               key={m.id}
+              data-result
               variant="ghost"
               className="justify-start"
               onClick={() => {
@@ -1241,7 +1258,7 @@ function QuickSearch({ close }: { close: () => void }) {
               Nothing matches “{q.trim()}”. Press Enter to search every bug.
             </p>
           )}
-          <Button variant="outline" size="sm" className="mt-1" onClick={goBugs}>
+          <Button data-result variant="outline" size="sm" className="mt-1" onClick={goBugs}>
             <Search />
             Search all bugs for “{q.trim()}”
           </Button>
@@ -1250,7 +1267,7 @@ function QuickSearch({ close }: { close: () => void }) {
         <div className="grid gap-1">
           {navigation.slice(0, 6).map((n) => (
             <Button key={n.to} asChild variant="ghost" className="justify-start" onClick={close}>
-              <Link to={n.to}>
+              <Link to={n.to} data-result>
                 <n.icon />
                 {n.label}
                 <ArrowUpRight className="ml-auto" />
@@ -1259,7 +1276,7 @@ function QuickSearch({ close }: { close: () => void }) {
           ))}
         </div>
       )}
-    </>
+    </div>
   );
 }
 const eventLabel = (action: string) =>

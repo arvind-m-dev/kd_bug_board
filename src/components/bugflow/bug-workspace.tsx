@@ -385,7 +385,7 @@ export function BugWorkspace({
           <RefreshCw className={data.isFetching ? "animate-spin" : ""} />
         </Button>
         {selecting ? (
-          <>
+          <span className="bf-bulk-actions">
             <Button
               variant="outline"
               size="sm"
@@ -408,7 +408,7 @@ export function BugWorkspace({
               <X />
               Done
             </Button>
-          </>
+          </span>
         ) : (
           <Button
             variant="outline"
@@ -706,6 +706,21 @@ export function BugWorkspace({
                 Raise a bug
               </Button>
             )}
+            {d.total > 0 &&
+              (query || filter !== "all" || priority !== "all" || severity !== "all") && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setQuery("");
+                    setFilter("all");
+                    setPriority("all");
+                    setSeverity("all");
+                  }}
+                >
+                  <X />
+                  Clear filters
+                </Button>
+              )}
           </div>
         )}
       </div>
