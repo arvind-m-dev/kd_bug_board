@@ -1,9 +1,9 @@
 type Statement = { query: string; params?: unknown[] };
 type NeonResult = { rows: Record<string, unknown>[]; fields: { name: string; dataTypeID: number }[]; rowCount: number | null; command: string };
 type NeonBatchResult = { results: NeonResult[] };
-type NeonResponse = { status: number; retryAfter: string | null; text: string; json: any; elapsedMs: number };
+type NeonResponse = { status: number; retryAfter: string | null; text: string; json: unknown; elapsedMs: number };
 type NeonErrorKind = 'unreachable' | 'stale_connection' | 'endpoint_blocked' | 'maybe_committed' | 'too_large' | 'rate_limited' | 'unavailable' | 'input' | 'statement' | 'rejected';
-type NeonError = Error & { status: number; code?: string; body: string; kind: NeonErrorKind };
+type NeonError = Error & { status: number; code?: string | undefined; body: string; kind: NeonErrorKind };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const toBody = (q: string | Statement[], params: unknown[]) => typeof q === 'string' ? { query: q, params } : { queries: q };
 // Direct Neon connection via DATABASE_URL, normalized to a status/json response so errors classify uniformly.
@@ -18,12 +18,13 @@ async function directFetch(url: string, body: { query?: string; params?: unknown
       : await sql.query(body.query!, body.params ?? []);
     const json = JSON.parse(JSON.stringify(result));
     return { status: 200, retryAfter: null, text: '', json, elapsedMs: Date.now() - started };
-  } catch (err: any) {
+  } catch (err: unknown) {
     // DNS/connection failures happen before anything is sent, so nothing can have been saved.
-    const cause = err?.sourceError?.cause?.code ?? err?.cause?.code;
-    if (['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ENETUNREACH', 'EHOSTUNREACH'].includes(cause)) return { status: 0, retryAfter: null, text: '', json: { message: `Cannot reach database host (${cause})`, unreachable: true }, elapsedMs: Date.now() - started };
-    const json = { message: String(err?.message ?? err), code: err?.code };
-    return { status: err?.code ? 400 : 0, retryAfter: null, text: json.message, json, elapsedMs: Date.now() - started };
+    const e = err as { sourceError?: { cause?: { code?: string } }; cause?: { code?: string }; message?: unknown; code?: string } | null;
+    const cause = e?.sourceError?.cause?.code ?? e?.cause?.code;
+    if (cause && ['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ENETUNREACH', 'EHOSTUNREACH'].includes(cause)) return { status: 0, retryAfter: null, text: '', json: { message: `Cannot reach database host (${cause})`, unreachable: true }, elapsedMs: Date.now() - started };
+    const json = { message: String(e?.message ?? err), code: e?.code };
+    return { status: e?.code ? 400 : 0, retryAfter: null, text: json.message, json, elapsedMs: Date.now() - started };
   }
 }
 async function neonFetch(body: unknown, headers: Record<string, string>): Promise<NeonResponse> {
@@ -31,10 +32,12 @@ async function neonFetch(body: unknown, headers: Record<string, string>): Promis
   if (!url) throw new Error('Missing DATABASE_URL');
   return directFetch(url, body as Parameters<typeof directFetch>[1], headers);
 }
-const isStale = (json: any) => json?.code === '28P01' || json?.code === '28000' || /^(password authentication failed|Control plane request failed: endpoint cannot be found)/.test(json?.message ?? '');
-const isEndpointBlocked = (json: any) => /^(The endpoint has been disabled|Control plane request failed: endpoint is)/.test(json?.message ?? '');
+type NeonErrorBody = { code?: string; message?: string; type?: string; unreachable?: boolean } | null | undefined;
+const errorBody = (json: unknown): NeonErrorBody => (json && typeof json === 'object' ? (json as NeonErrorBody) : null);
+const isStale = (json: unknown) => { const b = errorBody(json); return b?.code === '28P01' || b?.code === '28000' || /^(password authentication failed|Control plane request failed: endpoint cannot be found)/.test(b?.message ?? ''); };
+const isEndpointBlocked = (json: unknown) => /^(The endpoint has been disabled|Control plane request failed: endpoint is)/.test(errorBody(json)?.message ?? '');
 function neonFailure(r: NeonResponse, write: boolean): NeonError {
-  const { status, json, elapsedMs } = r; let hint: string; let kind: NeonErrorKind;
+  const { status, elapsedMs } = r; const json = errorBody(r.json); let hint: string; let kind: NeonErrorKind;
   if (json?.unreachable) { kind = 'unreachable'; hint = 'the database host could not be reached (DNS or network); nothing was sent'; }
   else if (isStale(json)) { kind = 'stale_connection'; hint = 'the stored connection string no longer works: stop retrying; replace DATABASE_URL with a current Neon connection string'; }
   else if (isEndpointBlocked(json)) { kind = 'endpoint_blocked'; hint = 'Neon is not serving this endpoint (disabled, or a quota or billing limit): log Neon\'s message; never retry unchanged'; }

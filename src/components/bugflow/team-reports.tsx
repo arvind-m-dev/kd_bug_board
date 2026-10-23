@@ -78,7 +78,8 @@ export function TeamReports() {
   const select = (id: string | null) => void navigate({ to: '/admin/reports', search: id ? { person: id } : {}, replace: true });
   const toggle = (id: string) => select(selected?.id === id ? null : id);
   // Keep the highlighted name visible (the list scrolls sideways on phones).
-  useEffect(() => { document.getElementById(selected ? `person-${selected.id}` : 'person-team')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [selected?.id]);
+  const selectedId = selected?.id;
+  useEffect(() => { document.getElementById(selectedId ? `person-${selectedId}` : 'person-team')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [selectedId]);
   function onKey(e: KeyboardEvent<HTMLUListElement>) {
     if (!['ArrowDown', 'ArrowUp'].includes(e.key)) return;
     e.preventDefault();
@@ -276,9 +277,9 @@ function ShareTip({ active, payload, total }: TooltipProps<number, string> & { t
 function TrendBars({ data }: { data: { week: string; raised: number; fixed: number }[] }) {
   const label = (w: string) => new Date(`${w}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   return <div className="bf-trend"><ResponsiveContainer width="100%" height="100%">
-    <BarChart data={data} margin={{ top: 6, right: 6, bottom: 0, left: -22 }} barGap={2} barCategoryGap="28%">
+    <BarChart data={data} margin={{ top: 8, right: 6, bottom: 0, left: -10 }} barGap={2} barCategoryGap="28%">
       <CartesianGrid vertical={false} stroke="var(--border)" />
-      <XAxis dataKey="week" tickFormatter={label} interval={1} tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }} axisLine={false} tickLine={false} />
+      <XAxis dataKey="week" tickFormatter={label} interval="preserveStartEnd" minTickGap={28} tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }} axisLine={false} tickLine={false} />
       <YAxis allowDecimals={false} tickCount={4} tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }} axisLine={false} tickLine={false} width={40} />
       <Tooltip cursor={{ fill: 'color-mix(in oklab, var(--foreground) 6%, transparent)' }} content={<WeekTip />} />
       <Bar dataKey="raised" name="Raised" fill="var(--viz-1)" radius={[4, 4, 0, 0]} isAnimationActive={false} />

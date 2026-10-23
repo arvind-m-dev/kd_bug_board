@@ -50,6 +50,7 @@ export function PersonalPortal({token,type}:{token:string;type:'reporter'|'qa'|'
  if(!portal.data)return <div className="min-h-screen bg-background"><header className="bf-topbar"><strong>Futurist Global Bug Board</strong></header><main className="bf-main"><div className="bf-access"><LockKeyhole className="mx-auto mb-5 text-primary" size={32}/><h1>Portal unavailable</h1><p>This link may be invalid, expired, or revoked. Ask your Admin for a new link if the problem continues.</p>{portal.isError&&<ErrorNotice message="This portal could not be verified. Please try again." onRetry={()=>{void portal.refetch();}} retrying={portal.isFetching}/>}</div></main></div>;
  const p=portal.data;const access:BugAccess={kind:'portal',token,type};const role=roleText(p.role);const first=p.name.trim().split(/\s+/)[0]||p.name;const current=TABS.find(t=>t.id===tab)!;
  return <div className="bf-shell">
+  {menu&&<div className="bf-sidebar-scrim" aria-hidden="true" onClick={()=>setMenu(false)}/>}
   <aside className="bf-sidebar" data-open={menu} aria-label="Portal navigation">
    <div className="bf-brand"><span className="bf-logo"><BrandMark/></span><span className="bf-brand-name">Futurist Global Bug Board<span className="text-primary">.</span></span></div>
    <div className="bf-workspace"><span className="bf-avatar">{initials(p.name)}</span><div className="min-w-0"><strong className="block truncate text-xs">{p.name}</strong><span className="text-[11.5px] text-muted-foreground">{role} · <span className="font-mono">{p.memberCode}</span></span></div></div>

@@ -1,8 +1,8 @@
 import { Link, useRouterState, useNavigate } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { useEffect, useState } from 'react';
-import { Bug, ChartPie, LayoutDashboard, UsersRound, ListChecks, FolderKanban, Activity, Settings2, Search, Menu, X, ArrowUpRight, ShieldCheck, Database, CircleHelp, ClipboardCheck, Link2, Plus, Copy, FileDown, RefreshCw, Upload, LockKeyhole, Layers3, Archive, ArchiveRestore, Printer, Palette, ArrowLeft, FileSpreadsheet, Trash2, SlidersHorizontal, Bot} from 'lucide-react';
+import { useEffect, useLayoutEffect, useState } from 'react';
+import { Bug, ChartPie, LayoutDashboard, UsersRound, ListChecks, FolderKanban, Activity, Settings2, Search, Menu, X, ArrowUpRight, ShieldCheck, Database, CircleHelp, ClipboardCheck, Link2, Plus, Copy, FileDown, RefreshCw, Upload, LockKeyhole, Layers3, Archive, ArchiveRestore, Printer, Palette, ArrowLeft, FileSpreadsheet, Trash2, SlidersHorizontal, Bot, ChevronLeft, ChevronRight, ChevronDown} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +43,13 @@ type View = 'overview'|'bugs'|'users'|'assignments'|'projects'|'activity'|'repor
 const navigation: {to:'/admin'|'/admin/bugs'|'/admin/users'|'/admin/assignments'|'/admin/projects'|'/admin/activity'|'/admin/reports'|'/admin/settings';label:string;icon:LucideIcon;count?:boolean}[] = [
  {to:'/admin',label:'Overview',icon:LayoutDashboard}, {to:'/admin/bugs',label:'All bugs',icon:Bug,count:true}, {to:'/admin/assignments',label:'Assignments',icon:ListChecks,count:true}, {to:'/admin/projects',label:'Projects & modules',icon:FolderKanban}, {to:'/admin/users',label:'Team & access',icon:UsersRound,count:true}, {to:'/admin/activity',label:'Activity & reports',icon:Activity}, {to:'/admin/reports',label:'Team reports',icon:ChartPie}, {to:'/admin/settings',label:'Settings',icon:Settings2}
 ];
+// Sidebar is grouped; each group's title carries a chevron to fold its links away.
+const navGroups: {id:string;label:string;icon:LucideIcon;items:typeof navigation}[] = [
+ {id:'overview',label:'Overview',icon:LayoutDashboard,items:navigation.slice(0,1)},
+ {id:'bugs',label:'Bugs',icon:Bug,items:navigation.slice(1,3)},
+ {id:'management',label:'Management',icon:FolderKanban,items:navigation.slice(3,5)},
+ {id:'reports',label:'Reports',icon:ChartPie,items:navigation.slice(5,7)},
+];
 const titles: Record<View,string> = {overview:'Overview',bugs:'All bugs',users:'Team & access',assignments:'Assignments',projects:'Projects & modules',activity:'Activity & reports',reports:'Team reports',settings:'Settings',appearance:'Theme Lab',['settings-options']:'Options & fields',['settings-storage']:'Storage & services',['settings-ai']:'AI access (MCP)',trash:'Trash',notifications:'Notifications'};
 const subtitles: Record<View,string> = {trash:'Deleted bugs and members, restorable for 30 days.',appearance:'Colours, style, fonts, motion, seasonal scenes and what is on screen — for the workspace and every portal.',['settings-options']:'Severities, modules, environments, devices, and who bugs can be assigned to.',['settings-storage']:'Where data and private media live, and the connection status.',['settings-ai']:'Let AI clients (Claude, Cursor, ChatGPT) read and report bugs, and manage their tokens.',overview:'A clear view of your bugs, team, and everything in between.',bugs:'Track, prioritize, and manage every reported issue.',users:'Your team, their roles and their private portal links — open, copy or replace a link here.',assignments:'Keep the right bugs with the right people.',projects:'Organize testing across your applications and modules.',reports:'How each person is doing — what they raised, fixed, rejected and how fast.',activity:'Every change, with the complete story behind it.',settings:'Workspace preferences, security, and connected services.',notifications:'Every bug update from the last 10 days.'};
 function useNavCounts():Record<string,number|undefined>{
@@ -55,31 +62,42 @@ function useNavCounts():Record<string,number|undefined>{
 export function Workspace({view='overview'}:{view?:View}) {
  const queryClient=useQueryClient();
  const [menu,setMenu]=useState(false); const [dialog,setDialog]=useState<string|null>(null);
+ // Collapsed rail (desktop/tablet) and per-group fold state are remembered per browser. Both start at their
+ // defaults so the server and client render the same HTML; the saved choice is applied before first paint.
+ const [collapsed,setCollapsed]=useState(false);
+ const [openGroups,setOpenGroups]=useState<Record<string,boolean>>({});
+ useLayoutEffect(()=>{try{setCollapsed(localStorage.getItem('bf-sidebar-collapsed')==='1');setOpenGroups(JSON.parse(localStorage.getItem('bf-nav-groups')||'{}') as Record<string,boolean>);}catch{/* private mode: keep defaults */}},[]);
+ const toggleCollapsed=()=>setCollapsed(c=>{const n=!c;try{localStorage.setItem('bf-sidebar-collapsed',n?'1':'0');}catch{/* private mode */}return n;});
+ const toggleGroup=(id:string)=>setOpenGroups(o=>{const n={...o,[id]:o[id]!==true};try{localStorage.setItem('bf-nav-groups',JSON.stringify(n));}catch{/* private mode */}return n;});
  const pathname=useRouterState({select:s=>s.location.pathname});const navCounts=useNavCounts();
+ // The group holding the current page is highlighted and forced open.
+ const activeGroup=navGroups.find(g=>g.items.some(n=>n.to===pathname||(n.to==='/admin'&&(pathname==='/'||pathname==='/admin'))))?.id;
  const {setPersonal}=useTheme();useEffect(()=>{setPersonal(null);},[setPersonal]);
  // ⌘K / Ctrl+K opens search from anywhere in the workspace.
  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();setDialog('search');}};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey);},[]);
  const print=<Button size="sm" variant="outline" title="Print or save as PDF" onClick={()=>window.print()}><Printer/>Print</Button>;
- return <div className="bf-shell">
+ return <div className="bf-shell" data-collapsed={collapsed||undefined}>
+  {menu&&<div className="bf-sidebar-scrim" aria-hidden="true" onClick={()=>setMenu(false)}/>}
   <aside className="bf-sidebar" data-open={menu} aria-label="Main navigation">
-   <Link to="/" className="bf-brand"><span className="bf-logo"><BrandMark/></span><span className="bf-brand-name">Futurist Global Bug Board<span className="text-primary">.</span></span></Link>
+   <button type="button" className="bf-sidebar-toggle" onClick={toggleCollapsed} aria-expanded={!collapsed} aria-label={collapsed?'Expand sidebar':'Collapse sidebar'} title={collapsed?'Expand sidebar':'Collapse sidebar'}>{collapsed?<ChevronRight/>:<ChevronLeft/>}</button>
+   <Link to="/" className="bf-brand" title="Futurist Global Bug Board"><span className="bf-logo"><BrandMark/></span><span className="bf-brand-name">Futurist Global Bug Board<span className="text-primary">.</span></span></Link>
 
-   <nav className="bf-nav">{navigation.slice(0,1).map(n=><Link key={n.to} to={n.to} activeOptions={{exact:true}} className="bf-nav-link" data-status={n.to==='/admin'&&pathname==='/'?'active':undefined} onClick={()=>setMenu(false)}><n.icon/>{n.label}{n.count&&<span className="bf-nav-count">{navCounts[n.to]??'—'}</span>}</Link>)}</nav>
-   <div className="bf-nav-label mt-7">Bugs</div>
-   <nav className="bf-nav">{navigation.slice(1,3).map(n=><Link key={n.to} to={n.to} activeOptions={{exact:true}} className="bf-nav-link" data-status={n.to==='/admin'&&pathname==='/'?'active':undefined} onClick={()=>setMenu(false)}><n.icon/>{n.label}{n.count&&<span className="bf-nav-count">{navCounts[n.to]??'—'}</span>}</Link>)}</nav>
-   <div className="bf-nav-label mt-7">Management</div>
-   <nav className="bf-nav">{navigation.slice(3,5).map(n=><Link key={n.to} to={n.to} activeOptions={{exact:true}} className="bf-nav-link" onClick={()=>setMenu(false)}><n.icon/>{n.label}{n.count&&<span className="bf-nav-count">{navCounts[n.to]??'—'}</span>}</Link>)}</nav>
-   <div className="bf-nav-label mt-7">Reports</div>
-   <nav className="bf-nav">{navigation.slice(5,7).map(n=><Link key={n.to} to={n.to} activeOptions={{exact:true}} className="bf-nav-link" onClick={()=>setMenu(false)} onMouseEnter={n.to==='/admin/activity'?()=>prefetchActivityPage(queryClient):undefined} onFocus={n.to==='/admin/activity'?()=>prefetchActivityPage(queryClient):undefined}><n.icon/>{n.label}{n.count&&<span className="bf-nav-count">{navCounts[n.to]??'—'}</span>}</Link>)}</nav>
-   <div className="bf-sidebar-bottom"><Link to="/admin/trash" activeOptions={{exact:true}} className="bf-nav-link mb-1" onClick={()=>setMenu(false)}><Trash2/>Trash{navCounts['/admin/trash']?<span className="bf-nav-count">{navCounts['/admin/trash']}</span>:null}</Link><Link to="/admin/settings" className="bf-nav-link mb-2" onClick={()=>setMenu(false)}><Settings2/>Settings</Link>
-   <Button variant="ghost" className="mb-3 w-full justify-start text-xs text-muted-foreground" data-ui="help" onClick={()=>setDialog('help')}><CircleHelp size={16}/>Help & support</Button>
-   <div className="flex items-center gap-10 border-t pt-4"><div className="flex items-center gap-9"><div className="flex items-center gap-3"><span className="bf-avatar">BF</span><div><strong className="block text-xs">Team administration</strong><span className="text-[11.5px] text-muted-foreground">Private access</span></div></div></div><ShieldCheck size={15} className="ml-auto text-muted-foreground"/></div></div>
+   {navGroups.map(g=>{const active=g.id===activeGroup;
+    const n=g.items[0];if(g.items.length===1&&n){return <nav key={g.id} className="bf-nav bf-nav-solo"><Link to={n.to} activeOptions={{exact:true}} className="bf-nav-link" title={n.label} data-status={n.to==='/admin'&&(pathname==='/'||pathname==='/admin')?'active':undefined} onClick={()=>setMenu(false)}><n.icon/>{n.label}{n.count&&<span className="bf-nav-count">{navCounts[n.to]??'—'}</span>}</Link></nav>;}
+    const open=collapsed||openGroups[g.id]===true;return <div key={g.id} className="bf-nav-group" data-open={open||undefined} data-active={active||undefined}>
+    <button type="button" className="bf-nav-group-head" data-active={active||undefined} onClick={()=>toggleGroup(g.id)} aria-expanded={open} title={`${open?'Collapse':'Expand'} ${g.label}`}><g.icon className="bf-nav-group-icon"/><span>{g.label}</span><ChevronDown className="bf-nav-group-chevron"/></button>
+    <div className="bf-nav-group-items"><nav className="bf-nav" aria-label={g.label}>{g.items.map(n=><Link key={n.to} to={n.to} activeOptions={{exact:true}} className="bf-nav-link" title={n.label} data-status={n.to==='/admin'&&pathname==='/'?'active':undefined} onClick={()=>setMenu(false)} onMouseEnter={n.to==='/admin/activity'?()=>prefetchActivityPage(queryClient):undefined} onFocus={n.to==='/admin/activity'?()=>prefetchActivityPage(queryClient):undefined}><n.icon/>{n.label}{n.count&&<span className="bf-nav-count">{navCounts[n.to]??'—'}</span>}</Link>)}</nav></div>
+   </div>;})}
+   <div className="bf-sidebar-bottom"><Link to="/admin/settings" className="bf-nav-link mb-2" title="Settings" onClick={()=>setMenu(false)}><Settings2/>Settings</Link>
+   <Button variant="ghost" className="mb-3 w-full justify-start text-xs text-muted-foreground" data-ui="help" title="Help & support" onClick={()=>setDialog('help')}><CircleHelp size={16}/>Help & support</Button>
+   <div className="flex items-center gap-3 border-t pt-4"><span className="bf-avatar">BF</span><div className="min-w-0"><strong className="block truncate text-xs">Team administration</strong><span className="text-[11.5px] text-muted-foreground">Private access</span></div><ShieldCheck size={15} className="ml-auto shrink-0 text-muted-foreground"/></div></div>
   </aside>
   <div className="bf-body"><header className="bf-topbar"><div className="bf-topbar-left"><Button variant="ghost" size="icon" className="bf-mobile-menu" aria-label={menu?'Close navigation':'Open navigation'} onClick={()=>setMenu(!menu)}>{menu?<X/>:<Menu/>}</Button><Breadcrumb data-ui="breadcrumb"><BreadcrumbList className="text-xs"><BreadcrumbItem><BreadcrumbLink asChild><Link to="/admin">Workspace</Link></BreadcrumbLink></BreadcrumbItem><BreadcrumbSeparator/><BreadcrumbItem><BreadcrumbPage>{titles[view]}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb></div><div className="bf-topbar-right"><ThemeToggle/><Button size="icon" variant="ghost" aria-label="Search workspace" title="Search workspace (⌘K)" onClick={()=>setDialog('search')}><Search size={17}/></Button><NotificationMenu/><span className="h-5 border-l"/><SignOutButton/></div></header>
   <main className="bf-main"><div className="bf-page-heading"><div><h1>{titles[view]}</h1><p>{subtitles[view]}</p></div><div className="bf-page-actions">{view==='bugs'?<Button size="sm" variant="outline" onClick={()=>setDialog('sheet')}><FileSpreadsheet/>Export sheet</Button>:view==='users'?<Button size="sm" onClick={()=>setDialog('user')}><Plus/>Add member</Button>:view==='projects'?<Button size="sm" onClick={()=>setDialog('project')}><Plus/>New project</Button>:view==='activity'?<>{print}<Button size="sm" variant="outline" onClick={()=>setDialog('export')}><FileDown/>Export report</Button></>:view==='reports'||view==='overview'?print:null}</div></div>
   <AdminAccess showAccount={false}>
    {view==='overview'?<DashboardSummary/>:view==='bugs'?<AdminBugs/>:view==='users'?<UsersView/>:view==='assignments'?<AdminBugs assignmentsOnly/>:view==='projects'?<ProjectsView onDialog={setDialog}/>:view==='activity'?<ActivityView/>:view==='reports'?<TeamReports/>:view==='settings'?<SettingsOverview/>:view==='appearance'?<SettingsPage tab="appearance"><AppearanceSettings/></SettingsPage>:view==='settings-options'?<SettingsPage tab="settings-options"><DropdownOptionsEditor onAddMember={()=>setDialog('user')}/></SettingsPage>:view==='settings-storage'?<SettingsPage tab="settings-storage"><StorageSettings/></SettingsPage>:view==='settings-ai'?<SettingsPage tab="settings-ai"><AiTokensCard/></SettingsPage>:view==='trash'?<TrashView/>:<NotificationsPage/>}
   </AdminAccess><footer className="bf-footer"><span>Futurist Global Bug Board <span className="mx-1">·</span> Every bug. One place.</span><span className="flex items-center gap-2"><ShieldCheck size={12}/>Private portals · Shared records</span></footer></main></div>
+  <Link to="/admin/trash" activeOptions={{exact:true}} className="bf-trash-fab" data-status={pathname==='/admin/trash'?'active':undefined} title="Trash — restore deleted items for 30 days" aria-label={`Trash${navCounts['/admin/trash']?` (${navCounts['/admin/trash']} items)`:''}`} onClick={()=>setMenu(false)}><Trash2/>{navCounts['/admin/trash']?<span className="bf-trash-fab-count">{navCounts['/admin/trash']}</span>:null}</Link>
   <WorkspaceDialog kind={dialog} close={()=>setDialog(null)}/>
  </div>;
 }

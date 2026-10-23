@@ -9,7 +9,7 @@ export function toCsv(headers: string[], rows: (string | number | null | undefin
 
 /** Saves text as a file from the browser; the BOM makes Excel read UTF-8 (names with accents) correctly. */
 export function downloadText(filename: string, text: string, type = 'text/csv;charset=utf-8') {
-  const url = URL.createObjectURL(new Blob([type.startsWith('text/csv') ? `﻿${text}` : text], { type }));
+  const url = URL.createObjectURL(new Blob([type.startsWith('text/csv') ? `\uFEFF${text}` : text], { type }));
   const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

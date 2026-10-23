@@ -33,7 +33,7 @@ function Item({ n, onClick }: { n: NotificationItem; onClick?: () => void }) {
   return <Link to={n.action.startsWith("bug.") ? "/admin/bugs" : "/admin/users"} onClick={onClick} className={`bf-notice ${n.unread ? 'bf-notice-unread' : ''}`}>
     <span className="bf-notice-icon"><Icon size={17} /></span>
     <span className="min-w-0 flex-1">
-      <span className="flex items-center gap-2"><strong className="text-sm">{notificationLabel(n.action)}</strong>{n.unread && <span className="bf-notice-dot" data-tone={notificationTone(n.action, n.status)} aria-label="Unread" />}{n.status && <span className="bf-notice-tag ml-auto">{statusLabel(n.status)}</span>}</span>
+      <span className="flex min-w-0 flex-wrap items-center gap-2"><strong className="text-sm">{notificationLabel(n.action)}</strong>{n.unread && <span className="bf-notice-dot" data-tone={notificationTone(n.action, n.status)} aria-label="Unread" />}{n.status && <span className="bf-notice-tag ml-auto">{statusLabel(n.status)}</span>}</span>
       <span className="block truncate text-xs text-muted-foreground">{n.title || (n.action.startsWith('bug.') ? 'Bug update' : 'Team & access')} · by {n.actor}</span>
       <time className="block text-xs text-muted-foreground" title={dateLabel(n.at)}>{timeAgo(n.at)}</time>
     </span>
@@ -45,7 +45,7 @@ export function NotificationMenu() {
   const unread = q.data?.unread ?? 0;
   return <Popover open={open} onOpenChange={o => { setOpen(o); if (!o && unread) mark.mutate('read'); }}>
     <PopoverTrigger asChild><Button size="icon" variant="ghost" className="relative" aria-label={`Notifications${unread ? `: ${unread} unread` : ''}`}><Bell size={17} />{unread > 0 && <span className="bf-badge">{unread > 99 ? '99+' : unread}</span>}</Button></PopoverTrigger>
-    <PopoverContent align="end" className="w-[380px] p-0">
+    <PopoverContent align="end" className="w-[min(380px,calc(100vw-24px))] p-0">
       <div className="flex items-center justify-between border-b px-4 py-3"><strong className="text-sm">Notifications</strong>{unread > 0 && <span className="bf-unread-pill">{unread} unread</span>}</div>
       <div className="grid max-h-[360px] gap-2 overflow-y-auto p-3">
         {q.isPending ? <p className="text-xs text-muted-foreground">Loading…</p>
@@ -64,18 +64,18 @@ export function NotificationsPage() {
   if (q.isPending) return <SkeletonRows rows={5} label="Loading notifications" />;
   if (q.isError) return <ErrorNotice message={actionError(q.error, 'Notifications could not be loaded.')} onRetry={() => q.refetch()} />;
   const items = tab === 'unread' ? q.data.items.filter(n => n.unread) : q.data.items;
-  return <div className="grid gap-4">
+  return <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
     <div className="flex flex-wrap items-center gap-2">
       <Button size="sm" variant={tab === 'all' ? 'default' : 'outline'} onClick={() => setTab('all')}>All ({q.data.total})</Button>
       <Button size="sm" variant={tab === 'unread' ? 'default' : 'outline'} onClick={() => setTab('unread')}>Unread ({q.data.unread})</Button>
       <span className="text-xs text-muted-foreground">Showing the last {NOTIFICATION_DAYS} days</span>
-      <div className="ml-auto flex gap-2">
+      <div className="flex flex-wrap gap-2 sm:ml-auto">
         <Button size="sm" variant="outline" disabled={!q.data.unread || mark.isPending} onClick={() => mark.mutate('read')}><CheckCheck />Mark all read</Button>
         <Button size="sm" variant="outline" disabled={!q.data.total} onClick={() => setConfirm(true)}><Trash2 />Clear all</Button>
         <ConfirmAction open={confirm} onOpenChange={setConfirm} destructive title="Clear notifications?" description={`This clears all notifications from the last ${NOTIFICATION_DAYS} days. Bug history is kept.`} confirmLabel="Clear all" onConfirm={async () => { await mark.mutateAsync('clear'); }} />
       </div>
     </div>
-    {items.length ? groupByDay(items).map(g => <section key={g.day} className="grid gap-2" aria-label={g.day}>
+    {items.length ? groupByDay(items).map(g => <section key={g.day} className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2" aria-label={g.day}>
         <h2 className="bf-day-heading">{g.day}<span>{g.items.length}</span></h2>
         {g.items.map(n => <Item key={n.id} n={n} />)}
       </section>)
