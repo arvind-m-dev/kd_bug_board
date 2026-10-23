@@ -19,6 +19,9 @@ export const PALETTES: Palette[] = [
   { id: 'ocean', name: 'Ocean Blue', description: 'Trustworthy corporate blue with a cyan partner.',
     light: { primary: 'oklch(0.5 0.16 255)', primaryForeground: 'oklch(1 0 0)', brand2: 'oklch(0.58 0.12 215)', accent: 'oklch(0.95 0.03 255)' },
     dark: { primary: 'oklch(0.75 0.13 250)', primaryForeground: 'oklch(0.17 0.03 255)', brand2: 'oklch(0.78 0.11 210)', accent: 'oklch(0.31 0.06 252)' } },
+  { id: 'glass', name: 'System blue', description: 'Bright system blue with an indigo partner — made for the Glass style.',
+    light: { primary: 'oklch(0.55 0.21 258)', primaryForeground: 'oklch(1 0 0)', brand2: 'oklch(0.52 0.2 285)', accent: 'oklch(0.95 0.03 258)' },
+    dark: { primary: 'oklch(0.72 0.15 252)', primaryForeground: 'oklch(0.18 0.04 258)', brand2: 'oklch(0.74 0.15 290)', accent: 'oklch(0.32 0.06 258)' } },
   { id: 'indigo', name: 'Royal Indigo', description: 'Rich indigo with a magenta partner — confident and modern.',
     light: { primary: 'oklch(0.5 0.2 278)', primaryForeground: 'oklch(1 0 0)', brand2: 'oklch(0.56 0.2 325)', accent: 'oklch(0.95 0.035 278)' },
     dark: { primary: 'oklch(0.75 0.15 280)', primaryForeground: 'oklch(0.18 0.04 280)', brand2: 'oklch(0.75 0.16 325)', accent: 'oklch(0.31 0.07 280)' } },
@@ -54,11 +57,13 @@ export const DEFAULT_PALETTE = 'teal';
 export const paletteById = (id: string | null | undefined) => PALETTES.find(p => p.id === id) ?? PALETTES[0]!;
 
 /** Font pairings (all on Google Fonts). 'query' is the css2 family part; empty means the root page already loads it. */
-export type FontPair = { id: string; name: string; heading: string; body: string; query: string; note: string };
+/** `stack`, when set, is used as the CSS font-family list verbatim (for system fonts that cannot be quoted or loaded from Google Fonts). */
+export type FontPair = { id: string; name: string; heading: string; body: string; query: string; note: string; stack?: string };
 export const FONTS: FontPair[] = [
   { id: 'dm', name: 'Manrope & DM Sans', heading: 'Manrope', body: 'DM Sans', query: '', note: 'The default — friendly and clear' },
   { id: 'jakarta', name: 'Plus Jakarta Sans & Figtree', heading: 'Plus Jakarta Sans', body: 'Figtree', query: 'family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Figtree:wght@400;500;600', note: 'Geometric headings, humanist body' },
   { id: 'inter', name: 'Inter', heading: 'Inter', body: 'Inter', query: 'family=Inter:wght@400;500;600;700', note: 'Neutral and compact' },
+  { id: 'system', name: 'System font', heading: 'System', body: 'System', query: 'family=Inter:wght@400;500;600;700', note: 'San Francisco on Apple devices, Segoe UI on Windows, Inter elsewhere', stack: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Inter, Roboto, sans-serif" },
   { id: 'plex', name: 'IBM Plex Sans', heading: 'IBM Plex Sans', body: 'IBM Plex Sans', query: 'family=IBM+Plex+Sans:wght@400;500;600;700', note: 'Technical and precise' },
   { id: 'grotesk', name: 'Space Grotesk & Inter', heading: 'Space Grotesk', body: 'Inter', query: 'family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600', note: 'Modern with character' },
   { id: 'nunito', name: 'Nunito', heading: 'Nunito', body: 'Nunito', query: 'family=Nunito:wght@400;600;700;800', note: 'Soft and rounded' },
@@ -76,6 +81,7 @@ export type Style = { id: string; name: string; description: string; fonts: stri
 export const STYLES: Style[] = [
   { id: 'none', name: 'Standard', description: 'Clean cards, soft shadows and crisp type.', fonts: 'dm' },
   { id: 'keydemand', name: 'Keydemand', description: 'White cards on cool grey, teal pills and gold counts — the Keydemand product look.', fonts: 'jakarta', palette: 'keydemand' },
+  { id: 'glass', name: 'Glass', description: 'Frosted, translucent panels over a soft colour wash, with light catching their edges — the look of Apple’s glass design.', fonts: 'system', palette: 'glass' },
   { id: 'sketch', name: 'Pencil sketch', description: 'Graphite on paper with hand-drawn lines; a chalkboard in dark mode.', fonts: 'hand', palette: 'graphite' },
   { id: 'ink', name: 'Ink', description: 'Only black and white — pen-and-ink outlines and hatching; scratchboard in dark mode.', fonts: 'ink', palette: 'graphite', monochrome: true },
   { id: 'halloween', name: 'Halloween', description: '3D beetles explore cards and tables, spiders descend on silk, and bats fly from a twisted tree and return to roost.', fonts: 'spooky', palette: 'pumpkin', decorated: true },
@@ -171,7 +177,7 @@ export function resolveAppearance(a: Appearance, dark: boolean): Resolved {
     : paletteById(a.palette === 'custom' ? style.palette ?? DEFAULT_PALETTE : a.palette)[mode];
   const fonts = fontById(a.fonts ?? style.fonts);
   return {
-    vars: { '--primary': tokens.primary, '--primary-foreground': tokens.primaryForeground, '--brand-2': tokens.brand2, '--accent': tokens.accent, '--font-sans': `'${fonts.body}', 'DM Sans', sans-serif`, '--font-heading': `'${fonts.heading}', 'Manrope', sans-serif` },
+    vars: { '--primary': tokens.primary, '--primary-foreground': tokens.primaryForeground, '--brand-2': tokens.brand2, '--accent': tokens.accent, '--font-sans': fonts.stack ?? `'${fonts.body}', 'DM Sans', sans-serif`, '--font-heading': fonts.stack ?? `'${fonts.heading}', 'Manrope', sans-serif` },
     attrs: { 'data-skin': style.id === 'none' ? null : style.id, 'data-radius': a.radius === 'soft' ? null : a.radius, 'data-density': a.density === 'comfortable' ? null : a.density, 'data-motion': a.motion, 'data-hide': a.hide.length ? a.hide.join(' ') : null },
     fontQuery: fonts.query,
   };

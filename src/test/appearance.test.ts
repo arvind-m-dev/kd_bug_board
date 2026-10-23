@@ -95,3 +95,14 @@ describe('scene knobs', () => {
     const v = spread(seededRandom(9), 0, 4, 1); expect(v).toBeGreaterThanOrEqual(0); expect(v).toBeLessThanOrEqual(1);
   });
 });
+
+describe('glass style', () => {
+  it('uses the system font stack verbatim and its own palette', () => {
+    const r = resolveAppearance(appearanceSchema.parse({ style: 'glass', palette: 'glass' }), false);
+    expect(r.attrs['data-skin']).toBe('glass');
+    expect(r.vars['--font-sans']).toMatch(/^-apple-system, BlinkMacSystemFont/); expect(r.vars['--font-heading']).toBe(r.vars['--font-sans']);
+    expect(r.vars['--font-sans']).not.toContain("'-apple-system'"); // quoting would turn the keyword into a missing family name
+    expect(STYLES.find(s => s.id === 'glass')).toMatchObject({ fonts: 'system', palette: 'glass' });
+    expect(resolveAppearance(appearanceSchema.parse({ style: 'glass', fonts: 'inter' }), false).vars['--font-sans']).toContain("'Inter'");
+  });
+});
