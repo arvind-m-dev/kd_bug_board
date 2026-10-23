@@ -27,7 +27,10 @@ import { Route as MediaBugIdRouteImport } from './routes/media.$bugId'
 import { Route as MemberPortalTokenRouteImport } from './routes/member.$portalToken'
 import { Route as QaPortalTokenRouteImport } from './routes/qa.$portalToken'
 import { Route as ReporterPortalTokenRouteImport } from './routes/reporter.$portalToken'
+import { Route as AdminSettingsAiRouteImport } from './routes/admin_.settings_.ai'
 import { Route as AdminSettingsAppearanceRouteImport } from './routes/admin_.settings_.appearance'
+import { Route as AdminSettingsOptionsRouteImport } from './routes/admin_.settings_.options'
+import { Route as AdminSettingsStorageRouteImport } from './routes/admin_.settings_.storage'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -119,9 +122,24 @@ const ReporterPortalTokenRoute = ReporterPortalTokenRouteImport.update({
   path: '/reporter/$portalToken',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminSettingsAiRoute = AdminSettingsAiRouteImport.update({
+  id: '/admin_/settings_/ai',
+  path: '/admin/settings/ai',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminSettingsAppearanceRoute = AdminSettingsAppearanceRouteImport.update({
   id: '/admin_/settings_/appearance',
   path: '/admin/settings/appearance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSettingsOptionsRoute = AdminSettingsOptionsRouteImport.update({
+  id: '/admin_/settings_/options',
+  path: '/admin/settings/options',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSettingsStorageRoute = AdminSettingsStorageRouteImport.update({
+  id: '/admin_/settings_/storage',
+  path: '/admin/settings/storage',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -144,7 +162,10 @@ export interface FileRoutesByFullPath {
   '/member/$portalToken': typeof MemberPortalTokenRoute
   '/qa/$portalToken': typeof QaPortalTokenRoute
   '/reporter/$portalToken': typeof ReporterPortalTokenRoute
+  '/admin/settings/ai': typeof AdminSettingsAiRoute
   '/admin/settings/appearance': typeof AdminSettingsAppearanceRoute
+  '/admin/settings/options': typeof AdminSettingsOptionsRoute
+  '/admin/settings/storage': typeof AdminSettingsStorageRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -165,7 +186,10 @@ export interface FileRoutesByTo {
   '/member/$portalToken': typeof MemberPortalTokenRoute
   '/qa/$portalToken': typeof QaPortalTokenRoute
   '/reporter/$portalToken': typeof ReporterPortalTokenRoute
+  '/admin/settings/ai': typeof AdminSettingsAiRoute
   '/admin/settings/appearance': typeof AdminSettingsAppearanceRoute
+  '/admin/settings/options': typeof AdminSettingsOptionsRoute
+  '/admin/settings/storage': typeof AdminSettingsStorageRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -187,7 +211,10 @@ export interface FileRoutesById {
   '/member/$portalToken': typeof MemberPortalTokenRoute
   '/qa/$portalToken': typeof QaPortalTokenRoute
   '/reporter/$portalToken': typeof ReporterPortalTokenRoute
+  '/admin_/settings_/ai': typeof AdminSettingsAiRoute
   '/admin_/settings_/appearance': typeof AdminSettingsAppearanceRoute
+  '/admin_/settings_/options': typeof AdminSettingsOptionsRoute
+  '/admin_/settings_/storage': typeof AdminSettingsStorageRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -210,7 +237,10 @@ export interface FileRouteTypes {
     | '/member/$portalToken'
     | '/qa/$portalToken'
     | '/reporter/$portalToken'
+    | '/admin/settings/ai'
     | '/admin/settings/appearance'
+    | '/admin/settings/options'
+    | '/admin/settings/storage'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -231,7 +261,10 @@ export interface FileRouteTypes {
     | '/member/$portalToken'
     | '/qa/$portalToken'
     | '/reporter/$portalToken'
+    | '/admin/settings/ai'
     | '/admin/settings/appearance'
+    | '/admin/settings/options'
+    | '/admin/settings/storage'
   id:
     | '__root__'
     | '/'
@@ -252,7 +285,10 @@ export interface FileRouteTypes {
     | '/member/$portalToken'
     | '/qa/$portalToken'
     | '/reporter/$portalToken'
+    | '/admin_/settings_/ai'
     | '/admin_/settings_/appearance'
+    | '/admin_/settings_/options'
+    | '/admin_/settings_/storage'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -274,7 +310,10 @@ export interface RootRouteChildren {
   MemberPortalTokenRoute: typeof MemberPortalTokenRoute
   QaPortalTokenRoute: typeof QaPortalTokenRoute
   ReporterPortalTokenRoute: typeof ReporterPortalTokenRoute
+  AdminSettingsAiRoute: typeof AdminSettingsAiRoute
   AdminSettingsAppearanceRoute: typeof AdminSettingsAppearanceRoute
+  AdminSettingsOptionsRoute: typeof AdminSettingsOptionsRoute
+  AdminSettingsStorageRoute: typeof AdminSettingsStorageRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -405,11 +444,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReporterPortalTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/settings_/ai': {
+      id: '/admin_/settings_/ai'
+      path: '/admin/settings/ai'
+      fullPath: '/admin/settings/ai'
+      preLoaderRoute: typeof AdminSettingsAiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin_/settings_/appearance': {
       id: '/admin_/settings_/appearance'
       path: '/admin/settings/appearance'
       fullPath: '/admin/settings/appearance'
       preLoaderRoute: typeof AdminSettingsAppearanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin_/settings_/options': {
+      id: '/admin_/settings_/options'
+      path: '/admin/settings/options'
+      fullPath: '/admin/settings/options'
+      preLoaderRoute: typeof AdminSettingsOptionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin_/settings_/storage': {
+      id: '/admin_/settings_/storage'
+      path: '/admin/settings/storage'
+      fullPath: '/admin/settings/storage'
+      preLoaderRoute: typeof AdminSettingsStorageRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -434,7 +494,10 @@ const rootRouteChildren: RootRouteChildren = {
   MemberPortalTokenRoute: MemberPortalTokenRoute,
   QaPortalTokenRoute: QaPortalTokenRoute,
   ReporterPortalTokenRoute: ReporterPortalTokenRoute,
+  AdminSettingsAiRoute: AdminSettingsAiRoute,
   AdminSettingsAppearanceRoute: AdminSettingsAppearanceRoute,
+  AdminSettingsOptionsRoute: AdminSettingsOptionsRoute,
+  AdminSettingsStorageRoute: AdminSettingsStorageRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

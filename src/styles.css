@@ -1513,3 +1513,14 @@ body:has([role="dialog"], [role="alertdialog"], [role="listbox"]) .bf-seasonal-g
 .bf-mcp-controls { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in oklab, var(--primary) 5%, var(--card)); }
 .bf-mcp-endpoint { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .bf-mcp-endpoint code { flex: 1; min-width: 160px; overflow-x: auto; white-space: nowrap; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); font-size: 12px; }
 .bf-mcp-controls .bf-switch-row[data-disabled] { opacity: .5; }
+
+/* ───────────── Settings sub-pages: sub-nav and overview cards ───────────── */
+.bf-settings-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.bf-settings-tab { display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted-foreground); font-size: 13px; font-weight: 600; background: var(--card); transition: color .15s, border-color .15s, background .15s; }
+.bf-settings-tab:hover { color: var(--foreground); border-color: color-mix(in oklab, var(--primary) 40%, var(--border)); }
+.bf-settings-tab[data-active] { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+.bf-settings-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.bf-settings-card { display: flex; align-items: flex-start; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--foreground); box-shadow: var(--shadow-panel); transition: border-color .15s, transform .15s; }
+.bf-settings-card:hover { border-color: color-mix(in oklab, var(--primary) 45%, var(--border)); transform: translateY(-1px); }
+.bf-settings-card h3 { margin: 0 0 3px; font-size: 14px; } .bf-settings-card p { margin: 0; font-size: 12.5px; color: var(--muted-foreground); line-height: 1.45; }
+.bf-settings-info { display: grid; gap: 16px; margin-top: 18px; }
