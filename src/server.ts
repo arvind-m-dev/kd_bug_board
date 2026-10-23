@@ -80,6 +80,14 @@ export default {
       }
       // Model Context Protocol endpoint: any AI client reaches the bugs with a BugFlow AI token. CORS-open; auth is the token.
       const mcpPath = new URL(request.url).pathname;
+      const isMcp = mcpPath === '/api/mcp' || mcpPath === '/mcp';
+      const isOauth = mcpPath.startsWith('/api/oauth/') || mcpPath.startsWith('/.well-known/oauth-');
+      if (isMcp || isOauth) {
+        const { mcpConfig } = await import('./lib/mcp-config.server');
+        const cfg = await mcpConfig();
+        if (!cfg.enabled) return mcpCors(Response.json({ error: 'mcp_disabled', error_description: 'AI access is turned off for this workspace.' }, { status: 404 }));
+        if (isOauth && !cfg.oauth) return mcpCors(Response.json({ error: 'oauth_disabled', error_description: 'App connectors (OAuth) are turned off. Paste a token instead.' }, { status: 404 }));
+      }
       if (mcpPath === '/api/mcp' || mcpPath === '/mcp') {
         if (request.method === 'OPTIONS') return mcpCors(new Response(null, { status: 204 }));
         if (request.method === 'GET' && new URL(request.url).searchParams.get('token') === null) {
