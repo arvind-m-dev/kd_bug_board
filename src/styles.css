@@ -1462,3 +1462,27 @@ html[data-skin=glass] .bf-savebar { background: var(--glass-strong); -webkit-bac
   html[data-skin=glass] { --glass: rgb(255 255 255 / .9); --glass-strong: rgb(255 255 255 / .96); }
   html[data-skin=glass].dark { --glass: rgb(34 37 52 / .92); --glass-strong: rgb(26 29 42 / .97); }
 }
+
+/* ───────────── Trash: the bin toast and the card that flies into it ───────────── */
+.bf-bin-toast { display: flex; align-items: center; gap: 14px; width: min(370px, calc(100vw - 32px)); padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); color: var(--foreground); box-shadow: var(--shadow-lift, 0 12px 32px -12px rgb(0 0 0 / .35)); }
+.bf-bin { position: relative; flex: none; display: grid; justify-items: center; width: 52px; height: 64px; perspective: 220px; transform-origin: 50% 100%; }
+.bf-bin-body { position: absolute; bottom: 0; filter: drop-shadow(0 4px 4px rgb(0 0 0 / .25)); }
+.bf-bin-lid { position: absolute; top: 3px; transform-origin: 92% 85%; transition: transform .32s cubic-bezier(.3, 1.5, .5, 1); filter: drop-shadow(0 2px 2px rgb(0 0 0 / .2)); }
+.bf-bin[data-lid=open] .bf-bin-lid { transform: rotateY(-24deg) rotateZ(38deg) translate(4px, -9px); transition-duration: .22s; }
+.bf-bin .bf-bin-s1 { stop-color: color-mix(in oklab, var(--primary) 30%, #5f6b80); } .bf-bin .bf-bin-s2 { stop-color: color-mix(in oklab, var(--primary) 12%, #e9eef7); }
+.bf-bin .bf-bin-s3 { stop-color: color-mix(in oklab, var(--primary) 18%, #a3adbf); } .bf-bin .bf-bin-s4 { stop-color: color-mix(in oklab, var(--primary) 35%, #4c566a); }
+.bf-bin-rim { stroke: color-mix(in oklab, var(--primary) 25%, #c7cfdc); } .bf-bin-ribs { stroke: rgb(0 0 0 / .18); } .bf-bin-band { stroke: color-mix(in oklab, var(--primary) 70%, transparent); }
+.bf-bin-lidtop { fill: color-mix(in oklab, var(--primary) 14%, #dfe5ef); } .bf-bin-handle { stroke: color-mix(in oklab, var(--primary) 30%, #6b7488); }
+.dark .bf-bin-lidtop { fill: color-mix(in oklab, var(--primary) 20%, #9aa4b6); }
+@keyframes bf-bin-gulp { 0% { transform: scale(1); } 28% { transform: scale(1.14, .88); } 55% { transform: scale(.94, 1.07) rotate(-3deg); } 78% { transform: scale(1.02, .98) rotate(1.5deg); } 100% { transform: scale(1); } }
+.bf-bin[data-gulp] { animation: bf-bin-gulp .5s cubic-bezier(.3, 1.4, .5, 1); }
+.bf-bin-ghost { position: fixed; z-index: 2147483000; display: flex; align-items: center; padding: 0 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12.5px; font-weight: 600; color: var(--foreground); background: var(--card); border: 1px solid color-mix(in oklab, var(--primary) 45%, var(--border)); border-radius: 10px; box-shadow: 0 14px 30px -10px rgb(0 0 0 / .45); pointer-events: none; will-change: transform, opacity; }
+@media (prefers-reduced-motion: reduce) { .bf-bin-lid, .bf-bin[data-gulp] { transition: none; animation: none; } }
+
+/* ───────────── Trash page ───────────── */
+.bf-trash-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.bf-trash-row:last-child { border-bottom: 0; }
+.bf-trash-row > .bf-stat-icon { width: 36px; height: 36px; }
+.bf-trash-row strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; } .bf-trash-row small { display: block; color: var(--muted-foreground); font-size: 12px; }
+.bf-trash-left[data-soon] { color: var(--warning); border-color: color-mix(in oklab, var(--warning) 40%, var(--border)); }
+@media (max-width: 760px) { .bf-trash-row { grid-template-columns: 36px minmax(0, 1fr); } .bf-trash-row > :nth-child(3), .bf-trash-row > :nth-child(4) { grid-column: 2; justify-self: start; } }

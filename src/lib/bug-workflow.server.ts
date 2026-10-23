@@ -17,6 +17,7 @@ const columns=`b.*,pr.name as project_name,r.name as reporter_name,coalesce(a.na
 const joins=`from bugflow.bugs b join bugflow.projects pr on pr.id=b.project_id join bugflow.users r on r.id=b.reporter_id left join bugflow.users a on a.id=b.assignee_id left join bugflow.bug_details d on d.bug_id=b.id`;
 function parseBug(r:Record<string,unknown>,evidence=false):LiveBug{return {id:String(r['id']),code:formatBugCode(String(r['id'])),title:String(r['title']),projectId:String(r['project_id']),project:String(r['project_name']),reporterId:String(r['reporter_id']),reporter:String(r['reporter_name']),assigneeId:r['assignee_id']?String(r['assignee_id']):null,assignee:String(r['assignee_name']),assignees:Array.isArray(r['assignees'])?(r['assignees'] as {id:string;name:string}[]).map(x=>({id:String(x.id),name:String(x.name)})):[],status:r['status'] as Status,priority:String(r['priority']),severity:String(r['severity']),description:String(r['description']),expected:String(r['expected']),actual:String(r['actual']),browserDevice:String(r['browser_device']),environment:String(r['environment']),fixNotes:String(r['fix_notes']),createdAt:String(r['created_iso']),updatedAt:String(r['updated_iso']),version:String(r['version']),module:String(r['module_name']),steps:Array.isArray(r['steps'])?r['steps'].map(String):[],lastChange:r['last_change']&&typeof r['last_change']==='object'?(()=>{const l=r['last_change'] as Record<string,unknown>;return {by:String(l['by']),via:String(l['via']),action:String(l['action']),at:String(l['at'])};})():null,evidenceUrls:evidence&&Array.isArray(r['evidence_urls'])?r['evidence_urls'].map(String):[],statusNote:r['status_note']&&typeof r['status_note']==='object'?(()=>{const n=r['status_note'] as Record<string,unknown>;return {by:String(n['by']),at:String(n['at']),notes:String(n['notes'])};})():null};}
 export async function workspaceData(access:BugAccess,cursor?:string):Promise<BugWorkspaceData>{
+ await (await import('./trash.server')).maybeExpireTrash().catch(()=>undefined);
  const actor=await actorFor(access);if(!actor.permissions.includes('view'))throw new Error('This portal does not have permission to view bugs.');
  const params=[actor.portalId,actor.userId,actor.role==='qa'||actor.permissions.includes('view_all')];
  const where=scope(actor);
@@ -81,7 +82,7 @@ export async function deleteBugReport(id:string,reason:string){
   {query:`insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $1,$2,$3,'bug.deleted',jsonb_build_object('reason',$4::text) where exists(select 1 from bugflow.bugs where id=$2 and deleted_at is not null)`,params:[crypto.randomUUID(),id,admin.userId,reason]},
  ]);
  if(!results[0]?.rows.length)throw new Error('This bug was already deleted.');
- await (await import('./bug-media.server')).deleteAllMedia(id,admin.userId).catch(()=>undefined);
+ // Attachments stay with the bug in the Trash so a restore brings them back; they leave storage when it is deleted forever.
  return {deleted:true};
 }
 

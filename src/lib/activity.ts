@@ -101,6 +101,8 @@ export function changeText(row: ActivityRow) {
   if (clean(d['noteTo'])) parts.push(`Note to ${d['noteTo']}`);
   if (clean(d['media'])) parts.push(row.action === 'bug.media_renamed' ? `Renamed ${d['from']} to ${d['media']}` : `${row.action === 'bug.media_deleted' ? 'Removed' : 'Attached'} ${d['media']}`);
   if (row.action === 'bug.media_cleared' && d['count']) parts.push(`${d['count']} ${Number(d['count']) === 1 ? 'file' : 'files'} removed${d['reason'] === 'auto' ? ` by the clean-up schedule (${d['days']} days after closing)` : ''}`);
+  if (row.action === 'bug.purged') parts.push(d['reason'] === 'auto' ? `Deleted forever after ${d['days']} days in the Trash` : `Deleted forever${Number(d['files']) ? ` with ${d['files']} ${Number(d['files']) === 1 ? 'file' : 'files'}` : ''}`);
+  if (row.action === 'trash.emptied') parts.push(`Trash emptied: ${d['bugs']} bugs, ${d['members']} members, ${d['files']} files`);
   if (clean(d['notes'])) parts.push(d['notes']);
   if (clean(d['title'])) parts.push(d['title']);
   if (clean(d['reason'])) parts.push(d['reason']);

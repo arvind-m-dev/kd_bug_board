@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Progress } from '@/components/ui/progress';
 import { ConfirmAction, actionError } from './action-feedback';
 import { AnnotationEditor, captureFrame, loadImage, type AnnotationSource } from './media-annotate';
+import { moveToTrashToast } from './trash-bin';
 import { clearBugMedia, deleteMedia, finishMediaUpload, prepareMediaUpload, renameMedia } from '@/lib/bug-media.functions';
 import { MEDIA_NAME_MAX, clock, formatBytes, isClosedForMedia, mayDeleteMedia, mayUploadMedia, mediaLinkPath, type MediaConfig, type MediaItem } from '@/lib/bug-media';
 import { prepareFile, uploadPut, type PreparedFile } from '@/lib/media-client';
@@ -141,7 +142,7 @@ export function MediaLightbox({ items, index, onIndex, onClose, actions, videoRe
 /** The "Attachments" card on a bug: gallery with lightbox, rename, mark-up, Open and Remove, plus the drop zone for people who may attach files. */
 export function BugMedia({ access, bug, actor, items, config, readOnly = false, openMediaId }: { access: BugAccess; bug: LiveBug; actor: BugActor; items: MediaItem[]; config: MediaConfig; readOnly?: boolean; openMediaId?: string | undefined }) {
   const client = useQueryClient(); const remove = useServerFn(deleteMedia); const rename = useServerFn(renameMedia); const clearAll = useServerFn(clearBugMedia);
-  const [open, setOpen] = useState<number | null>(null); const [removing, setRemoving] = useState<MediaItem | null>(null); const [clearing, setClearing] = useState(false);
+  const [open, setOpen] = useState<number | null>(null); const [removing, setRemoving] = useState<MediaItem | null>(null); const [clearing, setClearing] = useState(false); const removingRect = useRef<DOMRect | null>(null); const section = useRef<HTMLElement>(null);
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null); const [savingName, setSavingName] = useState(false);
   const [markup, setMarkup] = useState<{ source: AnnotationSource; name: string; caption: string; derivedFrom: string; atSeconds: number | null } | null>(null);
   const video = useRef<HTMLVideoElement | null>(null);
@@ -174,7 +175,7 @@ export function BugMedia({ access, bug, actor, items, config, readOnly = false, 
     catch (e) { toast.error(actionError(e, 'The frame could not be captured.')); }
   }
   const remaining = config.maxFiles - items.length - uploader.uploads.filter(u => u.status !== 'failed').length;
-  return <section className="bf-rc-card" data-tone="info"><h3 className="bf-section-title"><span className="bf-rc-icon"><Paperclip size={15} /></span>Attachments{items.length > 0 && <span className="bf-tag ml-1">{items.length} of {config.maxFiles}</span>}
+  return <section ref={section} className="bf-rc-card" data-tone="info"><h3 className="bf-section-title"><span className="bf-rc-icon"><Paperclip size={15} /></span>Attachments{items.length > 0 && <span className="bf-tag ml-1">{items.length} of {config.maxFiles}</span>}
     {items.length > 0 && <span className="ml-auto flex gap-1"><Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => void copyMediaLink(bug.id)}><Link2 />Copy link to all files</Button>{!readOnly && actor.role === 'admin' && isClosedForMedia(bug.status) && <Button type="button" variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => setClearing(true)}><Trash2 />Remove all {items.length} files</Button>}</span>}</h3>
     {!readOnly && actor.role === 'admin' && isClosedForMedia(bug.status) && items.length > 0 && <p className="text-xs text-muted-foreground">This bug is closed. Its files take {formatBytes(items.reduce((n, m) => n + m.size, 0))} of storage; remove them here, or set a clean-up schedule in Settings → Media storage.</p>}
     {items.length > 0 && <div className="bf-media-grid">{items.map((m, i) => <figure key={m.id} className="bf-media-tile" data-derived={m.derivedFrom ? '' : undefined}>
@@ -187,7 +188,7 @@ export function BugMedia({ access, bug, actor, items, config, readOnly = false, 
       <span className="bf-media-actions">
         {!readOnly && mayDeleteMedia(actor, m) && editing?.id !== m.id && <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setEditing({ id: m.id, value: m.name })}><Pencil />Rename</Button>}
         <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" aria-label={`Copy link to ${m.name}`} onClick={() => void copyMediaLink(bug.id, m.id)}><Link2 />Link</Button>
-        {!readOnly && mayDeleteMedia(actor, m) && <Button type="button" variant="ghost" size="sm" className="ml-auto h-7 text-xs text-destructive" onClick={() => setRemoving(m)}><Trash2 />Remove</Button>}
+        {!readOnly && mayDeleteMedia(actor, m) && <Button type="button" variant="ghost" size="sm" className="ml-auto h-7 text-xs text-destructive" onClick={e => { removingRect.current = (e.currentTarget.closest('figure') as HTMLElement | null)?.getBoundingClientRect() ?? null; setRemoving(m); }}><Trash2 />Remove</Button>}
       </span>
     </figure>)}</div>}
     {canUpload && <MediaDropZone accept={config.accept} remaining={remaining} disabledReason={disabledReason} onFiles={f => void uploader.add(f)} uploads={uploader.uploads} onRetry={uploader.retry} onRemove={uploader.remove} onLabel={uploader.setLabel} />}
@@ -197,8 +198,8 @@ export function BugMedia({ access, bug, actor, items, config, readOnly = false, 
     {markup && <AnnotationEditor source={markup.source} defaultName={markup.name} caption={markup.caption}
       onSave={async (file, name) => { await uploader.add([file], { name, derivedFrom: markup.derivedFrom, atSeconds: markup.atSeconds }); setMarkup(null); setOpen(null); toast.success('Marked-up copy is being attached'); }}
       onClose={() => setMarkup(null)} />}
-    <ConfirmAction open={clearing} onOpenChange={setClearing} destructive title={`Remove all ${items.length} files from ${bug.code}?`} description="Every screenshot, recording and PDF on this bug is removed for everyone and deleted from storage. One audit entry records it with your name, date and time." confirmLabel="Remove all files" onConfirm={async () => { await clearAll({ data: { access, media: { bugId: bug.id } } }); await refresh(); toast.success('All files removed'); setClearing(false); }} />
+    <ConfirmAction open={clearing} onOpenChange={setClearing} destructive title={`Remove all ${items.length} files from ${bug.code}?`} description="Every screenshot, recording and PDF on this bug is removed for everyone and deleted from storage. One audit entry records it with your name, date and time." confirmLabel="Remove all files" onConfirm={async () => { const source = section.current?.getBoundingClientRect() ?? null; const n = items.length; await clearAll({ data: { access, media: { bugId: bug.id } } }); await Promise.all([refresh(), client.invalidateQueries({ queryKey: ['trash'] })]); moveToTrashToast({ title: 'Files removed', label: `${n} ${n === 1 ? 'file' : 'files'} from ${bug.code}`, detail: 'Deleted from storage; listed in Trash for the record.', source, trashLink: access.kind === 'admin' }); setClearing(false); }} />
     <ConfirmAction open={removing !== null} onOpenChange={o => { if (!o) setRemoving(null); }} destructive title={`Remove ${removing?.name ?? 'this file'}?`} description="The file is removed from this bug for everyone and deleted from private storage. The removal is recorded with your name, date and time." confirmLabel="Remove file"
-      onConfirm={async () => { if (!removing) return; await remove({ data: { access, media: { id: removing.id } } }); await refresh(); toast.success('File removed'); setRemoving(null); }} />
+      onConfirm={async () => { if (!removing) return; const source = removingRect.current; await remove({ data: { access, media: { id: removing.id } } }); await Promise.all([refresh(), client.invalidateQueries({ queryKey: ['trash'] })]); moveToTrashToast({ title: 'File removed', label: removing.name, detail: 'Deleted from storage; listed in Trash for the record.', source, trashLink: access.kind === 'admin' }); setRemoving(null); }} />
   </section>;
 }

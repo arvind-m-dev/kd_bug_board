@@ -240,11 +240,6 @@ export async function saveMediaCleanup(data: { cleanupDays: CleanupDays } | { no
   ]);
   forgetMediaConfig(); return mediaStatus(false);
 }
-/** Soft-deletes every file of a bug (used when the bug itself is deleted) and purges the objects. */
-export async function deleteAllMedia(bugId: string, byUserId: string) {
-  await neonExecute(`update bugflow.bug_media set deleted_at=now(),deleted_by=$2 where bug_id=$1 and deleted_at is null`, [bugId, byUserId]);
-  await sweep(MEDIA_MAX_FILES).catch(() => undefined);
-}
 /** Settings → Media storage: configuration, usage from our own rows and, on request, a real round trip to the bucket. */
 export async function mediaStatus(test: boolean): Promise<MediaStatus> {
   await requireAdmin(); if (test) checkOrigin(); const { config, missing, source, defaultAvailable, stored } = await mediaConfig();

@@ -20,6 +20,7 @@ import { Route as AdminNotificationsRouteImport } from './routes/admin_.notifica
 import { Route as AdminProjectsRouteImport } from './routes/admin_.projects'
 import { Route as AdminReportsRouteImport } from './routes/admin_.reports'
 import { Route as AdminSettingsRouteImport } from './routes/admin_.settings'
+import { Route as AdminTrashRouteImport } from './routes/admin_.trash'
 import { Route as AdminUsersRouteImport } from './routes/admin_.users'
 import { Route as DeveloperPortalTokenRouteImport } from './routes/developer.$portalToken'
 import { Route as MediaBugIdRouteImport } from './routes/media.$bugId'
@@ -83,6 +84,11 @@ const AdminSettingsRoute = AdminSettingsRouteImport.update({
   path: '/admin/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminTrashRoute = AdminTrashRouteImport.update({
+  id: '/admin_/trash',
+  path: '/admin/trash',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/admin_/users',
   path: '/admin/users',
@@ -131,6 +137,7 @@ export interface FileRoutesByFullPath {
   '/admin/projects': typeof AdminProjectsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/trash': typeof AdminTrashRoute
   '/admin/users': typeof AdminUsersRoute
   '/developer/$portalToken': typeof DeveloperPortalTokenRoute
   '/media/$bugId': typeof MediaBugIdRoute
@@ -151,6 +158,7 @@ export interface FileRoutesByTo {
   '/admin/projects': typeof AdminProjectsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/trash': typeof AdminTrashRoute
   '/admin/users': typeof AdminUsersRoute
   '/developer/$portalToken': typeof DeveloperPortalTokenRoute
   '/media/$bugId': typeof MediaBugIdRoute
@@ -172,6 +180,7 @@ export interface FileRoutesById {
   '/admin_/projects': typeof AdminProjectsRoute
   '/admin_/reports': typeof AdminReportsRoute
   '/admin_/settings': typeof AdminSettingsRoute
+  '/admin_/trash': typeof AdminTrashRoute
   '/admin_/users': typeof AdminUsersRoute
   '/developer/$portalToken': typeof DeveloperPortalTokenRoute
   '/media/$bugId': typeof MediaBugIdRoute
@@ -194,6 +203,7 @@ export interface FileRouteTypes {
     | '/admin/projects'
     | '/admin/reports'
     | '/admin/settings'
+    | '/admin/trash'
     | '/admin/users'
     | '/developer/$portalToken'
     | '/media/$bugId'
@@ -214,6 +224,7 @@ export interface FileRouteTypes {
     | '/admin/projects'
     | '/admin/reports'
     | '/admin/settings'
+    | '/admin/trash'
     | '/admin/users'
     | '/developer/$portalToken'
     | '/media/$bugId'
@@ -234,6 +245,7 @@ export interface FileRouteTypes {
     | '/admin_/projects'
     | '/admin_/reports'
     | '/admin_/settings'
+    | '/admin_/trash'
     | '/admin_/users'
     | '/developer/$portalToken'
     | '/media/$bugId'
@@ -255,6 +267,7 @@ export interface RootRouteChildren {
   AdminProjectsRoute: typeof AdminProjectsRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminTrashRoute: typeof AdminTrashRoute
   AdminUsersRoute: typeof AdminUsersRoute
   DeveloperPortalTokenRoute: typeof DeveloperPortalTokenRoute
   MediaBugIdRoute: typeof MediaBugIdRoute
@@ -343,6 +356,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/trash': {
+      id: '/admin_/trash'
+      path: '/admin/trash'
+      fullPath: '/admin/trash'
+      preLoaderRoute: typeof AdminTrashRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin_/users': {
       id: '/admin_/users'
       path: '/admin/users'
@@ -407,6 +427,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminProjectsRoute: AdminProjectsRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
+  AdminTrashRoute: AdminTrashRoute,
   AdminUsersRoute: AdminUsersRoute,
   DeveloperPortalTokenRoute: DeveloperPortalTokenRoute,
   MediaBugIdRoute: MediaBugIdRoute,
