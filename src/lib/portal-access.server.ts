@@ -13,7 +13,11 @@ export async function databaseCall<T>(work: () => Promise<T>): Promise<T> {
   }
 }
 export function checkOrigin() {
-  const request = getRequest(); const origin = request.headers.get('origin');
+  // Browser server-function calls run inside the Start request runtime; AI-token (MCP) calls run outside it and carry no
+  // cookie, so there is no CSRF surface and no request to read — skip the check there rather than throw.
+  let request: Request;
+  try { request = getRequest(); } catch { return; }
+  const origin = request.headers.get('origin');
   if (origin && origin !== new URL(request.url).origin) throw new Error('This request must come from your Futurist Global Bug Board workspace.');
 }
 // Verified Admin sessions are remembered briefly per server instance so each request skips a database round trip.

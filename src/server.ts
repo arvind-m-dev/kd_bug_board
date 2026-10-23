@@ -55,6 +55,15 @@ const PORTAL_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
 };
 
+// MCP is called cross-origin by AI clients, so the endpoint allows any origin; the AI token is the only credential.
+function mcpCors(response: Response): Response {
+  const headers = new Headers(response.headers);
+  headers.set('Access-Control-Allow-Origin', '*');
+  headers.set('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  headers.set('Access-Control-Allow-Headers', 'authorization, content-type, mcp-session-id, mcp-protocol-version, accept');
+  headers.set('Access-Control-Expose-Headers', 'mcp-session-id, www-authenticate');
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
 function withPortalHeaders(request: Request, response: Response): Response {
   if (!PORTAL_PATH.test(new URL(request.url).pathname)) return response;
   const headers = new Headers(response.headers);
@@ -68,6 +77,20 @@ export default {
       if (request.method === 'POST' && new URL(request.url).pathname === '/api/presence') {
         const { handlePresence } = await import('./lib/presence.server');
         return await handlePresence(request);
+      }
+      // Model Context Protocol endpoint: any AI client reaches the bugs with a BugFlow AI token. CORS-open; auth is the token.
+      const mcpPath = new URL(request.url).pathname;
+      if (mcpPath === '/api/mcp' || mcpPath === '/mcp') {
+        if (request.method === 'OPTIONS') return mcpCors(new Response(null, { status: 204 }));
+        if (request.method === 'GET' && new URL(request.url).searchParams.get('token') === null) {
+          return mcpCors(Response.json({ name: 'BugFlow MCP', version: '1.0.0', transport: 'streamable-http', authentication: 'Bearer AI token (create one in Settings or your portal)' }));
+        }
+        const { handleMcpRequest } = await import('./lib/mcp.server');
+        return mcpCors(await handleMcpRequest(request));
+      }
+      if (mcpPath === '/.well-known/oauth-protected-resource' || mcpPath === '/.well-known/oauth-protected-resource/api/mcp') {
+        const origin = new URL(request.url).origin;
+        return mcpCors(Response.json({ resource: `${origin}/api/mcp`, authorization_servers: [], bearer_methods_supported: ['header'] }));
       }
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);

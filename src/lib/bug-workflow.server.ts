@@ -7,6 +7,14 @@ import type { Status } from './bugflow';
 
 export async function actorFor(access:BugAccess):Promise<BugActor> {
  if(access.kind==='admin'){const a=await requireAdmin();return {userId:a.userId,portalId:a.id,name:a.name,role:'admin',permissions:['view','report','comment','evidence','validate','assign']};}
+ if(access.kind==='ai'){
+  // An AI token resolves to its portal's actor; the admin portal grants full permissions, a member portal its granted set.
+  const {rows}=await neonExecute(`update bugflow.ai_tokens t set last_used_at=now() from bugflow.portals p join bugflow.users u on u.id=p.user_id where t.portal_id=p.id and t.token_hash=$1 and t.revoked_at is null and p.active and u.active and p.revoked_at is null and (p.expires_at is null or p.expires_at>now()) returning p.id,p.user_id,p.type,u.name,(select o.permissions from bugflow.portal_onboarding o where o.portal_id=p.id) as permissions`,[await hashToken(access.token)]);
+  const r=rows[0];if(!r)throw new Error('This AI token is invalid or has been revoked.');
+  const type=String(r['type']);
+  if(type==='admin')return {userId:String(r['user_id']),portalId:String(r['id']),name:String(r['name']),role:'admin',permissions:['view','report','comment','evidence','validate','assign']};
+  return {portalId:String(r['id']),userId:String(r['user_id']),name:String(r['name']),role:type as 'reporter'|'qa'|'developer'|'member',permissions:Array.isArray(r['permissions'])?r['permissions'].filter((v):v is string=>typeof v==='string'):[]};
+ }
  const {rows}=await neonQuery(`select p.id,p.user_id,p.type,u.name,o.permissions from bugflow.portals p join bugflow.users u on u.id=p.user_id join bugflow.portal_onboarding o on o.portal_id=p.id where p.token_hash=$1 and p.type=$2 and p.active and u.active and p.revoked_at is null and (p.expires_at is null or p.expires_at>now()) limit 1`,[await hashToken(access.token),access.type]);
  const r=rows[0];if(!r)throw new Error('This portal link has expired or been revoked. Ask your Admin for a new link.');
  return {portalId:String(r['id']),userId:String(r['user_id']),name:String(r['name']),role:access.type,permissions:Array.isArray(r['permissions'])?r['permissions'].filter((v):v is string=>typeof v==='string'):[]};
