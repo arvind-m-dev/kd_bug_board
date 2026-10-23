@@ -28,10 +28,17 @@ import {
   type prepareMediaSchema,
   type finishMediaSchema,
   type renameMediaSchema,
+  type saveMarksSchema,
+  type TrashedMedia,
+  type MediaUsage,
+  MEDIA_THUMB_MAX,
+  thumbKey,
+  readMarks,
   type mediaStorageSchema,
   downloadName,
 } from "./bug-media";
 import { formatBugCode } from "./bug-workflow";
+import { TRASH_DAYS } from "./trash";
 import type { BugAccess } from "./bug-workflow";
 import type { z } from "zod";
 
@@ -80,6 +87,8 @@ type Stored = {
   };
   cleanupDays?: CleanupDays;
   cleanupBy?: string;
+  /** Storage limit Admin set for the usage meter (bytes); unset = the R2 free plan's 10 GB for R2, else none. */
+  quotaBytes?: number;
 };
 async function storedChoice(): Promise<Stored> {
   const { rows } = await neonQuery(`select value from bugflow.settings where key='media_storage'`);
@@ -225,6 +234,9 @@ async function signPut(cfg: Config, key: string, contentType: string, size: numb
     { expiresIn: MEDIA_PUT_TTL },
   );
 }
+const SIGN_WINDOW = 300;
+const signingWindow = () =>
+  new Date(Math.floor(Date.now() / (SIGN_WINDOW * 1000)) * SIGN_WINDOW * 1000);
 async function signGet(cfg: Config, key: string, contentType: string, name: string) {
   const [{ GetObjectCommand }, { getSignedUrl }] = await Promise.all([
     import("@aws-sdk/client-s3"),
@@ -240,7 +252,10 @@ async function signGet(cfg: Config, key: string, contentType: string, name: stri
       ResponseContentDisposition: `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`,
       ResponseCacheControl: "private, max-age=300",
     }),
-    { expiresIn: MEDIA_URL_TTL },
+    // Signed from the start of the current 5-minute window: the same file gets the same link for those 5 minutes,
+    // so reopening it (or a refetch) is served from the browser cache instead of downloading it again.
+    // The extra 5 minutes keeps every link valid for at least MEDIA_URL_TTL.
+    { expiresIn: MEDIA_URL_TTL + SIGN_WINDOW, signingDate: signingWindow() },
   );
 }
 async function head(
@@ -269,7 +284,7 @@ async function remove(cfg: Config, key: string) {
   });
 }
 
-const ITEM = `m.id,m.bug_id,m.key,m.name,m.content_type,m.kind,m.size,m.width,m.height,m.uploaded_by,m.derived_from,m.at_seconds,u.name as uploader,to_json(m.created_at) as created_iso`;
+const ITEM = `m.id,m.bug_id,m.key,m.name,m.content_type,m.kind,m.size,m.width,m.height,m.uploaded_by,m.derived_from,m.at_seconds,m.marks,m.marks_version,m.has_thumb,u.name as uploader,to_json(m.created_at) as created_iso`;
 async function toItems(rows: Record<string, unknown>[], withUrls: boolean): Promise<MediaItem[]> {
   const { config } = await mediaConfig();
   const expiresAt = new Date(Date.now() + MEDIA_URL_TTL * 1000).toISOString();
@@ -286,9 +301,19 @@ async function toItems(rows: Record<string, unknown>[], withUrls: boolean): Prom
               downloadName(name, contentType),
             ).catch(() => null)
           : null;
+      const thumbUrl =
+        withUrls && config && r["has_thumb"] === true
+          ? await signGet(
+              config,
+              thumbKey(String(r["key"])),
+              "image/jpeg",
+              `${name} preview.jpg`,
+            ).catch(() => null)
+          : null;
       return {
         id: String(r["id"]),
         bugId: String(r["bug_id"]),
+        thumbUrl,
         name,
         contentType,
         kind: mediaKind(contentType),
@@ -302,6 +327,8 @@ async function toItems(rows: Record<string, unknown>[], withUrls: boolean): Prom
         expiresAt: url ? expiresAt : null,
         derivedFrom: r["derived_from"] == null ? null : String(r["derived_from"]),
         atSeconds: r["at_seconds"] == null ? null : Number(r["at_seconds"]),
+        marks: readMarks(r["marks"]),
+        marksVersion: Number(r["marks_version"] ?? 0),
       };
     }),
   );
@@ -367,6 +394,11 @@ export async function prepareUpload(access: BugAccess, data: z.infer<typeof prep
   return {
     uploadUrl: await storageCall("sign", () => signPut(config, key, data.contentType, data.size)),
     headers: { "Content-Type": data.contentType, "If-None-Match": "*" },
+    thumbUrl: data.thumbSize
+      ? await storageCall("sign", () =>
+          signPut(config, thumbKey(key), "image/jpeg", data.thumbSize!),
+        )
+      : null,
     expiresAt: new Date(Date.now() + MEDIA_PUT_TTL * 1000).toISOString(),
   };
 }
@@ -413,9 +445,17 @@ export async function finishUpload(
         : "The uploaded file did not match what was announced and was discarded.",
     );
   }
+  // The preview is optional: it counts only when it really arrived as a small JPEG.
+  const preview = data.thumb ? await head(config, thumbKey(key)).catch(() => null) : null;
+  const hasThumb =
+    !!preview &&
+    preview.size > 0 &&
+    preview.size <= MEDIA_THUMB_MAX &&
+    (!preview.contentType || preview.contentType.startsWith("image/jpeg"));
+  if (data.thumb && !hasThumb) await remove(config, thumbKey(key)).catch(() => undefined);
   await neonExecute([
     {
-      query: `with u as (update bugflow.bug_media set status='ready',ready_at=now(),size=$6,width=$7,height=$8 where id=$1 and status='pending' and deleted_at is null returning id)
+      query: `with u as (update bugflow.bug_media set status='ready',ready_at=now(),size=$6,width=$7,height=$8,has_thumb=$10 where id=$1 and status='pending' and deleted_at is null returning id)
       insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $2,$3,$4,'bug.media_added',jsonb_build_object('media',$5::text,'kind',$9::text,'size',$6::bigint) from u`,
       params: [
         data.id,
@@ -427,12 +467,13 @@ export async function finishUpload(
         data.width,
         data.height,
         String(row["kind"]),
+        hasThumb,
       ],
     },
   ]);
   return (
     await toItems(
-      [{ ...row, size: obj.size, width: data.width, height: data.height }],
+      [{ ...row, size: obj.size, width: data.width, height: data.height, has_thumb: hasThumb }],
       actor.permissions.includes("evidence"),
     )
   )[0]!;
@@ -465,6 +506,50 @@ export async function renameMedia(
     ]);
   return (await toItems([{ ...row, name }], actor.permissions.includes("evidence")))[0]!;
 }
+/**
+ * Saves a recording's timed marks, sent by the uploader's browser right after the upload (marks are drawn on the local
+ * file before it goes up). Only the uploader, who must still be allowed to attach files to the bug. The version must
+ * match what the editor loaded, so a concurrent edit is refused instead of overwritten; the change is audited atomically.
+ */
+export async function saveVideoMarks(access: BugAccess, data: z.infer<typeof saveMarksSchema>) {
+  checkOrigin();
+  const actor = await actorFor(access);
+  const { rows } = await neonQuery(
+    `select bug_id,kind,uploaded_by from bugflow.bug_media where id=$1 and status='ready' and deleted_at is null limit 1`,
+    [data.id],
+  );
+  const row = rows[0];
+  if (!row) throw new Error("This recording is no longer available.");
+  if (row["kind"] !== "video") throw new Error("Only recordings can have timed marks.");
+  // Mark-up belongs to the upload: only the person who attached the recording can add its timed marks.
+  if (String(row["uploaded_by"]) !== actor.userId)
+    throw new Error("Only the person who attached this recording can mark it up.");
+  const bugId = String(row["bug_id"]);
+  const { bug } = await bugDetail(access, bugId);
+  if (!mayUploadMedia(actor, bug))
+    throw new Error(
+      "Only the reporter, the assigned developer, QA or Admin can mark up recordings, and only while the bug is open.",
+    );
+  const saved = await neonQuery(
+    `with u as (update bugflow.bug_media set marks=$2::jsonb, marks_version=marks_version+1 where id=$1 and marks_version=$3 returning bug_id,marks_version),
+      a as (insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $4,u.bug_id,$5,'bug.media_marked',jsonb_build_object('media',$1::text,'marks',$6::int) from u)
+      select marks_version from u`,
+    [
+      data.id,
+      JSON.stringify(data.marks),
+      data.version,
+      crypto.randomUUID(),
+      actor.userId,
+      data.marks.length,
+    ],
+  );
+  const version = saved.rows[0]?.["marks_version"];
+  if (version == null)
+    throw new Error(
+      "Someone else changed these marks meanwhile. Close the recording, reopen it and try again.",
+    );
+  return { version: Number(version) };
+}
 /** Everything the actor attached (Admin: everything anyone attached), newest first, with the bug each file belongs to. */
 export async function listLibrary(access: BugAccess): Promise<LibraryItem[]> {
   const actor = await actorFor(access);
@@ -483,7 +568,7 @@ export async function listLibrary(access: BugAccess): Promise<LibraryItem[]> {
     bugStatus: String(rows[i]!["bug_status"]),
   }));
 }
-/** Removes a file: hidden immediately and audited atomically; the object is deleted right after (retried by the sweep if that fails). */
+/** Removes a file to the Trash: hidden immediately and audited atomically; it stays restorable for TRASH_DAYS before the sweep deletes it from storage. */
 export async function deleteMedia(access: BugAccess, id: string) {
   checkOrigin();
   const actor = await actorFor(access);
@@ -497,7 +582,7 @@ export async function deleteMedia(access: BugAccess, id: string) {
   if (!mayDeleteMedia(actor, { uploadedById: String(row["uploaded_by"]) }))
     throw new Error("Only the person who attached a file, or Admin, can remove it.");
   const { rows: done } = await neonExecute(
-    `with u as (update bugflow.bug_media set deleted_at=now(),deleted_by=$2 where id=$1 and deleted_at is null returning id)
+    `with u as (update bugflow.bug_media set deleted_at=now(),deleted_by=$2,restorable_until=now()+make_interval(days=>$7) where id=$1 and deleted_at is null returning id)
     insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $3,$4,$2,'bug.media_deleted',jsonb_build_object('media',$5::text,'kind',$6::text) from u returning id`,
     [
       id,
@@ -506,17 +591,89 @@ export async function deleteMedia(access: BugAccess, id: string) {
       String(row["bug_id"]),
       String(row["name"]),
       String(row["kind"]),
+      TRASH_DAYS,
     ],
   );
   if (!done.length) throw new Error("This file was already removed.");
+  return { deleted: true, restorableDays: TRASH_DAYS };
+}
+/** A removed file the actor may act on in the Trash: restorable, on a bug they can see, uploaded by them (Admin: anyone). */
+async function trashedFile(access: BugAccess, id: string) {
+  const actor = await actorFor(access);
+  const { rows } = await neonQuery(
+    `select id,bug_id,key,name,kind,uploaded_by from bugflow.bug_media where id=$1 and status='ready' and deleted_at is not null and purged_at is null and restorable_until>now() limit 1`,
+    [id],
+  );
+  const row = rows[0];
+  if (!row) throw new Error("This file is no longer in the Trash.");
+  if (!mayDeleteMedia(actor, { uploadedById: String(row["uploaded_by"]) }))
+    throw new Error("Only the person who attached a file, or Admin, can restore or delete it.");
+  return { actor, row, bugId: String(row["bug_id"]) };
+}
+/** Brings a removed file back onto its bug (the bug must not be in the Trash, and must have room). */
+export async function restoreMedia(access: BugAccess, id: string) {
+  checkOrigin();
+  const { actor, row, bugId } = await trashedFile(access, id);
+  await bugDetail(access, bugId).catch(() => {
+    throw new Error("The bug this file belongs to is not available. Restore the bug first.");
+  });
+  const { rows } = await neonExecute(
+    `with room as (select count(*)::int as n from bugflow.bug_media where bug_id=$4 and status='ready' and deleted_at is null),
+    r as (update bugflow.bug_media set deleted_at=null,deleted_by=null,restorable_until=null where id=$1 and deleted_at is not null and purged_at is null and restorable_until>now() and (select n from room)<$5 returning id)
+    insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $2,$4,$3,'bug.media_restored',jsonb_build_object('media',$6::text) from r returning id`,
+    [id, crypto.randomUUID(), actor.userId, bugId, MEDIA_MAX_FILES, String(row["name"])],
+  );
+  if (!rows.length)
+    throw new Error(
+      `This file could not be restored: the bug already has ${MEDIA_MAX_FILES} files, or the file left the Trash.`,
+    );
+  return { restored: true, bugId, name: String(row["name"]) };
+}
+/** Deletes a removed file from storage now instead of waiting for the Trash to expire. */
+export async function deleteMediaForever(access: BugAccess, id: string) {
+  checkOrigin();
+  const { actor, row, bugId } = await trashedFile(access, id);
+  const { rows } = await neonExecute(
+    `with p as (update bugflow.bug_media set restorable_until=null where id=$1 and deleted_at is not null and purged_at is null returning id)
+    insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $2,$4,$3,'bug.media_purged',jsonb_build_object('media',$5::text) from p returning id`,
+    [id, crypto.randomUUID(), actor.userId, bugId, String(row["name"])],
+  );
+  if (!rows.length) throw new Error("This file is no longer in the Trash.");
   const purged = await purge(String(row["key"]), id);
-  return { deleted: true, purged };
+  return { purged };
+}
+/** Files the actor removed in the last TRASH_DAYS that can still be restored (Admin: everyone's). */
+export async function listMediaTrash(access: BugAccess): Promise<TrashedMedia[]> {
+  const actor = await actorFor(access);
+  if (!actor.permissions.includes("view")) throw new Error("Bug access is not permitted.");
+  const mine = actor.role !== "admin";
+  const { rows } = await neonQuery(
+    `select m.id,m.bug_id,m.name,m.kind,m.size,b.title as bug_title,u.name as uploader,to_json(m.deleted_at) as deleted_iso,to_json(m.restorable_until) as until_iso,(b.deleted_at is not null) as bug_trashed
+    from bugflow.bug_media m join bugflow.bugs b on b.id=m.bug_id join bugflow.users u on u.id=m.uploaded_by
+    where m.status='ready' and m.deleted_at is not null and m.purged_at is null and m.restorable_until>now() and b.purged_at is null ${mine ? "and m.uploaded_by=$1" : ""}
+    order by m.deleted_at desc limit 200`,
+    mine ? [actor.userId] : [],
+  );
+  return rows.map((r) => ({
+    id: String(r["id"]),
+    bugId: String(r["bug_id"]),
+    bugCode: formatBugCode(String(r["bug_id"])),
+    bugTitle: String(r["bug_title"]),
+    name: String(r["name"]),
+    kind: String(r["kind"]),
+    size: Number(r["size"]),
+    uploadedBy: String(r["uploader"]),
+    deletedAt: String(r["deleted_iso"]),
+    restorableUntil: String(r["until_iso"]),
+    bugInTrash: r["bug_trashed"] === true,
+  }));
 }
 async function purge(key: string, id: string) {
   const { config } = await mediaConfig();
   if (!config) return false;
   try {
     await remove(config, key);
+    await remove(config, thumbKey(key)).catch(() => undefined);
     await neonExecute(
       `update bugflow.bug_media set purged_at=now() where id=$1 and purged_at is null`,
       [id],
@@ -552,7 +709,7 @@ export async function sweep(limit = 10) {
   }
   const { rows } = await neonQuery(
     `with stale as (update bugflow.bug_media set deleted_at=now() where status='pending' and deleted_at is null and created_at<now()-interval '${MEDIA_PENDING_MINUTES} minutes' returning id,key)
-    select id,key from stale union all (select id,key from bugflow.bug_media where deleted_at is not null and purged_at is null order by deleted_at limit $1)`,
+    select id,key from stale union all (select id,key from bugflow.bug_media where deleted_at is not null and purged_at is null and (restorable_until is null or restorable_until<now()) order by deleted_at limit $1)`,
     [limit],
   );
   for (const r of rows.slice(0, limit)) await purge(String(r["key"]), String(r["id"]));
@@ -603,6 +760,128 @@ export async function saveMediaCleanup(
   ]);
   forgetMediaConfig();
   return mediaStatus(false);
+}
+const R2_FREE_BYTES = 10 * 1024 ** 3;
+let usageCache: {
+  at: number;
+  bucket: string;
+  scan: {
+    bytes: number;
+    objects: number;
+    previewBytes: number;
+    previews: number;
+    truncated: boolean;
+  };
+} | null = null;
+/**
+ * Settings → Media storage → Usage: what the bucket really holds (every object listed and summed, previews included,
+ * cached for a minute), split by kind from our own rows, against the limit Admin set. S3 APIs cannot report a
+ * provider's remaining quota, so "remaining" is measured against that limit.
+ */
+export async function mediaUsage(refresh = false): Promise<MediaUsage> {
+  await requireAdmin();
+  const { config, stored } = await mediaConfig();
+  const { rows } = await neonQuery(
+    `select kind,count(*) filter(where deleted_at is null)::int as files,coalesce(sum(size) filter(where deleted_at is null),0)::bigint as bytes,
+      count(*) filter(where deleted_at is not null and purged_at is null)::int as trash_files,coalesce(sum(size) filter(where deleted_at is not null and purged_at is null),0)::bigint as trash_bytes
+    from bugflow.bug_media where status='ready' group by kind`,
+  );
+  const kind = (k: string) => {
+    const r = rows.find((x) => x["kind"] === k);
+    return { files: Number(r?.["files"] ?? 0), bytes: Number(r?.["bytes"] ?? 0) };
+  };
+  const trashFiles = rows.reduce((n, r) => n + Number(r["trash_files"] ?? 0), 0);
+  const trashBytes = rows.reduce((n, r) => n + Number(r["trash_bytes"] ?? 0), 0);
+  let scan: NonNullable<typeof usageCache>["scan"] | null = null;
+  let scanError: string | null = null;
+  if (config) {
+    if (
+      !refresh &&
+      usageCache &&
+      usageCache.bucket === config.bucket &&
+      Date.now() - usageCache.at < 60_000
+    )
+      scan = usageCache.scan;
+    else
+      try {
+        const { ListObjectsV2Command } = await import("@aws-sdk/client-s3");
+        const client = await s3(config);
+        let token: string | undefined;
+        const total = { bytes: 0, objects: 0, previewBytes: 0, previews: 0, truncated: false };
+        for (let page = 0; page < 100; page++) {
+          const out = await storageCall("list", () =>
+            client.send(
+              new ListObjectsV2Command({
+                Bucket: config.bucket,
+                ContinuationToken: token,
+                MaxKeys: 1000,
+              }),
+              { requestTimeout: 15000 },
+            ),
+          );
+          for (const o of out.Contents ?? []) {
+            total.bytes += Number(o.Size ?? 0);
+            total.objects++;
+            if (o.Key?.endsWith(".thumb.jpg")) {
+              total.previewBytes += Number(o.Size ?? 0);
+              total.previews++;
+            }
+          }
+          token = out.IsTruncated ? out.NextContinuationToken : undefined;
+          if (!token) break;
+          if (page === 99) total.truncated = true;
+        }
+        scan = total;
+        usageCache = { at: Date.now(), bucket: config.bucket, scan };
+      } catch (e) {
+        scanError = (e as Error).message;
+      }
+  }
+  const isR2 = !!config && providerName(config.endpoint) === "Cloudflare R2";
+  const quota = stored.quotaBytes ?? (isR2 ? R2_FREE_BYTES : null);
+  const known = kind("image").bytes + kind("video").bytes + kind("pdf").bytes + trashBytes;
+  const used = scan?.bytes ?? known;
+  return {
+    configured: !!config,
+    provider: config ? providerName(config.endpoint) : "",
+    bucket: config?.bucket ?? "",
+    usedBytes: used,
+    objects: scan?.objects ?? null,
+    measured: !!scan,
+    truncated: scan?.truncated ?? false,
+    scanError,
+    quotaBytes: quota,
+    quotaIsDefault: stored.quotaBytes == null && quota !== null,
+    remainingBytes: quota === null ? null : Math.max(0, quota - used),
+    images: kind("image"),
+    videos: kind("video"),
+    pdfs: kind("pdf"),
+    previews: { files: scan?.previews ?? 0, bytes: scan?.previewBytes ?? 0 },
+    trash: { files: trashFiles, bytes: trashBytes },
+    otherBytes: scan ? Math.max(0, scan.bytes - known - scan.previewBytes) : 0,
+    measuredAt: new Date(usageCache?.at ?? Date.now()).toISOString(),
+  };
+}
+/** Settings → Media storage → Usage: the limit the meter measures against (null = back to the default). */
+export async function saveMediaQuota(gb: number | null): Promise<MediaUsage> {
+  checkOrigin();
+  const admin = await requireAdmin();
+  const current = await storedChoice();
+  const next: Stored = { ...current };
+  if (gb === null) delete next.quotaBytes;
+  else next.quotaBytes = Math.round(gb * 1024 ** 3);
+  await neonExecute([
+    {
+      query: `insert into bugflow.settings(key,value) values('media_storage',$1::jsonb) on conflict (key) do update set value=excluded.value`,
+      params: [JSON.stringify(next)],
+    },
+    {
+      query: `insert into bugflow.activity(id,actor_id,action,detail) values($1,$2,'settings.media_quota',$3::jsonb)`,
+      params: [crypto.randomUUID(), admin.userId, JSON.stringify({ gb })],
+    },
+  ]);
+  forgetMediaConfig();
+  return mediaUsage();
 }
 /** Settings → Media storage: configuration, usage from our own rows and, on request, a real round trip to the bucket. */
 export async function mediaStatus(test: boolean): Promise<MediaStatus> {

@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  Camera,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -32,15 +31,8 @@ import {
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { ConfirmAction, actionError } from "./action-feedback";
-import { AnnotationEditor, captureFrame, loadImage, type AnnotationSource } from "./media-annotate";
 import { moveToTrashToast } from "./trash-bin";
-import {
-  clearBugMedia,
-  deleteMedia,
-  finishMediaUpload,
-  prepareMediaUpload,
-  renameMedia,
-} from "@/lib/bug-media.functions";
+import { clearBugMedia, deleteMedia, renameMedia, restoreMedia } from "@/lib/bug-media.functions";
 import {
   MEDIA_NAME_MAX,
   clock,
@@ -52,39 +44,13 @@ import {
   type MediaConfig,
   type MediaItem,
 } from "@/lib/bug-media";
-import { prepareFile, uploadPut, type PreparedFile } from "@/lib/media-client";
+import { uploadLabel, useMediaUpload, type UploadState } from "./media-queue";
+import { VideoPlayer } from "./video-marks";
+import { UploadMarkup } from "./upload-markup";
 import type { BugAccess, BugActor, LiveBug } from "@/lib/bug-workflow";
 import { timeAgo } from "@/lib/format";
 
-export type UploadMeta = { name?: string; derivedFrom?: string | null; atSeconds?: number | null };
-export type UploadState = {
-  id: string;
-  name: string;
-  label: string;
-  size: number;
-  status: "preparing" | "queued" | "uploading" | "verifying" | "done" | "failed";
-  progress: number;
-  note?: string | undefined;
-  error?: string | undefined;
-  preview?: string | undefined;
-  file?: PreparedFile | undefined;
-  abort?: AbortController | undefined;
-  derivedFrom: string | null;
-  atSeconds: number | null;
-};
-const label = (u: UploadState) =>
-  u.status === "preparing"
-    ? (u.note ?? "Compressing…")
-    : u.status === "queued"
-      ? "Ready to upload"
-      : u.status === "uploading"
-        ? `Uploading ${Math.round(u.progress * 100)}%`
-        : u.status === "verifying"
-          ? "Verifying…"
-          : u.status === "done"
-            ? "Attached"
-            : (u.error ?? "Failed");
-const baseName = (name: string) => name.replace(/\.[^.]+$/, "") || name;
+export { useMediaUpload, type UploadMeta, type UploadState } from "./media-queue";
 
 /** Copies an in-app link to a bug's files (or one file). It opens for whoever is signed in or has their portal open. */
 export async function copyMediaLink(bugId: string, mediaId?: string) {
@@ -101,147 +67,6 @@ export async function copyMediaLink(bugId: string, mediaId?: string) {
   }
 }
 
-/**
- * Upload queue: compress in the browser → signed link → PUT straight to the bucket → server verification.
- * With bugId null the files are only prepared ("staged") until start(bugId) is called — the report form uses that.
- * Each file carries a name people can edit before it goes up (and rename afterwards).
- */
-export function useMediaUpload(access: BugAccess, bugId: string | null) {
-  const client = useQueryClient();
-  const prepare = useServerFn(prepareMediaUpload);
-  const finish = useServerFn(finishMediaUpload);
-  const [uploads, setUploads] = useState<UploadState[]>([]);
-  const latest = useRef<UploadState[]>([]);
-  latest.current = uploads;
-  const patch = (id: string, p: Partial<UploadState>) =>
-    setUploads((list) => list.map((u) => (u.id === id ? { ...u, ...p } : u)));
-  useEffect(
-    () => () => {
-      for (const u of latest.current) if (u.preview) URL.revokeObjectURL(u.preview);
-    },
-    [],
-  );
-  async function send(u: UploadState, target: string) {
-    if (!u.file) return false;
-    const abort = new AbortController();
-    patch(u.id, { status: "uploading", progress: 0, error: undefined, abort });
-    const name =
-      (latest.current.find((x) => x.id === u.id)?.label ?? u.label).trim() || u.file.name;
-    try {
-      const { uploadUrl, headers } = await prepare({
-        data: {
-          access,
-          upload: {
-            bugId: target,
-            id: u.id,
-            name,
-            contentType: u.file.contentType,
-            size: u.file.size,
-            derivedFrom: u.derivedFrom,
-            atSeconds: u.atSeconds,
-          },
-        },
-      });
-      await uploadPut(
-        uploadUrl,
-        headers,
-        u.file.blob,
-        (f) => patch(u.id, { progress: f }),
-        abort.signal,
-      );
-      patch(u.id, { status: "verifying", progress: 1 });
-      await finish({
-        data: { access, upload: { id: u.id, width: u.file.width, height: u.file.height } },
-      });
-      patch(u.id, { status: "done" });
-      await Promise.all([
-        client.invalidateQueries({ queryKey: ["bug-detail"] }),
-        client.invalidateQueries({ queryKey: ["bug-workspace"] }),
-        client.invalidateQueries({ queryKey: ["media-library"] }),
-      ]);
-      window.setTimeout(() => setUploads((list) => list.filter((x) => x.id !== u.id)), 1500);
-      return true;
-    } catch (e) {
-      patch(u.id, { status: "failed", error: actionError(e, "The upload failed.") });
-      return false;
-    }
-  }
-  async function add(files: File[], meta: UploadMeta = {}) {
-    for (const f of files) {
-      const id = crypto.randomUUID();
-      const preview = f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined;
-      const start: UploadState = {
-        id,
-        name: f.name,
-        label: meta.name ?? baseName(f.name),
-        size: f.size,
-        status: "preparing",
-        progress: 0,
-        preview,
-        derivedFrom: meta.derivedFrom ?? null,
-        atSeconds: meta.atSeconds ?? null,
-      };
-      const abort = new AbortController();
-      setUploads((list) => [...list, { ...start, abort }]);
-      const r = await prepareFile(f, {
-        onProgress: (fraction, done, total) =>
-          patch(id, {
-            progress: fraction,
-            note: `Compressing ${clock(done)} of ${clock(total)} · keep this tab open`,
-          }),
-        signal: abort.signal,
-      });
-      if (!r.ok) {
-        patch(id, { status: "failed", error: r.error });
-        continue;
-      }
-      const u: UploadState = {
-        ...start,
-        name: r.file.name,
-        size: r.file.size,
-        status: "queued",
-        file: r.file,
-      };
-      patch(id, {
-        name: u.name,
-        size: u.size,
-        status: "queued",
-        file: u.file,
-        note: f.size > r.file.size * 1.5 ? `Compressed from ${formatBytes(f.size)}` : undefined,
-        progress: 0,
-      });
-      if (bugId) void send(u, bugId);
-    }
-  }
-  /** Uploads everything staged, one after another; returns how many failed. */
-  async function start(target: string) {
-    let failed = 0;
-    for (const u of latest.current)
-      if (u.status === "queued" || u.status === "failed") {
-        if (!(await send(u, target))) failed++;
-      }
-    return failed;
-  }
-  const retry = (id: string) => {
-    const u = latest.current.find((x) => x.id === id);
-    if (u && bugId) void send(u, bugId);
-    else if (u) patch(id, { status: "queued", error: undefined });
-  };
-  const remove = (id: string) => {
-    const u = latest.current.find((x) => x.id === id);
-    u?.abort?.abort();
-    if (u?.preview) URL.revokeObjectURL(u.preview);
-    setUploads((list) => list.filter((x) => x.id !== id));
-  };
-  const setLabel = (id: string, value: string) =>
-    patch(id, { label: value.slice(0, MEDIA_NAME_MAX) });
-  const busy = uploads.some(
-    (u) => u.status === "preparing" || u.status === "uploading" || u.status === "verifying",
-  );
-  const staged = uploads.filter((u) => u.status === "queued" || u.status === "failed").length;
-  return { uploads, add, start, retry, remove, setLabel, busy, staged };
-}
-
 /** Drop zone + picker + the queue of files in flight, each with an editable name. Purely presentational; the hook above does the work. */
 export function MediaDropZone({
   accept,
@@ -253,7 +78,10 @@ export function MediaDropZone({
   onRemove,
   onLabel,
   hint,
+  markup = false,
 }: {
+  /** Offer "Mark up" on queued images and recordings (the uploader's local files, before they go up). */
+  markup?: boolean | undefined;
   accept: string[];
   remaining: number;
   disabledReason?: string | undefined;
@@ -266,6 +94,7 @@ export function MediaDropZone({
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [active, setActive] = useState(false);
+  const [marking, setMarking] = useState<UploadState | null>(null);
   const disabled = !!disabledReason || remaining <= 0;
   const take = (list: FileList | null) => {
     if (!list) return;
@@ -347,7 +176,7 @@ export function MediaDropZone({
             (remaining <= 0
               ? "Remove one to add another"
               : (hint ??
-                `PNG, JPEG, WebP, GIF, MP4, WebM or PDF · images are shrunk and recordings over 100 MB are compressed in your browser · ${remaining} more`))}
+                `PNG, JPEG, WebP, GIF, MP4, MOV, WebM or PDF · images are shrunk and recordings over 100 MB are compressed in your browser · ${remaining} more`))}
         </span>
         {!disabledReason && (
           <Button
@@ -395,7 +224,7 @@ export function MediaDropZone({
                 )}
                 <small>
                   {formatBytes(u.size)} · {u.status === "queued" && u.note ? `${u.note} · ` : ""}
-                  {label(u)}
+                  {uploadLabel(u)}
                 </small>
                 {(u.status === "uploading" ||
                   u.status === "verifying" ||
@@ -404,6 +233,27 @@ export function MediaDropZone({
                 )}
               </span>
               <span className="flex items-center gap-1">
+                {markup &&
+                  u.status === "queued" &&
+                  u.file &&
+                  (u.file.contentType.startsWith("image/") ||
+                    u.file.contentType.startsWith("video/")) && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setMarking(u)}
+                      title={
+                        u.marks?.length
+                          ? "Change or preview the timed marks before uploading"
+                          : "Mark up this file before it is uploaded"
+                      }
+                    >
+                      <PenLine />
+                      {u.marks?.length ? "Edit / preview marks" : "Mark up"}
+                    </Button>
+                  )}
                 {u.status === "failed" && u.file && (
                   <Button
                     type="button"
@@ -450,6 +300,7 @@ export function MediaDropZone({
           ))}
         </ul>
       )}
+      {marking && <UploadMarkup upload={marking} onClose={() => setMarking(null)} />}
     </div>
   );
 }
@@ -479,15 +330,26 @@ export function MediaThumb({ item, onOpen }: { item: MediaItem; onOpen: () => vo
     >
       {item.kind === "image" && item.url ? (
         <img
-          src={item.url}
+          src={item.thumbUrl ?? item.url}
           alt={item.name}
           loading="lazy"
           decoding="async"
           referrerPolicy="no-referrer"
         />
       ) : item.kind === "video" && item.url ? (
+        // Lists never download the recording itself: a poster when there is one, otherwise an icon.
         <>
-          <video src={item.url} preload="metadata" muted playsInline />
+          {item.thumbUrl ? (
+            <img
+              src={item.thumbUrl}
+              alt={item.name}
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <Film size={30} />
+          )}
           <span className="bf-media-play">
             <Play size={18} />
           </span>
@@ -506,7 +368,7 @@ export function MediaThumb({ item, onOpen }: { item: MediaItem; onOpen: () => vo
 
 /**
  * Full-size viewer with previous/next (buttons and arrow keys), inline PDF, copy link, and whatever extra actions the caller adds.
- * The video element is CORS-enabled so a frame can be captured for marking up.
+ * View only: recordings play with the uploader's timed marks; nothing is marked up here.
  */
 export function MediaLightbox({
   items,
@@ -524,20 +386,32 @@ export function MediaLightbox({
   videoRef?: React.RefObject<HTMLVideoElement | null> | undefined;
 }) {
   const m = index === null ? null : (items[index] ?? null);
+  const videoState = useRef({ editing: false, dirty: false });
+  const onVideoState = useCallback((s: { editing: boolean; dirty: boolean }) => {
+    videoState.current = s;
+  }, []);
+  // Unsaved timed marks are never dropped silently by closing or switching files.
+  const leave = () =>
+    !videoState.current.dirty || window.confirm("Discard the timed marks you have not saved?");
   const go = (d: number) => {
-    if (index === null || items.length < 2) return;
+    if (index === null || items.length < 2 || !leave()) return;
+    videoState.current = { editing: false, dirty: false };
     onIndex((index + d + items.length) % items.length);
   };
   return (
     <Dialog
       open={m !== null}
       onOpenChange={(o) => {
-        if (!o) onClose();
+        if (!o && leave()) {
+          videoState.current = { editing: false, dirty: false };
+          onClose();
+        }
       }}
     >
       <DialogContent
         className="bf-lightbox max-w-5xl"
         onKeyDown={(e) => {
+          if (videoState.current.editing) return;
           if (e.key === "ArrowLeft") {
             e.preventDefault();
             go(-1);
@@ -562,14 +436,13 @@ export function MediaLightbox({
               <img src={m.url} alt={m.name} referrerPolicy="no-referrer" />
             )}
             {m.kind === "video" && m.url && (
-              <video
+              <VideoPlayer
                 key={m.id}
-                ref={videoRef}
                 src={m.url}
-                controls
-                autoPlay
-                playsInline
-                crossOrigin="anonymous"
+                poster={m.thumbUrl}
+                initialMarks={m.marks}
+                videoRef={videoRef}
+                onState={onVideoState}
               />
             )}
             {m.kind === "pdf" && m.url && <iframe key={m.id} src={m.url} title={m.name} />}
@@ -655,6 +528,7 @@ export function BugMedia({
 }) {
   const client = useQueryClient();
   const remove = useServerFn(deleteMedia);
+  const restoreFile = useServerFn(restoreMedia);
   const rename = useServerFn(renameMedia);
   const clearAll = useServerFn(clearBugMedia);
   const [open, setOpen] = useState<number | null>(null);
@@ -664,15 +538,9 @@ export function BugMedia({
   const section = useRef<HTMLElement>(null);
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
   const [savingName, setSavingName] = useState(false);
-  const [markup, setMarkup] = useState<{
-    source: AnnotationSource;
-    name: string;
-    caption: string;
-    derivedFrom: string;
-    atSeconds: number | null;
-  } | null>(null);
   const video = useRef<HTMLVideoElement | null>(null);
-  const uploader = useMediaUpload(access, bug.id);
+  // Files wait in the queue until "Upload" so the uploader can mark them up first; then they go up in the background.
+  const uploader = useMediaUpload(access, null);
   // A link to one file opens it as soon as it is in the list (once).
   const opened = useRef<string | null>(null);
   useEffect(() => {
@@ -717,39 +585,7 @@ export function BugMedia({
       setSavingName(false);
     }
   }
-  async function markImage(m: MediaItem) {
-    if (!m.url) return;
-    try {
-      const img = await loadImage(m.url);
-      setMarkup({
-        source: { image: img, width: img.naturalWidth, height: img.naturalHeight },
-        name: `${m.name} (marked up)`,
-        caption: m.name,
-        derivedFrom: m.id,
-        atSeconds: null,
-      });
-    } catch (e) {
-      toast.error(actionError(e, "The image could not be loaded for drawing."));
-    }
-  }
-  function markFrame(m: MediaItem) {
-    const v = video.current;
-    if (!v) return;
-    v.pause();
-    try {
-      const source = captureFrame(v);
-      const at = v.currentTime;
-      setMarkup({
-        source,
-        name: `${m.name} at ${clock(at)}`,
-        caption: `${m.name} at ${clock(at)}`,
-        derivedFrom: m.id,
-        atSeconds: Math.round(at * 100) / 100,
-      });
-    } catch (e) {
-      toast.error(actionError(e, "The frame could not be captured."));
-    }
-  }
+  const waiting = uploader.uploads.filter((u) => u.target === null && u.status !== "done").length;
   const remaining =
     config.maxFiles - items.length - uploader.uploads.filter((u) => u.status !== "failed").length;
   return (
@@ -873,7 +709,7 @@ export function BugMedia({
                   <Link2 />
                   Link
                 </Button>
-                {!readOnly && mayDeleteMedia(actor, m) && (
+                {mayDeleteMedia(actor, m) && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -906,7 +742,20 @@ export function BugMedia({
           onRetry={uploader.retry}
           onRemove={uploader.remove}
           onLabel={uploader.setLabel}
+          markup
+          hint="Files wait here so you can name and mark them up, then press Upload"
         />
+      )}
+      {canUpload && waiting > 0 && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <span className="text-xs text-muted-foreground">
+            Mark up screenshots and recordings now if you want: after upload they are view-only.
+          </span>
+          <Button type="button" size="sm" onClick={() => uploader.handoff(bug.id, bug.code)}>
+            <Upload />
+            Upload {waiting} {waiting === 1 ? "file" : "files"}
+          </Button>
+        </div>
       )}
       {items.some((m) => !m.url) && (
         <p className="text-xs text-muted-foreground">
@@ -919,40 +768,8 @@ export function BugMedia({
         onIndex={setOpen}
         onClose={() => setOpen(null)}
         videoRef={video}
-        actions={(m) =>
-          canUpload && remaining > 0 ? (
-            m.kind === "image" ? (
-              <Button type="button" variant="outline" size="sm" onClick={() => void markImage(m)}>
-                <PenLine />
-                Mark up
-              </Button>
-            ) : m.kind === "video" ? (
-              <Button type="button" variant="outline" size="sm" onClick={() => markFrame(m)}>
-                <Camera />
-                Mark up this frame
-              </Button>
-            ) : null
-          ) : null
-        }
       />
-      {markup && (
-        <AnnotationEditor
-          source={markup.source}
-          defaultName={markup.name}
-          caption={markup.caption}
-          onSave={async (file, name) => {
-            await uploader.add([file], {
-              name,
-              derivedFrom: markup.derivedFrom,
-              atSeconds: markup.atSeconds,
-            });
-            setMarkup(null);
-            setOpen(null);
-            toast.success("Marked-up copy is being attached");
-          }}
-          onClose={() => setMarkup(null)}
-        />
-      )}
+
       <ConfirmAction
         open={clearing}
         onOpenChange={setClearing}
@@ -982,19 +799,24 @@ export function BugMedia({
         }}
         destructive
         title={`Remove ${removing?.name ?? "this file"}?`}
-        description="The file is removed from this bug for everyone and deleted from private storage. The removal is recorded with your name, date and time."
-        confirmLabel="Remove file"
+        description="The file is removed from this bug for everyone and moved to the Trash, where it can be restored for 30 days. The removal is recorded with your name, date and time."
+        confirmLabel="Move to Trash"
         onConfirm={async () => {
           if (!removing) return;
           const source = removingRect.current;
           await remove({ data: { access, media: { id: removing.id } } });
           await Promise.all([refresh(), client.invalidateQueries({ queryKey: ["trash"] })]);
+          const gone = removing;
           moveToTrashToast({
-            title: "File removed",
-            label: removing.name,
-            detail: "Deleted from storage; listed in Trash for the record.",
+            title: "File moved to Trash",
+            label: gone.name,
+            detail: "Restorable for 30 days from My media or the Trash.",
             source,
             trashLink: access.kind === "admin",
+            onUndo: async () => {
+              await restoreFile({ data: { access, media: { id: gone.id } } });
+              await Promise.all([refresh(), client.invalidateQueries({ queryKey: ["trash"] })]);
+            },
           });
           setRemoving(null);
         }}

@@ -28,6 +28,9 @@ export const isClosedForMedia = (status: string) =>
   (MEDIA_CLOSED_STATUSES as readonly string[]).includes(status);
 export const CLEANUP_CHOICES = [0, 7, 30, 90] as const;
 export type CleanupDays = (typeof CLEANUP_CHOICES)[number];
+export const MEDIA_THUMB_MAX = 400_000; // bytes for a list preview (JPEG, longest side 640 px)
+/** Where a file's preview lives, next to the file itself. */
+export const thumbKey = (key: string) => `${key}.thumb.jpg`;
 export const MEDIA_URL_TTL = 600; // seconds a signed view link lasts
 export const MEDIA_PUT_TTL = 900; // seconds a signed upload link lasts
 export const MEDIA_PENDING_MINUTES = 120; // an upload that never finished is forgotten after this
@@ -50,6 +53,25 @@ export type MediaItem = {
   expiresAt: string | null;
   derivedFrom: string | null;
   atSeconds: number | null;
+  /** Small JPEG preview for lists and the video poster; null for older files and PDFs. */
+  thumbUrl: string | null;
+  /** Timed mark-up on a recording (empty for other files). */
+  marks: VideoMark[];
+  marksVersion: number;
+};
+/** A removed file still in the Trash (restorable until restorableUntil). */
+export type TrashedMedia = {
+  id: string;
+  bugId: string;
+  bugCode: string;
+  bugTitle: string;
+  name: string;
+  kind: string;
+  size: number;
+  uploadedBy: string;
+  deletedAt: string;
+  restorableUntil: string;
+  bugInTrash: boolean;
 };
 /** A file in someone's media library: the item plus the bug it belongs to. */
 export type LibraryItem = MediaItem & { bugCode: string; bugTitle: string; bugStatus: string };
@@ -82,7 +104,8 @@ export const MEDIA_OFF: MediaConfig = {
   maxBytes: MEDIA_MAX_BYTES,
   maxVideoBytes: MEDIA_MAX_VIDEO_BYTES,
   maxFiles: MEDIA_MAX_FILES,
-  accept: MEDIA_ACCEPT,
+  // The picker also offers macOS .mov recordings; they upload as MP4.
+  accept: [...MEDIA_ACCEPT, "video/quicktime", ".mov"],
 };
 export const MEDIA_ON: MediaConfig = { ...MEDIA_OFF, enabled: true };
 
@@ -131,11 +154,17 @@ const EXT_TYPES: Record<string, MediaType> = {
   webm: "video/webm",
   pdf: "application/pdf",
 };
+/** macOS screen and QuickTime recordings (.mov). They are stored as MP4: H.264 QuickTime plays as MP4 in current browsers. */
+export function isQuickTime(fileName: string, fileType: string) {
+  const ext = fileName.toLowerCase().split(".").pop() ?? "";
+  return fileType.toLowerCase().split(";")[0]!.trim() === "video/quicktime" || ext === "mov";
+}
 /** The MIME type to upload as, from the browser's type with an extension fallback (some browsers send ''). */
 export function resolveContentType(fileName: string, fileType: string): MediaType | null {
   const t = fileType.toLowerCase().split(";")[0]!.trim();
   if (isMediaType(t)) return t;
   if (t === "image/jpg") return "image/jpeg";
+  if (isQuickTime(fileName, t)) return "video/mp4";
   const ext = fileName.toLowerCase().split(".").pop() ?? "";
   return (!t || t === "application/octet-stream") && EXT_TYPES[ext] ? EXT_TYPES[ext]! : null;
 }
@@ -145,10 +174,8 @@ export function rejectReason(fileName: string, fileType: string, size: number): 
   const ext = fileName.toLowerCase().split(".").pop() ?? "";
   if (t.includes("heic") || t.includes("heif") || ext === "heic" || ext === "heif")
     return "Convert HEIC photos to JPEG first (iPhone: Settings → Camera → Formats → Most Compatible).";
-  if (t === "video/quicktime" || ext === "mov")
-    return "Export .mov recordings as MP4 first — browsers cannot play or compress them.";
   const type = resolveContentType(fileName, fileType);
-  if (!type) return "Only PNG, JPEG, WebP, GIF, MP4, WebM and PDF files can be attached.";
+  if (!type) return "Only PNG, JPEG, WebP, GIF, MP4, MOV, WebM and PDF files can be attached.";
   if (size <= 0) return "This file is empty.";
   if (mediaKind(type) === "video" && size > MEDIA_VIDEO_INPUT_MAX)
     return `Too large (${formatBytes(size)}) — recordings up to ${formatBytes(MEDIA_VIDEO_INPUT_MAX)} can be compressed here; trim or split this one first.`;
@@ -197,6 +224,8 @@ export const prepareMediaSchema = z
     size: z.number().int().min(1).max(MEDIA_MAX_VIDEO_BYTES),
     derivedFrom: id.nullable().default(null),
     atSeconds: z.number().min(0).max(360000).nullable().default(null),
+    /** Size of the JPEG preview the browser made, when it made one. */
+    thumbSize: z.number().int().min(1).max(MEDIA_THUMB_MAX).nullable().default(null),
   })
   .strict()
   .refine((v) => v.size <= maxBytesFor(v.contentType), {
@@ -207,6 +236,70 @@ export const clearMediaSchema = z.object({ bugId }).strict();
 export const mediaCleanupSchema = z
   .object({ cleanupDays: z.union([z.literal(0), z.literal(7), z.literal(30), z.literal(90)]) })
   .strict();
+// Timed video marks. Coordinates and sizes are fractions of the frame (0–1), so marks fit any player size.
+const unit = z.number().min(0).max(1);
+const markColor = z.string().regex(/^#[0-9a-f]{6}$/i);
+const stroke = z.number().min(0.001).max(0.05);
+const box = { x1: unit, y1: unit, x2: unit, y2: unit, color: markColor, width: stroke };
+export const markShapeSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("pen"),
+      points: z.array(unit).min(2).max(4000),
+      color: markColor,
+      width: stroke,
+    })
+    .strict(),
+  z.object({ type: z.literal("rect"), ...box }).strict(),
+  z.object({ type: z.literal("arrow"), ...box }).strict(),
+  z
+    .object({
+      type: z.literal("text"),
+      x: unit,
+      y: unit,
+      text: z.string().trim().min(1).max(120),
+      color: markColor,
+      size: z.number().min(0.01).max(0.2),
+    })
+    .strict(),
+]);
+export const videoMarkSchema = z
+  .object({
+    id: z.string().uuid(),
+    start: z.number().min(0).max(86_400),
+    end: z.number().min(0).max(86_400).nullable(),
+    shapes: z.array(markShapeSchema).min(1).max(80),
+  })
+  .strict()
+  .refine((m) => m.end === null || m.end > m.start, "A mark must end after it starts.");
+export type MarkShape = z.infer<typeof markShapeSchema>;
+export type VideoMark = z.infer<typeof videoMarkSchema>;
+export const VIDEO_MARKS_MAX = 150;
+const VIDEO_MARKS_BYTES = 600_000;
+export const saveMarksSchema = z
+  .object({
+    id: z.string().uuid(),
+    version: z.number().int().min(0),
+    marks: z
+      .array(videoMarkSchema)
+      .max(VIDEO_MARKS_MAX, `Up to ${VIDEO_MARKS_MAX} marks per recording.`)
+      .refine(
+        (m) => JSON.stringify(m).length <= VIDEO_MARKS_BYTES,
+        "These marks are too detailed to save. Remove some drawings.",
+      ),
+  })
+  .strict();
+/** Marks on screen at a moment: from their start until (not including) their end. */
+export const marksAt = (marks: VideoMark[], t: number) =>
+  marks.filter((m) => t >= m.start - 0.001 && (m.end === null || t < m.end));
+/** Marks read back from storage: anything malformed is skipped rather than breaking the player. */
+export function readMarks(value: unknown): VideoMark[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((m) => {
+    const r = videoMarkSchema.safeParse(m);
+    return r.success ? [r.data] : [];
+  });
+}
 export const renameMediaSchema = z
   .object({ id, name: z.string().trim().min(1).max(MEDIA_NAME_MAX) })
   .strict();
@@ -215,6 +308,7 @@ export const finishMediaSchema = z
     id,
     width: z.number().int().min(1).max(20000).nullable().default(null),
     height: z.number().int().min(1).max(20000).nullable().default(null),
+    thumb: z.boolean().default(false),
   })
   .strict();
 export const deleteMediaSchema = z.object({ id }).strict();
@@ -246,18 +340,63 @@ export type MediaStatus = {
   pending: number;
   test: { ok: boolean; ms: number; message: string } | null;
 };
+/** Settings → Media storage → Usage. Sizes in bytes; counts are files. */
+export type MediaUsage = {
+  configured: boolean;
+  provider: string;
+  bucket: string;
+  /** Measured from the bucket's own object list when `measured`, else from our rows. */
+  usedBytes: number;
+  objects: number | null;
+  measured: boolean;
+  truncated: boolean;
+  scanError: string | null;
+  quotaBytes: number | null;
+  quotaIsDefault: boolean;
+  remainingBytes: number | null;
+  images: { files: number; bytes: number };
+  videos: { files: number; bytes: number };
+  pdfs: { files: number; bytes: number };
+  previews: { files: number; bytes: number };
+  trash: { files: number; bytes: number };
+  /** Objects in the bucket we have no row for (other apps' files, failed uploads). */
+  otherBytes: number;
+  measuredAt: string;
+};
+export const mediaQuotaSchema = z
+  .object({ gb: z.number().min(0.1).max(100_000).nullable() })
+  .strict();
 /** Choosing where files live: the default bucket from the environment, or a bucket the Admin enters here (secret kept encrypted; blank on update keeps the saved one). */
+/**
+ * Forgiving endpoint input: trims spaces, adds a missing https://, and drops any path such as the
+ * "/bucket-name" Cloudflare appends to the S3 API URL shown on a bucket. The bucket has its own field.
+ */
+export function normalizeEndpoint(value: unknown) {
+  if (typeof value !== "string") return value;
+  let text = value.replace(/\s+/g, "");
+  if (text && !/^[a-z][a-z0-9+.-]*:\/\//i.test(text)) text = `https://${text}`;
+  if (/[<>]/.test(text)) return text;
+  try {
+    const url = new URL(text);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return text;
+  }
+}
 export const mediaStorageSchema = z.discriminatedUnion("source", [
   z.object({ source: z.literal("default") }).strict(),
   z
     .object({
       source: z.literal("custom"),
-      endpoint: z
-        .string()
-        .trim()
-        .url()
-        .max(300)
-        .refine((u) => u.startsWith("https://"), "The endpoint must start with https://"),
+      endpoint: z.preprocess(
+        normalizeEndpoint,
+        z
+          .string()
+          .url("Paste the S3 API URL, for example https://<account id>.r2.cloudflarestorage.com")
+          .max(300)
+          .refine((u) => u.startsWith("https://"), "The endpoint must start with https://")
+          .refine((u) => !/[<>]/.test(u), "Replace <ACCOUNT_ID> with your Cloudflare account ID"),
+      ),
       bucket: z
         .string()
         .trim()

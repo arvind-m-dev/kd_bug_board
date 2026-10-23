@@ -29,6 +29,12 @@ import {
   priorityNames,
   severityLevel,
   statusPath,
+  ASSIGN_TASK_LABELS,
+  assignmentMessage,
+  defaultTask,
+  roleName,
+  roleTag,
+  type AssignTask,
   type BugAccess,
   type BugChange,
   type BugWorkspaceData,
@@ -36,6 +42,9 @@ import {
 } from "@/lib/bug-workflow";
 import { STATUSES, type Status } from "@/lib/bugflow";
 import { actionError } from "./action-feedback";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RoleTag } from "./role-tag";
 
 import { statusLabel, statusTone } from "@/lib/format";
 const STATUS_HELP: Record<string, string> = {
@@ -369,7 +378,12 @@ export function RowStatus({
   );
 }
 
-/** Assignee cell: pick a person and it's assigned immediately (validating first when needed and allowed). */
+/**
+ * Assignee cell: who is on the bug, and a panel to assign one person or several at once. Each person gets a task
+ * (fix, re-validate, retest, add media or info) defaulted from their role, and the assignment message ("Assigned to
+ * Krishna (Developer) to fix it…") is saved on the bug. A bug that is not validated yet says so and is validated first.
+ * Admin can also pick members outside the bug's project; assigning gives them access to it in the same save.
+ */
 export function RowAssign({
   bug,
   access,
@@ -380,11 +394,16 @@ export function RowAssign({
   workspace: BugWorkspaceData;
 }) {
   const { send, busy } = useBugChange(access, bug);
-  const owners = bug.assignees?.length
-    ? bug.assignees
+  const [open, setOpen] = useState(false);
+  const roleOf = (id: string) => workspace.developers.find((m) => m.id === id)?.role ?? "";
+  const owners: { id: string; name: string; role: string }[] = bug.assignees?.length
+    ? bug.assignees.map((a) => ({ ...a, role: a.role || roleOf(a.id) }))
     : bug.assigneeId
-      ? [{ id: bug.assigneeId, name: bug.assignee }]
+      ? [{ id: bug.assigneeId, name: bug.assignee, role: roleOf(bug.assigneeId) }]
       : [];
+  const ownerText = owners
+    .map((o) => (roleTag(o.role) ? `${o.name} · ${roleTag(o.role)}` : o.name))
+    .join(", ");
   const assignable = [
     "VALIDATED",
     "READY_FOR_ASSIGNMENT",
@@ -393,32 +412,24 @@ export function RowAssign({
     "IN_PROGRESS",
   ].includes(bug.status);
   const viaValidation = !assignable && !!statusPath(workspace.actor, bug, "READY_FOR_ASSIGNMENT");
-  const people = workspace.developers.filter((m) => m.projectIds.includes(bug.projectId));
   const closed = ["RESOLVED", "NOT_A_BUG", "DUPLICATE", "WONT_FIX"].includes(bug.status);
   const lockReason = closed
     ? "This bug is closed — assignment is locked."
     : bug.status === "RECHECK"
       ? "Waiting for QA retest — reassign after QA decides."
       : !assignable && !viaValidation
-        ? "Validate this bug before assigning it."
+        ? "Validate this bug first, then assign it. Ask QA or Admin to validate it."
         : "";
-  const assign = (id: string, name: string) =>
-    void send(
-      { action: "assign", assigneeIds: [id] },
-      viaValidation
-        ? `${bug.code} validated and assigned to ${name}`
-        : `${bug.code} assigned to ${name}`,
-    );
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild disabled={busy}>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild disabled={busy}>
         <button
           type="button"
           className="bf-assign-trigger"
           data-empty={!owners.length || undefined}
           data-locked={!!lockReason || undefined}
-          title={owners.map((o) => o.name).join(", ") || undefined}
-          aria-label={`Assignee of ${bug.code}: ${owners.map((o) => o.name).join(", ") || "unassigned"}`}
+          title={ownerText || undefined}
+          aria-label={`Assignee of ${bug.code}: ${ownerText || "unassigned"}`}
         >
           {busy ? (
             <LoaderCircle size={13} className="animate-spin" />
@@ -430,77 +441,232 @@ export function RowAssign({
             <UserPlus size={13} />
           )}
           <span className="truncate">
-            {owners.length
-              ? owners[0]!.name + (owners.length > 1 ? ` +${owners.length - 1}` : "")
-              : lockReason
-                ? "Unassigned"
-                : "Assign"}
+            {owners.length ? owners[0]!.name : lockReason ? "Unassigned" : "Assign"}
           </span>
+          {owners[0] && <RoleTag role={owners[0].role} />}
+          {owners.length > 1 && <span className="bf-role-more">+{owners.length - 1}</span>}
           <ChevronDown size={12} />
         </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="max-h-72 w-60 overflow-y-auto">
-        {lockReason ? (
+      </PopoverTrigger>
+      <PopoverContent align="start" className="bf-assign-panel w-[340px] p-0">
+        {open && (
+          <AssignPanel
+            bug={bug}
+            workspace={workspace}
+            owners={owners}
+            lockReason={lockReason}
+            viaValidation={viaValidation}
+            busy={busy}
+            onAssign={async (people, note, grant) => {
+              const message = assignmentMessage(people);
+              const ok = await send(
+                {
+                  action: "assign",
+                  assigneeIds: people.map((p) => p.id),
+                  notes: [message, note.trim()].filter(Boolean).join("\n\n"),
+                  ...(grant ? { grantAccess: true } : {}),
+                },
+                `${bug.code}${viaValidation ? " validated and" : ""} ${message.replace(/^Assigned/, "assigned").replace(/\.$/, "")}`,
+              );
+              if (ok) setOpen(false);
+            }}
+          />
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+type Pick = { id: string; name: string; role: string; task: AssignTask };
+function AssignPanel({
+  bug,
+  workspace,
+  owners,
+  lockReason,
+  viaValidation,
+  busy,
+  onAssign,
+}: {
+  bug: LiveBug;
+  workspace: BugWorkspaceData;
+  owners: { id: string; name: string; role: string }[];
+  lockReason: string;
+  viaValidation: boolean;
+  busy: boolean;
+  onAssign: (people: Pick[], note: string, grant: boolean) => Promise<void>;
+}) {
+  const isAdmin = workspace.actor.role === "admin";
+  const everyone = workspace.developers;
+  const onProject = everyone.filter((m) => m.projectIds.includes(bug.projectId));
+  const others = isAdmin ? everyone.filter((m) => !m.projectIds.includes(bug.projectId)) : [];
+  const [multiple, setMultiple] = useState(owners.length > 1);
+  const [query, setQuery] = useState("");
+  const [note, setNote] = useState("");
+  const [picked, setPicked] = useState<Pick[]>(() =>
+    owners.flatMap((o) => {
+      const m = everyone.find((x) => x.id === o.id);
+      const role = m?.role ?? o.role;
+      return [{ id: o.id, name: o.name, role, task: defaultTask(role) }];
+    }),
+  );
+  if (lockReason)
+    return (
+      <div className="grid gap-2 p-3">
+        {owners.length > 0 && (
+          <div className="grid gap-1">
+            <span className="bf-menu-heading">Assigned to</span>
+            {owners.map((o) => (
+              <span key={o.id} className="flex items-center gap-2 text-sm">
+                <span className="bf-avatar !size-5 !text-[9.5px]">
+                  {o.name.slice(0, 2).toUpperCase()}
+                </span>
+                {o.name}
+                <RoleTag role={o.role} />
+              </span>
+            ))}
+          </div>
+        )}
+        <p className="flex items-start gap-2 text-xs text-muted-foreground">
+          <Lock size={13} className="mt-0.5 shrink-0" />
+          {lockReason}
+        </p>
+      </div>
+    );
+  const match = (m: { name: string; role?: string }) =>
+    `${m.name} ${roleName(m.role ?? "")}`.toLowerCase().includes(query.trim().toLowerCase());
+  const toggle = (m: { id: string; name: string; role?: string }) => {
+    const role = m.role ?? "";
+    setPicked((list) =>
+      list.some((p) => p.id === m.id)
+        ? list.filter((p) => p.id !== m.id)
+        : multiple
+          ? [...list, { id: m.id, name: m.name, role, task: defaultTask(role) }]
+          : [{ id: m.id, name: m.name, role, task: defaultTask(role) }],
+    );
+  };
+  const grant = picked.some((p) => others.some((o) => o.id === p.id));
+  const unchanged =
+    picked.length === owners.length &&
+    picked.every((p) => owners.some((o) => o.id === p.id)) &&
+    !note.trim();
+  const row = (m: (typeof everyone)[number], outside: boolean) => {
+    const on = picked.some((p) => p.id === m.id);
+    return (
+      <li key={m.id}>
+        <label className="bf-assign-person" data-on={on || undefined}>
+          <input
+            type={multiple ? "checkbox" : "radio"}
+            name={`assign-${bug.id}`}
+            checked={on}
+            onChange={() => toggle(m)}
+          />
+          <span className="bf-avatar !size-6 !text-[10px]">{m.name.slice(0, 2).toUpperCase()}</span>
+          <span className="min-w-0 flex-1 truncate">{m.name}</span>
+          <RoleTag role={m.role} />
+          {outside && (
+            <span className="bf-assign-role" title="Not on this project yet">
+              + access
+            </span>
+          )}
+        </label>
+      </li>
+    );
+  };
+  return (
+    <div className="grid gap-2 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <strong className="text-sm">Assign {bug.code}</strong>
+        <label className="flex items-center gap-1.5 text-xs">
+          <input
+            type="checkbox"
+            checked={multiple}
+            onChange={(e) => {
+              setMultiple(e.target.checked);
+              if (!e.target.checked) setPicked((l) => l.slice(0, 1));
+            }}
+          />
+          Multiple people
+        </label>
+      </div>
+      {viaValidation && (
+        <p className="bf-assign-warn">
+          {bug.code} is not validated yet. It will be validated first (to Ready for assignment),
+          then assigned.
+        </p>
+      )}
+      {everyone.length > 6 && (
+        <input
+          className="bf-input h-8"
+          placeholder="Search people or roles"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Search people"
+        />
+      )}
+      <div className="bf-assign-list">
+        <span className="bf-menu-heading">On {bug.project}</span>
+        <ul>{onProject.filter(match).map((m) => row(m, false))}</ul>
+        {!onProject.length && (
+          <p className="px-1 text-xs text-muted-foreground">
+            Nobody has access to this project yet.
+          </p>
+        )}
+        {others.length > 0 && (
           <>
-            {owners.length > 0 && (
-              <>
-                <DropdownMenuLabel className="bf-menu-heading">Assigned to</DropdownMenuLabel>
-                {owners.map((o) => (
-                  <DropdownMenuLabel key={o.id} className="flex items-center gap-2 font-normal">
-                    <span className="bf-avatar !size-5 !text-[9.5px]">
-                      {o.name.slice(0, 2).toUpperCase()}
-                    </span>
-                    {o.name}
-                  </DropdownMenuLabel>
-                ))}
-                <DropdownMenuSeparator />
-              </>
-            )}
-            <DropdownMenuLabel className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
-              <Lock size={13} />
-              {lockReason}
-            </DropdownMenuLabel>
-          </>
-        ) : (
-          <>
-            {viaValidation && (
-              <>
-                <DropdownMenuLabel className="text-[11.5px] font-normal text-muted-foreground">
-                  Picking someone also validates this bug.
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-              </>
-            )}
-            {people.length ? (
-              people.map((m) => (
-                <DropdownMenuItem
-                  key={m.id}
-                  onSelect={() => assign(m.id, m.name)}
-                  className="justify-between"
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="bf-avatar !size-5 !text-[9.5px]">
-                      {m.name.slice(0, 2).toUpperCase()}
-                    </span>
-                    {m.name}
-                  </span>
-                  <span className="flex items-center gap-2 text-[11.5px] text-muted-foreground">
-                    {m.role === "qa" ? "QA" : m.role}
-                    {owners.some((o) => o.id === m.id) && (
-                      <Check size={13} className="text-primary" />
-                    )}
-                  </span>
-                </DropdownMenuItem>
-              ))
-            ) : (
-              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                No members have access to this project.
-              </DropdownMenuLabel>
-            )}
+            <span className="bf-menu-heading">
+              Other members · assigning gives them access to {bug.project}
+            </span>
+            <ul>{others.filter(match).map((m) => row(m, true))}</ul>
           </>
         )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </div>
+      {picked.length > 0 && (
+        <div className="bf-assign-tasks">
+          {picked.map((p) => (
+            <label key={p.id} className="flex items-center gap-2 text-xs">
+              <span className="min-w-0 flex-1 truncate">
+                {p.name} <span className="text-muted-foreground">({roleName(p.role)})</span> to
+              </span>
+              <select
+                className="bf-input h-7 w-auto py-0 text-xs"
+                value={p.task}
+                onChange={(e) =>
+                  setPicked((l) =>
+                    l.map((x) =>
+                      x.id === p.id ? { ...x, task: e.target.value as AssignTask } : x,
+                    ),
+                  )
+                }
+                aria-label={`Task for ${p.name}`}
+              >
+                {(Object.keys(ASSIGN_TASK_LABELS) as AssignTask[]).map((t) => (
+                  <option key={t} value={t}>
+                    {ASSIGN_TASK_LABELS[t]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+          <p className="bf-assign-message">{assignmentMessage(picked)}</p>
+          <textarea
+            className="bf-input min-h-[52px] text-xs"
+            placeholder="Add a note for them (optional)"
+            maxLength={1500}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
+      )}
+      <Button
+        type="button"
+        size="sm"
+        disabled={busy || !picked.length || unchanged}
+        onClick={() => void onAssign(picked, note, grant)}
+      >
+        {busy ? <LoaderCircle className="animate-spin" /> : <UserPlus />}
+        {viaValidation ? "Validate & assign" : grant ? "Give access & assign" : "Assign"}
+      </Button>
+    </div>
   );
 }
 

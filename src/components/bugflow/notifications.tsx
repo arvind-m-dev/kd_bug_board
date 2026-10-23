@@ -2,7 +2,8 @@ import { useState } from "react";
 import { SkeletonRows } from "./loading";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
 import {
   Bell,
   Bug,
@@ -16,12 +17,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { getNotifications, updateNotifications } from "@/lib/notifications.functions";
+import { getBugState, getNotifications, updateNotifications } from "@/lib/notifications.functions";
+import { formatBugCode } from "@/lib/bug-workflow";
 import {
   NOTIFICATION_DAYS,
   notificationLabel,
   notificationTone,
   type NotificationItem,
+  notificationHref,
 } from "@/lib/notifications";
 import { ConfirmAction, ErrorNotice, actionError } from "./action-feedback";
 import { dateLabel, dayHeading, statusLabel, timeAgo } from "@/lib/format";
@@ -71,12 +74,42 @@ function useMark() {
 
 function Item({ n, onClick }: { n: NotificationItem; onClick?: () => void }) {
   const Icon = iconFor(n.action);
-  return (
-    <Link
-      to={n.action.startsWith("bug.") ? "/admin/bugs" : "/admin/users"}
-      onClick={onClick}
-      className={`bf-notice ${n.unread ? "bf-notice-unread" : ""}`}
-    >
+  const navigate = useNavigate();
+  const lookup = useServerFn(getBugState);
+  const bugId = n.action.startsWith("bug.") ? n.bugId : null;
+  /** A bug notification opens that bug (highlighted in the list); a deleted bug says who deleted it and when. */
+  async function openBug(e: React.MouseEvent) {
+    if (!bugId || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    e.preventDefault();
+    onClick?.();
+    const code = formatBugCode(bugId);
+    try {
+      const s = await lookup({ data: { bugId } });
+      if (s.state === "ok") {
+        void navigate({ href: `/admin/bugs?bug=${bugId}` });
+        return;
+      }
+      if (s.state === "missing") {
+        toast.error(`${code} no longer exists`);
+        return;
+      }
+      if (s.state === "trashed") {
+        toast.error(`${code} was deleted by ${s.by}`, {
+          description: `${timeAgo(s.at)} (${dateLabel(s.at)}) · “${s.title}” is in the Trash and can be restored there.`,
+          action: { label: "Open Trash", onClick: () => void navigate({ to: "/admin/trash" }) },
+        });
+        return;
+      }
+      toast.error(`${code} was deleted forever by ${s.by}`, {
+        description: `${timeAgo(s.at)} (${dateLabel(s.at)})${s.deletedBy ? ` · first moved to the Trash by ${s.deletedBy}` : ""} · “${s.title}” cannot be opened any more.`,
+      });
+    } catch (err) {
+      toast.error(actionError(err, "This bug could not be opened."));
+    }
+  }
+  const className = `bf-notice ${n.unread ? "bf-notice-unread" : ""}`;
+  const body = (
+    <>
       <span className="bf-notice-icon">
         <Icon size={17} />
       </span>
@@ -99,7 +132,26 @@ function Item({ n, onClick }: { n: NotificationItem; onClick?: () => void }) {
           {timeAgo(n.at)}
         </time>
       </span>
-    </Link>
+    </>
+  );
+  // Bug notifications are plain links (so a new tab gets the same ?bug= address) with a checked open on click.
+  return bugId ? (
+    <a href={`/admin/bugs?bug=${bugId}`} className={className} onClick={(e) => void openBug(e)}>
+      {body}
+    </a>
+  ) : (
+    <a
+      href={notificationHref(n)}
+      className={className}
+      onClick={(e) => {
+        onClick?.();
+        if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+        e.preventDefault();
+        void navigate({ href: notificationHref(n) });
+      }}
+    >
+      {body}
+    </a>
   );
 }
 

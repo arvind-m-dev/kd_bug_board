@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Link } from "@tanstack/react-router";
 import {
   Bug,
   FileText,
@@ -51,7 +50,9 @@ export function TrashView() {
         description:
           r.kind === "bug"
             ? "Back in every list, with its attachments."
-            : "Back in Team & access, deactivated. Activate them and replace their link to give access again.",
+            : r.kind === "file"
+              ? "Back on its bug, with its name and marks."
+              : "Back in Team & access, deactivated. Activate them and replace their link to give access again.",
       });
     },
     onError: (e) => toast.error(actionError(e, "It could not be restored.")),
@@ -62,7 +63,8 @@ export function TrashView() {
     members: d?.members.length ?? 0,
     files: d?.files.length ?? 0,
   };
-  const total = counts.bugs + counts.members;
+  const restorableFiles = d?.files.filter((f) => f.restorable).length ?? 0;
+  const total = counts.bugs + counts.members + restorableFiles;
   const left = (iso: string) => {
     const n = daysLeft(iso);
     return (
@@ -223,8 +225,9 @@ export function TrashView() {
             (d.files.length ? (
               <>
                 <p className="px-5 py-3 text-xs text-muted-foreground">
-                  Removed files are deleted from storage straight away, so they cannot be restored.
-                  They are listed here for {d.days} days for the record.
+                  Files removed one by one stay in storage for {d.days} days and can be restored to
+                  their bug. Files cleared by the clean-up or “Remove all files” left storage at
+                  once and are listed for the record.
                 </p>
                 {d.files.map((f) => (
                   <div key={f.id} className="bf-trash-row">
@@ -244,11 +247,18 @@ export function TrashView() {
                         {f.deletedBy} {timeAgo(f.deletedAt)}
                       </small>
                     </span>
-                    <span className="bf-tag">Deleted from storage</span>
+                    {f.restorable ? (
+                      <>
+                        {left(f.deletedAt)}
+                        {restoreButton({ kind: "file", id: f.id })}
+                        {foreverButton({ kind: "file", id: f.id }, f.name)}
+                      </>
+                    ) : (
+                      <span className="bf-tag">Deleted from storage</span>
+                    )}
+                    {/* The Admin bug list, with the bug opened and highlighted (a removed file is not shown on it). */}
                     <Button asChild size="sm" variant="ghost">
-                      <Link to="/media/$bugId" params={{ bugId: f.bugId }}>
-                        Open bug
-                      </Link>
+                      <a href={`/admin/bugs?bug=${f.bugId}`}>Open bug</a>
                     </Button>
                   </div>
                 ))}
@@ -271,8 +281,10 @@ export function TrashView() {
         }
         description={
           pending?.kind === "empty"
-            ? "Every bug and member in the Trash is deleted forever and the bugs’ attachments are deleted from storage. History and comments stay in the audit log. This cannot be undone."
-            : "It cannot be restored afterwards. A bug’s attachments are deleted from storage; its history and comments stay in the audit log."
+            ? "Every bug, member and removed file in the Trash is deleted forever, and those files are deleted from storage. History and comments stay in the audit log. This cannot be undone."
+            : pending?.kind === "forever" && pending.item.kind === "file"
+              ? "The file is deleted from storage now and cannot be restored. The removal stays in the bug’s history."
+              : "It cannot be restored afterwards. A bug’s attachments are deleted from storage; its history and comments stay in the audit log."
         }
         confirmLabel={pending?.kind === "empty" ? "Empty Trash" : "Delete forever"}
         onConfirm={async () => {

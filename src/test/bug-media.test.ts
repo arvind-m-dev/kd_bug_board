@@ -50,7 +50,9 @@ describe("media rules", () => {
     expect(resolveContentType("a.svg", "image/svg+xml")).toBeNull();
     expect(resolveContentType("a.png", "text/html")).toBeNull();
     expect(rejectReason("IMG_1.heic", "image/heic", 100)).toMatch(/HEIC/);
-    expect(rejectReason("clip.mov", "video/quicktime", 100)).toMatch(/MP4/);
+    expect(rejectReason("clip.mov", "video/quicktime", 100)).toBeNull();
+    expect(resolveContentType("Screen Recording.mov", "video/quicktime")).toBe("video/mp4");
+    expect(resolveContentType("Screen Recording.mov", "")).toBe("video/mp4");
     expect(rejectReason("page.html", "text/html", 100)).toMatch(/Only PNG/);
     expect(rejectReason("big.mp4", "video/mp4", MEDIA_MAX_BYTES + 1)).toBeNull(); // recordings are compressed in the browser first
     expect(rejectReason("big.png", "image/png", MEDIA_MAX_BYTES * 3)).toBeNull(); // images are compressed first

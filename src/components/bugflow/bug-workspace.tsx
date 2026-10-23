@@ -1,4 +1,6 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { RoleTag } from "./role-tag";
+import { useUrlParam } from "@/hooks/use-url-param";
 import { SkeletonRows } from "./loading";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -130,7 +132,21 @@ export function BugWorkspace({
   const [priority, setPriority] = useState(/^P[0-5]$/.test(initialFilter) ? initialFilter : "all");
   const [severity, setSeverity] = useState("all");
   const [report, setReport] = useState(false);
-  const [id, setId] = useState<string | null>(null);
+  // The open bug lives in the URL (?bug=…), so a refresh or "Try again" reopens it.
+  const [rawId, setId] = useUrlParam("bug");
+  // Only a real bug number from the address is used; anything else is ignored rather than sent to the server.
+  const id = rawId && /^[1-9]\d*$/.test(rawId) ? rawId : null;
+  // The bug just opened (from a notification, a link or a click) stays highlighted in the list for a moment.
+  const [recent, setRecent] = useState<string | null>(null);
+  useEffect(() => {
+    if (id) {
+      setRecent(id);
+      return;
+    }
+    const t = window.setTimeout(() => setRecent(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [id]);
+  const jumped = useRef<string | null>(null);
   const [editOnOpen, setEditOnOpen] = useState(false);
   const [profile, setProfile] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -215,6 +231,16 @@ export function BugWorkspace({
     setFilterRaw(f);
     setPage(0);
   };
+  // Bring the highlighted row into view once the list (and its page) is on screen.
+  useEffect(() => {
+    if (!recent) return;
+    const raf = requestAnimationFrame(() =>
+      document
+        .querySelector(`[data-bug-row="${CSS.escape(recent)}"]`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" }),
+    );
+    return () => cancelAnimationFrame(raf);
+  }, [recent, page, data.data]);
   if (data.isPending)
     return (
       <div className="bf-panel">
@@ -245,6 +271,14 @@ export function BugWorkspace({
   );
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE));
   const current = Math.min(page, pageCount - 1);
+  // Open the page that holds the highlighted bug (once per bug, so paging afterwards still works).
+  if (recent && jumped.current !== recent) {
+    const at = rows.findIndex((b) => b.id === recent);
+    if (at >= 0) {
+      jumped.current = recent;
+      if (Math.floor(at / PAGE) !== current) setPage(Math.floor(at / PAGE));
+    }
+  }
   const visible = rows.slice(current * PAGE, current * PAGE + PAGE);
   const memberFor = (userId: string | null) =>
     userId ? members.data?.find((m) => m.userId === userId) : undefined;
@@ -485,7 +519,11 @@ export function BugWorkspace({
               const options = allowedStatuses(d.actor, b);
               return (
                 <Fragment key={b.id}>
-                  <tr data-selected={selected.has(b.id) || undefined}>
+                  <tr
+                    data-selected={selected.has(b.id) || undefined}
+                    data-recent={recent === b.id || undefined}
+                    data-bug-row={b.id}
+                  >
                     {selecting && (
                       <td className="bf-cell-select">
                         <input
@@ -571,11 +609,17 @@ export function BugWorkspace({
                       ) : b.assignees && b.assignees.length > 1 ? (
                         <span className="flex flex-wrap gap-1">
                           {b.assignees.map((a) => (
-                            <span key={a.id}>{person(a.id, a.name)}</span>
+                            <span key={a.id} className="inline-flex items-center gap-1">
+                              {person(a.id, a.name)}
+                              <RoleTag role={a.role} />
+                            </span>
                           ))}
                         </span>
                       ) : b.assigneeId ? (
-                        person(b.assigneeId, b.assignee)
+                        <span className="inline-flex items-center gap-1">
+                          {person(b.assigneeId, b.assignee)}
+                          <RoleTag role={b.assignees?.[0]?.role} />
+                        </span>
                       ) : (
                         <span className="text-muted-foreground">Unassigned</span>
                       )}
@@ -1021,8 +1065,15 @@ export function BugDetails({
             {actor.permissions.includes("assign") ? (
               <RowAssign bug={b} access={access} workspace={workspace} />
             ) : (
-              <span className="bf-owner">
-                {people.map((p) => p.name).join(", ") || "Unassigned"}
+              <span className="bf-owner inline-flex flex-wrap items-center gap-1.5">
+                {people.length
+                  ? people.map((p) => (
+                      <span key={p.id} className="inline-flex items-center gap-1">
+                        {p.name}
+                        <RoleTag role={"role" in p ? p.role : undefined} />
+                      </span>
+                    ))
+                  : "Unassigned"}
               </span>
             )}
           </span>

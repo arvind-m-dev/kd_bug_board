@@ -1,14 +1,15 @@
 import { z } from "zod";
 
 /**
- * Pure rules for the Trash. Deleted bugs and members stay restorable for TRASH_DAYS; after that, or on "Delete forever",
- * they leave the Trash and their files leave storage. Removed files are listed for the record only: their objects are
- * deleted from storage when they are removed, so they cannot come back.
+ * Pure rules for the Trash. Deleted bugs, members and individually removed files stay restorable for TRASH_DAYS; after
+ * that, or on "Delete forever", they leave the Trash and their files leave storage. Files removed by the clean-up or
+ * "Remove all files" leave storage at once and are listed for the record only.
  */
 export const TRASH_DAYS = 30;
 export const trashItemSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("bug"), id: z.string().regex(/^[1-9]\d*$/) }).strict(),
   z.object({ kind: z.literal("member"), id: z.string().uuid() }).strict(),
+  z.object({ kind: z.literal("file"), id: z.string().uuid() }).strict(),
 ]);
 export type TrashItemRef = z.infer<typeof trashItemSchema>;
 export type TrashBug = {
@@ -39,6 +40,8 @@ export type TrashFile = {
   bugTitle: string;
   deletedAt: string;
   deletedBy: string;
+  /** Removed on its own within the last 30 days: still in storage, so it can be restored or deleted forever. */
+  restorable: boolean;
 };
 export type TrashData = {
   days: number;

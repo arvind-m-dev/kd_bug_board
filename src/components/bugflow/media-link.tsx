@@ -54,9 +54,11 @@ export function MediaLinkPage({ bugId, mediaId }: { bugId: string; mediaId?: str
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // A signed-in Admin always sees the Admin view (with Admin navigation), even in a browser where a member
+      // portal was opened once; members without an Admin session fall through to their remembered portal.
       const candidates: BugAccess[] = [{ kind: "admin" }];
       const portal = rememberedPortal();
-      if (portal) candidates.unshift(portal);
+      if (portal) candidates.push(portal);
       for (const access of candidates) {
         try {
           const workspace = await fetch({ data: { access } });

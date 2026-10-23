@@ -1,4 +1,11 @@
 export const NOTIFICATION_DAYS = 10;
+/**
+ * File events (attached, removed, restored, renamed, marked up, cleared) are too frequent to notify about: they stay in
+ * the activity log and on each bug, but never reach the bell. Bug events (reported, assigned, status, deleted…) do.
+ */
+export const QUIET_ACTION_PREFIXES = ["bug.media_"] as const;
+export const isQuietAction = (action: string) =>
+  QUIET_ACTION_PREFIXES.some((p) => action.startsWith(p));
 export type NotificationItem = {
   id: string;
   action: string;
@@ -8,6 +15,10 @@ export type NotificationItem = {
   at: string;
   unread: boolean;
   status: string;
+  /** What the entry is about besides a bug, so a click can open and highlight it. */
+  portalId: string | null;
+  userId: string | null;
+  projectId: string | null;
 };
 const words: Record<string, string> = {
   "bug.created": "New bug reported",
@@ -31,6 +42,7 @@ const words: Record<string, string> = {
   "settings.dropdowns": "Dropdown options updated",
   "settings.appearance": "Colour theme changed",
   "settings.media_storage": "Media storage changed",
+  "settings.media_quota": "Storage limit changed",
   "settings.mcp": "AI access settings changed",
   "portal.created": "Portal link created",
   "portal.regenerated": "Portal link replaced",
@@ -45,6 +57,29 @@ const words: Record<string, string> = {
   "project.archived": "Project archived",
   "project.restored": "Project restored",
 };
+/**
+ * Where a notification leads (Admin panel). Bugs are handled separately (checked first, then opened and highlighted).
+ * Events raised from a member portal land here too, so they open the same Admin pages.
+ */
+export function notificationHref(n: NotificationItem): string {
+  const a = n.action;
+  if (a === "member.delete" || a === "member.purge" || a === "trash.emptied" || a === "bug.purged")
+    return "/admin/trash";
+  if (a.startsWith("member.") || a.startsWith("portal.")) {
+    const who = n.portalId ?? n.userId;
+    return who ? `/admin/users?member=${encodeURIComponent(who)}` : "/admin/users";
+  }
+  if (a.startsWith("project."))
+    return n.projectId
+      ? `/admin/projects?project=${encodeURIComponent(n.projectId)}`
+      : "/admin/projects";
+  if (a === "settings.appearance") return "/admin/settings/appearance";
+  if (a === "settings.dropdowns") return "/admin/settings/options";
+  if (a === "settings.mcp") return "/admin/settings/ai";
+  if (a.startsWith("settings.media")) return "/admin/settings/storage";
+  if (a.startsWith("settings.")) return "/admin/settings";
+  return a.startsWith("bug.") ? "/admin/bugs" : "/admin/users";
+}
 export function notificationLabel(action: string) {
   return (
     words[action] ??

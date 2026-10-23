@@ -102,6 +102,8 @@ export const bugChangeSchema = z
     severity: z.string().trim().min(1).max(40).optional(),
     assigneeId: z.string().uuid().optional(),
     assigneeIds: z.array(z.string().uuid()).max(20).optional(),
+    /** Admin only: give assignees without access to the bug's project that access, in the same save. */
+    grantAccess: z.boolean().optional(),
     notes: z.string().trim().max(4000).default(""),
     noteTo: z.string().trim().max(120).default(""),
     passed: z.boolean().optional(),
@@ -181,7 +183,7 @@ export type LiveBug = {
   reporter: string;
   assigneeId: string | null;
   assignee: string;
-  assignees?: { id: string; name: string }[];
+  assignees?: { id: string; name: string; role?: string }[];
   status: Status;
   priority: string;
   severity: string;
@@ -305,6 +307,59 @@ export function mayVerify(actor: BugActor, bug: { status: Status; assigneeId: st
     bug.status === "RECHECK" &&
     bug.assigneeId !== actor.userId
   );
+}
+/** What an assignee is asked to do; part of the assignment message everyone sees on the bug. */
+export const ASSIGN_TASKS = {
+  fix: "fix it",
+  revalidate: "re-validate it",
+  retest: "retest it",
+  media: "add screenshots or recordings",
+  info: "add the missing information",
+} as const;
+export type AssignTask = keyof typeof ASSIGN_TASKS;
+export const ASSIGN_TASK_LABELS: Record<AssignTask, string> = {
+  fix: "Fix",
+  revalidate: "Re-validate",
+  retest: "Retest",
+  media: "Add media",
+  info: "Add info",
+};
+export const roleName = (role: string) =>
+  role === "qa"
+    ? "QA"
+    : role === "developer"
+      ? "Developer"
+      : role === "reporter"
+        ? "Tester"
+        : role === "member"
+          ? "Member"
+          : role;
+/** Short tag shown next to a name: "Krishna · Dev", "Jenith · QA". */
+export const roleTag = (role: string | undefined) =>
+  role === "developer"
+    ? "Dev"
+    : role === "qa"
+      ? "QA"
+      : role === "reporter"
+        ? "Tester"
+        : role === "member"
+          ? "Member"
+          : role === "admin"
+            ? "Admin"
+            : "";
+/** The usual job for a role: developers fix, QA re-validates, testers and members retest. */
+export function defaultTask(role: string): AssignTask {
+  return role === "developer" ? "fix" : role === "qa" ? "revalidate" : "retest";
+}
+/** "Assigned to Krishna (Developer) to fix it, and John (QA) to re-validate it." */
+export function assignmentMessage(people: { name: string; role: string; task: AssignTask }[]) {
+  const parts = people.map((p) => `${p.name} (${roleName(p.role)}) to ${ASSIGN_TASKS[p.task]}`);
+  if (!parts.length) return "";
+  const list =
+    parts.length === 1
+      ? parts[0]
+      : `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
+  return `Assigned to ${list}.`;
 }
 export function formatBugCode(id: string) {
   return `BF-${id.padStart(6, "0")}`;

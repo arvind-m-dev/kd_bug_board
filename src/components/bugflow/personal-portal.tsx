@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useScrollLock } from "@/hooks/use-scroll-lock";
+import { useRestoredQueries } from "@/lib/query-cache";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useNavigate } from "@tanstack/react-router";
@@ -47,17 +49,24 @@ import { focusCounts, portalFocus, type BugAccess } from "@/lib/bug-workflow";
 import { initials, roleText } from "@/lib/format";
 import { useMemberFavicon } from "@/hooks/use-member-favicon";
 import { usePresence } from "@/hooks/use-presence";
+import { useUrlParam } from "@/hooks/use-url-param";
 
 type Tab = "bugs" | "media" | "access" | "ai" | "theme" | "help";
 type Focus = { filter: string; label: string };
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "bugs", label: "My bugs", icon: Bug },
   { id: "media", label: "My media", icon: Images },
-  { id: "access", label: "My access", icon: ShieldCheck },
   { id: "ai", label: "AI access", icon: Bot },
   { id: "theme", label: "My theme", icon: Palette },
   { id: "help", label: "How it works", icon: CircleHelp },
 ];
+
+const TAB_IDS: Tab[] = ["bugs", "media", "access", "ai", "theme", "help"];
+const ACCESS_VIEW: { id: Tab; label: string; icon: LucideIcon } = {
+  id: "access",
+  label: "My projects & access",
+  icon: ShieldCheck,
+};
 
 export function PersonalPortal({
   token,
@@ -66,6 +75,7 @@ export function PersonalPortal({
   token: string;
   type: "reporter" | "qa" | "developer" | "member";
 }) {
+  useRestoredQueries();
   const client = useQueryClient();
   const acknowledge = useServerFn(dismissWelcome);
   const welcome = useMutation({
@@ -73,9 +83,13 @@ export function PersonalPortal({
     onSuccess: () => client.invalidateQueries({ queryKey: ["personal-portal"] }),
   });
   const read = useServerFn(getMemberPortal);
-  const [tab, setTab] = useState<Tab>("bugs");
+  // The open tab lives in the URL (?tab=…), so a refresh or "Try again" reopens it.
+  const [tabParam, setTabParam] = useUrlParam("tab");
+  const tab: Tab = TAB_IDS.includes(tabParam as Tab) ? (tabParam as Tab) : "bugs";
+  const setTab = (t: Tab) => setTabParam(t === "bugs" ? null : t);
   const [sheet, setSheet] = useState(false);
   const [menu, setMenu] = useState(false);
+  useScrollLock(menu);
   // Escape closes the mobile drawer.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -164,7 +178,8 @@ export function PersonalPortal({
   const access: BugAccess = { kind: "portal", token, type };
   const role = roleText(p.role);
   const first = p.name.trim().split(/\s+/)[0] || p.name;
-  const current = TABS.find((t) => t.id === tab)!;
+  // "access" is opened from the My projects card rather than the tab list, so it has its own title.
+  const current = TABS.find((t) => t.id === tab) ?? ACCESS_VIEW;
   return (
     <div className="bf-shell">
       {menu && (
@@ -212,15 +227,28 @@ export function PersonalPortal({
           ))}
         </nav>
         <div className="bf-sidebar-bottom">
-          <div className="bf-connection">
+          {/* My projects opens the access view: assigned projects, role and permissions in one place. */}
+          <button
+            type="button"
+            className="bf-connection bf-connection-link"
+            data-status={tab === "access" ? "active" : undefined}
+            aria-current={tab === "access" ? "page" : undefined}
+            title="See your projects, role and permissions"
+            onClick={() => {
+              setTab("access");
+              setMenu(false);
+            }}
+          >
             <span className="flex items-center gap-2 text-xs font-semibold">
               <FolderKanban size={15} />
               My projects
+              <ShieldCheck size={13} className="ml-auto text-muted-foreground" />
             </span>
             <p className="mt-2 text-xs text-muted-foreground">
               {p.scope || "No projects assigned yet"}
             </p>
-          </div>
+            <small className="mt-1 block text-[11px] text-primary">Projects &amp; access →</small>
+          </button>
           <div className="flex items-center justify-between rounded-md border px-3 py-1 text-xs">
             <span>Theme</span>
             <ThemeToggle />
@@ -465,10 +493,10 @@ function AccessPanel({ role, granted, scope }: { role: string; granted: string[]
   const all = rolePermissions[role] ?? (Object.keys(permissionLabels) as Permission[]);
   const extra = granted.filter((g) => !(all as string[]).includes(g)) as Permission[];
   return (
-    <section className="grid gap-5" aria-label="My access">
+    <section className="grid gap-5" aria-label="My projects and access">
       <div className="bf-panel">
         <div className="bf-panel-heading">
-          <h2>Projects</h2>
+          <h2>My projects</h2>
           <span className="bf-tag">{scope ? scope.split(",").length : 0} assigned</span>
         </div>
         <p className="px-5 py-4 text-sm leading-6 text-muted-foreground">
@@ -484,7 +512,7 @@ function AccessPanel({ role, granted, scope }: { role: string; granted: string[]
       </div>
       <div className="bf-panel">
         <div className="bf-panel-heading">
-          <h2>Permissions</h2>
+          <h2>My access</h2>
           <span className="bf-tag">
             {granted.length} of {all.length + extra.length} enabled
           </span>

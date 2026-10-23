@@ -20,7 +20,7 @@ export async function maybeExpireTrash() {
   const { results } = await neonExecute<{ results: { rows: Record<string, unknown>[] }[] }>([
     {
       query: `with expired as (update bugflow.bugs b set purged_at=now() where b.deleted_at<now()-make_interval(days=>$1) and b.purged_at is null returning b.id),
-      files as (update bugflow.bug_media m set deleted_at=now() where m.bug_id in (select id from expired) and m.deleted_at is null returning m.id),
+      files as (update bugflow.bug_media m set deleted_at=coalesce(m.deleted_at,now()),restorable_until=null where m.bug_id in (select id from expired) and m.purged_at is null returning m.id),
       audit as (insert into bugflow.activity(id,bug_id,actor_id,action,detail) select gen_random_uuid(),e.id,d.actor_id,'bug.purged',jsonb_build_object('reason','auto','days',$1::int)
         from expired e join lateral (select a.actor_id from bugflow.activity a where a.bug_id=e.id and a.action='bug.deleted' order by a.created_at desc limit 1) d on true returning 1)
       select (select count(*) from expired)::int as bugs,(select count(*) from files)::int as files`,
@@ -34,7 +34,11 @@ export async function maybeExpireTrash() {
       params: [TRASH_DAYS],
     },
   ]);
-  if (N(results[0]?.rows[0]?.["files"])) await sweepMedia(50);
+  // Files removed one by one whose 30 days ran out leave storage too.
+  const { rows: due } = await neonExecute(
+    `select count(*)::int as n from bugflow.bug_media where deleted_at is not null and purged_at is null and restorable_until<now()`,
+  );
+  if (N(results[0]?.rows[0]?.["files"]) || N(due[0]?.["n"])) await sweepMedia(50);
 }
 
 /** Admin's Trash: bugs and members restorable for TRASH_DAYS, plus files removed in that time (for the record). */
@@ -58,7 +62,7 @@ export async function listTrash(): Promise<TrashData> {
       params: [TRASH_DAYS],
     },
     {
-      query: `select m.id,m.name,m.kind,m.size,m.bug_id,b.title as bug_title,to_json(m.deleted_at) as deleted_iso,coalesce(u.name,'Clean-up') as deleted_by
+      query: `select m.id,m.name,m.kind,m.size,m.bug_id,b.title as bug_title,to_json(m.deleted_at) as deleted_iso,coalesce(u.name,'Clean-up') as deleted_by,(m.purged_at is null and m.restorable_until>now() and b.deleted_at is null) as restorable
       from bugflow.bug_media m join bugflow.bugs b on b.id=m.bug_id left join bugflow.users u on u.id=m.deleted_by
       where m.deleted_at is not null and m.status='ready' and m.deleted_at>now()-make_interval(days=>$1) order by m.deleted_at desc limit 200`,
       params: [TRASH_DAYS],
@@ -94,6 +98,7 @@ export async function listTrash(): Promise<TrashData> {
       bugTitle: String(r["bug_title"]),
       deletedAt: String(r["deleted_iso"]),
       deletedBy: String(r["deleted_by"]),
+      restorable: r["restorable"] === true,
     })),
   };
 }
@@ -102,6 +107,10 @@ export async function listTrash(): Promise<TrashData> {
 export async function restoreTrashItem(item: TrashItemRef) {
   checkOrigin();
   const admin = await requireAdmin();
+  if (item.kind === "file") {
+    const r = await (await import("./bug-media.server")).restoreMedia({ kind: "admin" }, item.id);
+    return { kind: "file" as const, id: item.id, label: r.name };
+  }
   if (item.kind === "bug") {
     const { rows } = await neonExecute(
       `with r as (update bugflow.bugs set deleted_at=null,updated_at=clock_timestamp() where id=$1 and deleted_at is not null and purged_at is null returning id)
@@ -124,10 +133,14 @@ export async function restoreTrashItem(item: TrashItemRef) {
 export async function deleteTrashItemForever(item: TrashItemRef) {
   checkOrigin();
   const admin = await requireAdmin();
+  if (item.kind === "file") {
+    await (await import("./bug-media.server")).deleteMediaForever({ kind: "admin" }, item.id);
+    return { kind: "file" as const, files: 1 };
+  }
   if (item.kind === "bug") {
     const { rows } = await neonExecute(
       `with p as (update bugflow.bugs set purged_at=now() where id=$1 and deleted_at is not null and purged_at is null returning id),
-      f as (update bugflow.bug_media set deleted_at=now(),deleted_by=$3 where bug_id in (select id from p) and deleted_at is null returning id),
+      f as (update bugflow.bug_media set deleted_at=coalesce(deleted_at,now()),deleted_by=coalesce(deleted_by,$3),restorable_until=null where bug_id in (select id from p) and purged_at is null returning id),
       a as (insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $2,p.id,$3,'bug.purged',jsonb_build_object('files',(select count(*) from f)) from p returning 1)
       select (select count(*) from p)::int as n,(select count(*) from f)::int as files`,
       [item.id, crypto.randomUUID(), admin.userId],
@@ -151,7 +164,7 @@ export async function emptyTrash() {
   const admin = await requireAdmin();
   const { rows } = await neonExecute(
     `with b as (update bugflow.bugs set purged_at=now() where deleted_at is not null and purged_at is null returning id),
-    f as (update bugflow.bug_media set deleted_at=now(),deleted_by=$2 where bug_id in (select id from b) and deleted_at is null returning id),
+    f as (update bugflow.bug_media set deleted_at=coalesce(deleted_at,now()),deleted_by=coalesce(deleted_by,$2),restorable_until=null where purged_at is null and (bug_id in (select id from b) or (deleted_at is not null and restorable_until is not null)) returning id),
     u as (update bugflow.users set purged_at=now() where deleted_at is not null and purged_at is null returning id),
     a as (insert into bugflow.activity(id,actor_id,action,detail) select $1,$2,'trash.emptied',jsonb_build_object('bugs',(select count(*) from b),'members',(select count(*) from u),'files',(select count(*) from f)) returning 1)
     select (select count(*) from b)::int as bugs,(select count(*) from u)::int as members,(select count(*) from f)::int as files`,

@@ -25,3 +25,39 @@ describe("colours and priority order", () => {
     expect(priorityTone("P5")).toBe("neutral");
   });
 });
+
+import { notificationHref, type NotificationItem } from "@/lib/notifications";
+describe("notification links", () => {
+  const n = (action: string, extra: Partial<NotificationItem> = {}): NotificationItem => ({
+    id: "1",
+    action,
+    bugId: null,
+    title: "",
+    actor: "Stephen",
+    at: new Date().toISOString(),
+    unread: true,
+    status: "",
+    portalId: null,
+    userId: null,
+    projectId: null,
+    ...extra,
+  });
+  it("opens and highlights the member, project or setting the entry is about", () => {
+    expect(notificationHref(n("portal.created", { portalId: "p-1" }))).toBe(
+      "/admin/users?member=p-1",
+    );
+    expect(notificationHref(n("member.deactivate", { userId: "u-1" }))).toBe(
+      "/admin/users?member=u-1",
+    );
+    expect(notificationHref(n("project.created", { projectId: "pr-1" }))).toBe(
+      "/admin/projects?project=pr-1",
+    );
+    expect(notificationHref(n("settings.appearance"))).toBe("/admin/settings/appearance");
+    expect(notificationHref(n("settings.media_quota"))).toBe("/admin/settings/storage");
+    expect(notificationHref(n("settings.mcp"))).toBe("/admin/settings/ai");
+  });
+  it("sends deleted members and emptied Trash to the Trash", () => {
+    expect(notificationHref(n("member.delete", { userId: "u-1" }))).toBe("/admin/trash");
+    expect(notificationHref(n("trash.emptied"))).toBe("/admin/trash");
+  });
+});

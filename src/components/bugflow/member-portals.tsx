@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useUrlParam } from "@/hooks/use-url-param";
+import { useHighlight } from "@/hooks/use-highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -64,7 +66,10 @@ export function MemberPortals({ initialSearch = "" }: { initialSearch?: string }
   const [search, setSearch] = useState(initialSearch);
   const [role, setRole] = useState("all");
   const [state, setState] = useState("all");
-  const [id, setId] = useState<string | null>(null);
+  // The open profile lives in the URL (?member=…): notifications and links open it, and its row is highlighted.
+  const [id, setId] = useUrlParam("member");
+  const recent = useHighlight(id, members.data);
+  const jumped = useRef<string | null>(null);
   const [error, setError] = useState("");
   const [page, setPage] = useState(0);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -76,6 +81,13 @@ export function MemberPortals({ initialSearch = "" }: { initialSearch?: string }
   );
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE));
   const current = Math.min(page, pageCount - 1);
+  if (recent && jumped.current !== recent) {
+    const at = rows.findIndex((m) => m.id === recent || m.userId === recent);
+    if (at >= 0) {
+      jumped.current = recent;
+      if (Math.floor(at / PAGE) !== current) setPage(Math.floor(at / PAGE));
+    }
+  }
   const visible = rows.slice(current * PAGE, current * PAGE + PAGE);
   async function portalPath(id: string) {
     const r = await change({ data: { id, action: "copy" } });
@@ -209,7 +221,14 @@ export function MemberPortals({ initialSearch = "" }: { initialSearch?: string }
           </thead>
           <tbody>
             {visible.map((m) => (
-              <tr key={m.id}>
+              <tr
+                key={m.id}
+                data-highlight={m.id}
+                data-highlight-alt={m.userId}
+                data-recent={
+                  (recent !== null && (m.id === recent || m.userId === recent)) || undefined
+                }
+              >
                 <td>
                   <button
                     type="button"

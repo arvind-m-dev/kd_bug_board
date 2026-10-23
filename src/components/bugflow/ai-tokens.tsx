@@ -35,39 +35,101 @@ type Scope =
   | { kind: "portal"; token: string; type: "reporter" | "qa" | "developer" | "member" };
 type Member = { id: string; name: string; type: string };
 
-/** Secret shown once after creating a token: copy it, then it is gone. */
-function TokenReveal({ value, onDone }: { value: NewAiToken; onDone: () => void }) {
+/** A value with its own copy button: URLs, commands and config snippets. */
+function CopyBlock({ label, value, hint }: { label: string; value: string; hint?: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(value.secret);
+      await navigator.clipboard.writeText(value);
       setCopied(true);
-      toast.success("Token copied");
+      window.setTimeout(() => setCopied(false), 2000);
+      toast.success(`${label} copied`);
     } catch {
-      toast.error("Copy failed — select the token and copy it by hand.");
+      toast.error("Copy failed — select the text and copy it by hand.");
     }
   };
   return (
-    <div className="bf-token-reveal">
-      <strong className="text-sm">Your new AI token{value.label ? ` (${value.label})` : ""}</strong>
-      <p className="text-xs text-muted-foreground">
-        Copy it now — it is shown only once. Paste it into your AI client as the Bearer token or MCP
-        token.
-      </p>
+    <div className="grid gap-1">
+      <span className="text-xs font-semibold">{label}</span>
       <div className="bf-token-secret">
-        <code>{value.secret}</code>
+        <code className={value.includes("\n") ? "whitespace-pre" : undefined}>{value}</code>
         <Button
           type="button"
           size="icon"
           variant="outline"
           className="h-8 w-8 shrink-0"
-          aria-label="Copy token"
-          title="Copy the token — it is shown only once"
+          aria-label={`Copy ${label}`}
+          title={`Copy ${label}`}
           onClick={() => void copy()}
         >
           {copied ? <Check className="text-success" size={15} /> : <Copy size={15} />}
         </Button>
       </div>
+      {hint && <small className="text-xs text-muted-foreground">{hint}</small>}
+    </div>
+  );
+}
+/** Ready-to-paste connection settings for one token (or a placeholder before one exists). */
+function connectionSnippets(mcpUrl: string, secret: string) {
+  const fullUrl = `${mcpUrl}?token=${secret}`;
+  return {
+    fullUrl,
+    claudeCode: `claude mcp add --transport http bugflow ${mcpUrl} --header "Authorization: Bearer ${secret}"`,
+    json: JSON.stringify(
+      { mcpServers: { bugflow: { url: mcpUrl, headers: { Authorization: `Bearer ${secret}` } } } },
+      null,
+      2,
+    ),
+    desktop: JSON.stringify(
+      { mcpServers: { bugflow: { command: "npx", args: ["-y", "mcp-remote", fullUrl] } } },
+      null,
+      2,
+    ),
+  };
+}
+
+/** Secret shown once after creating a token, with every way to connect already filled in. */
+function TokenReveal({
+  value,
+  mcpUrl,
+  onDone,
+}: {
+  value: NewAiToken;
+  mcpUrl: string;
+  onDone: () => void;
+}) {
+  const c = connectionSnippets(mcpUrl, value.secret);
+  const local = /\/\/(localhost|127\.|\[::1\])/.test(mcpUrl);
+  return (
+    <div className="bf-token-reveal">
+      <strong className="text-sm">Your new AI token{value.label ? ` (${value.label})` : ""}</strong>
+      <p className="text-xs text-muted-foreground">
+        Copy what your AI client needs now: the token is shown only once. Anything below that
+        contains the token is a password: do not share it, and revoke the token if it leaks.
+      </p>
+      <CopyBlock
+        label="Full connection URL (token included)"
+        value={c.fullUrl}
+        hint="Paste this one URL into any client that asks only for a server URL: claude.ai or ChatGPT custom connectors, Cursor, Windsurf."
+      />
+      <CopyBlock label="Claude Code command" value={c.claudeCode} hint="Run it in a terminal." />
+      <CopyBlock
+        label="Cursor / VS Code / Windsurf config (mcp.json)"
+        value={c.json}
+        hint="Paste into the client's MCP settings file; the token travels as a header, not in the URL."
+      />
+      <CopyBlock
+        label="Claude Desktop config (claude_desktop_config.json)"
+        value={c.desktop}
+        hint="Claude Desktop → Settings → Developer → Edit config. Needs Node.js installed."
+      />
+      <CopyBlock label="Token only" value={value.secret} />
+      {local && (
+        <p className="text-xs text-warning">
+          This address only works on this computer. Cloud clients such as claude.ai or ChatGPT need
+          the deployed address of BugFlow instead of localhost.
+        </p>
+      )}
       <Button
         type="button"
         size="sm"
@@ -163,23 +225,26 @@ export function AiTokens({ scope, members = [] }: { scope: Scope; members?: Memb
       </div>
       {guide && (
         <div className="bf-media-guide">
+          <CopyBlock
+            label="Server URL (Streamable HTTP)"
+            value={mcpUrl}
+            hint="The exact address of this workspace's MCP server."
+          />
           <ol>
             <li>
-              <strong>Endpoint</strong>: <code>{mcpUrl}</code> (Streamable HTTP).
+              <strong>Create a token</strong> below. BugFlow then shows every option already filled
+              in with your token, ready to copy: a full URL, a Claude Code command and config files.
             </li>
             <li>
-              <strong>Create a token</strong> below and copy it.
+              <strong>Where the token goes</strong>, if you set a client up by hand: either as a
+              header <code>Authorization: Bearer bf_ai_…</code>, or at the end of the URL as{" "}
+              <code>{mcpUrl}?token=bf_ai_…</code>. Replace <code>bf_ai_…</code> with your whole
+              token.
             </li>
             <li>
-              <strong>Claude Code</strong>:{" "}
-              <code>
-                claude mcp add --transport http bugflow {mcpUrl} --header "Authorization: Bearer
-                &lt;token&gt;"
-              </code>
-            </li>
-            <li>
-              <strong>Cursor / VS Code / others</strong>: add an MCP server of type HTTP with that
-              URL and an <code>Authorization: Bearer &lt;token&gt;</code> header.
+              <strong>Changing a token</strong>: create a new one, paste it where the old one was
+              (the header or the <code>?token=</code> part of the URL), then revoke the old one
+              below.
             </li>
             <li>
               Then ask your AI things like “list my open bugs” or “report this crash as a bug”.
@@ -188,7 +253,7 @@ export function AiTokens({ scope, members = [] }: { scope: Scope; members?: Memb
         </div>
       )}
       {fresh ? (
-        <TokenReveal value={fresh} onDone={() => setFresh(null)} />
+        <TokenReveal value={fresh} mcpUrl={mcpUrl} onDone={() => setFresh(null)} />
       ) : (
         <form
           className="bf-token-form"

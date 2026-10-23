@@ -1,4 +1,8 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { useScrollLock } from "@/hooks/use-scroll-lock";
+import { useHighlight } from "@/hooks/use-highlight";
+import { useUrlParam } from "@/hooks/use-url-param";
+import { useRestoredQueries } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { lazy, Suspense, useEffect, useLayoutEffect, useState } from "react";
@@ -233,8 +237,10 @@ function useNavCounts(): Record<string, number | undefined> {
   };
 }
 export function Workspace({ view = "overview" }: { view?: View }) {
+  useRestoredQueries();
   const queryClient = useQueryClient();
   const [menu, setMenu] = useState(false);
+  useScrollLock(menu);
   const [dialog, setDialog] = useState<string | null>(null);
   // Collapsed rail (desktop/tablet) and per-group fold state are remembered per browser. Both start at their
   // defaults so the server and client render the same HTML; the saved choice is applied before first paint.
@@ -647,6 +653,16 @@ function ProjectsView({ onDialog }: { onDialog: (s: string) => void }) {
   const [pending, setPending] = useState<{ id: string; name: string; archived: boolean } | null>(
     null,
   );
+  // ?project=… (from a notification) highlights that project for a moment, switching to Archived if it is there.
+  const [project, setProject] = useUrlParam("project");
+  const recentProject = useHighlight(project, projects.data);
+  useEffect(() => {
+    if (!project || !projects.data) return;
+    const hit = projects.data.find((p) => p.id === project);
+    if (hit) setState(hit.archived ? "archived" : "active");
+    const t = window.setTimeout(() => setProject(null), 2500);
+    return () => window.clearTimeout(t);
+  }, [project, projects.data, setProject]);
   const when = (v: string | null) =>
     v
       ? new Date(v).toLocaleString("en-GB", {
@@ -743,7 +759,11 @@ function ProjectsView({ onDialog }: { onDialog: (s: string) => void }) {
             </thead>
             <tbody>
               {rows.map((p) => (
-                <tr key={p.id}>
+                <tr
+                  key={p.id}
+                  data-highlight={p.id}
+                  data-recent={recentProject === p.id || undefined}
+                >
                   <td>
                     <span className="flex items-center gap-3">
                       <span className="bf-stat-icon bf-tone-teal">

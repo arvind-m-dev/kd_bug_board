@@ -6,6 +6,8 @@ import {
   maxBytesFor,
   mediaKind,
   rejectReason,
+  isQuickTime,
+  MEDIA_THUMB_MAX,
   resolveContentType,
   safeFileName,
   videoPlan,
@@ -21,6 +23,8 @@ export type PreparedFile = {
   originalSize: number;
   width: number | null;
   height: number | null;
+  /** Small JPEG preview (longest side 640 px) shown in lists and as the video poster; null for PDFs or on failure. */
+  thumb: Blob | null;
 };
 
 async function decode(file: File): Promise<ImageBitmap | HTMLImageElement | null> {
@@ -84,9 +88,15 @@ async function compressImage(
 }
 export type VideoProgress = (fraction: number, doneSeconds: number, totalSeconds: number) => void;
 const recorderMime = () =>
-  ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"].find(
-    (m) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(m),
-  ) ?? null;
+  // MP4 first where the browser can record it: it plays and seeks better everywhere than recorder WebM, which has no seek index.
+  [
+    "video/mp4;codecs=avc1.42E01F,mp4a.40.2",
+    "video/mp4;codecs=avc1",
+    "video/mp4",
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm",
+  ].find((m) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(m)) ?? null;
 /**
  * Re-encodes a recording in the browser at a bitrate chosen from its length, so it lands near 80 MB. Plays it through silently
  * at normal speed (so it takes as long as the recording runs) and records the stream; no library download, no server work.
@@ -205,6 +215,72 @@ export async function compressVideo(
     void ac.close().catch(() => undefined);
   }
 }
+/** The recording with its index moved first (see mp4-faststart), or unchanged when that is not needed or possible. */
+async function faststartBlob(file: Blob, type: string) {
+  try {
+    const { faststart } = await import("./mp4-faststart");
+    const out = faststart(await file.arrayBuffer());
+    return new Blob([out ?? file], { type });
+  } catch {
+    return new Blob([file], { type });
+  }
+}
+/** Opens a recording locally: whether the browser can decode it, its length, and a poster frame as a small JPEG. */
+function probeVideo(file: Blob) {
+  return new Promise<{ ok: boolean; duration: number; poster: Blob | null }>((resolve) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.preload = "auto";
+    video.muted = true;
+    video.playsInline = true;
+    let duration = 0;
+    const done = (ok: boolean, poster: Blob | null = null) => {
+      window.clearTimeout(timer);
+      video.removeAttribute("src");
+      video.load();
+      URL.revokeObjectURL(url);
+      resolve({ ok, duration, poster });
+    };
+    const timer = window.setTimeout(() => done(duration > 0), 15000);
+    video.onloadedmetadata = () => {
+      if (!video.videoWidth) return done(false);
+      duration = Number.isFinite(video.duration) ? video.duration : 0;
+      // A frame a little way in is more telling than the first one, which is often black.
+      video.currentTime = Math.min(1, duration * 0.1 || 0);
+    };
+    video.onseeked = () => {
+      void jpeg(video, video.videoWidth, video.videoHeight).then((poster) => done(true, poster));
+    };
+    video.onerror = () => done(false);
+    video.src = url;
+  });
+}
+/** Draws a picture or frame into a JPEG whose longest side is at most 640 px. */
+async function jpeg(source: CanvasImageSource, width: number, height: number) {
+  try {
+    const scale = Math.min(1, 640 / Math.max(width, height));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(width * scale));
+    c.height = Math.max(1, Math.round(height * scale));
+    const ctx = c.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(source, 0, 0, c.width, c.height);
+    const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", 0.72));
+    return blob && blob.size <= MEDIA_THUMB_MAX ? blob : null;
+  } catch {
+    return null;
+  }
+}
+/** Preview for an image file (already shrunk for upload). */
+async function imageThumb(blob: Blob) {
+  const img = await decode(blob as File);
+  if (!img) return null;
+  const w = "naturalWidth" in img ? img.naturalWidth : img.width;
+  const h = "naturalHeight" in img ? img.naturalHeight : img.height;
+  return jpeg(img, w, h);
+}
+/** Recordings above this bitrate stream slowly on ordinary connections, so they are re-encoded before upload. */
+const SLOW_BITRATE = 5_000_000;
 /** Validates, compresses and names one file; returns an error message instead when it cannot be attached. Recordings over the limit are compressed first. */
 export async function prepareFile(
   file: File,
@@ -213,29 +289,74 @@ export async function prepareFile(
   const reason = rejectReason(file.name, file.type, file.size);
   if (reason) return { ok: false, error: reason };
   const type = resolveContentType(file.name, file.type)!;
+  const quickTime = isQuickTime(file.name, file.type);
+  const probe = mediaKind(type) === "video" ? await probeVideo(file) : null;
+  if (probe && !probe.ok && (quickTime || file.size > maxBytesFor(type)))
+    return {
+      ok: false,
+      error: quickTime
+        ? "This browser cannot read this .mov recording. Open it in QuickTime Player → File → Export As → 1080p, or attach it from Chrome or Safari."
+        : "This recording cannot be read by the browser. Export it as MP4 (H.264) and try again.",
+    };
+  // Re-encode recordings that are too big, or whose bitrate would make them slow to watch.
+  const heavy =
+    !!probe?.ok &&
+    probe.duration > 0 &&
+    (file.size * 8) / probe.duration > SLOW_BITRATE &&
+    typeof MediaRecorder !== "undefined";
   let r: { blob: Blob; contentType: MediaType; width: number | null; height: number | null };
   try {
     r =
       mediaKind(type) === "image"
         ? await compressImage(file, type)
-        : mediaKind(type) === "video" && file.size > maxBytesFor(type)
+        : mediaKind(type) === "video" && (file.size > maxBytesFor(type) || heavy)
           ? {
               ...(await compressVideo(file, video?.onProgress ?? (() => undefined), video?.signal)),
               width: null,
               height: null,
             }
-          : { blob: file as Blob, contentType: type, width: null, height: null };
+          : {
+              // A .mov under the limit is uploaded unchanged and labelled MP4 so every viewer's browser plays it.
+              // MP4/MOV files get their index moved to the front so playback starts without downloading the end first.
+              blob:
+                type === "video/mp4"
+                  ? await faststartBlob(file, type)
+                  : quickTime
+                    ? new Blob([file], { type })
+                    : (file as Blob),
+              contentType: type,
+              width: null,
+              height: null,
+            };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "The file could not be prepared." };
+    // Re-encoding only for speed is optional: if this browser cannot do it, the recording goes up as it is.
+    if (heavy && file.size <= maxBytesFor(type) && !video?.signal?.aborted)
+      r = {
+        blob: type === "video/mp4" ? await faststartBlob(file, type) : new Blob([file], { type }),
+        contentType: type,
+        width: null,
+        height: null,
+      };
+    else
+      return {
+        ok: false,
+        error: e instanceof Error ? e.message : "The file could not be prepared.",
+      };
   }
   if (r.blob.size > maxBytesFor(r.contentType))
     return {
       ok: false,
       error: `Still ${formatBytes(r.blob.size)} after compression — the limit is ${formatBytes(maxBytesFor(r.contentType))}.`,
     };
+  const thumb =
+    mediaKind(r.contentType) === "image"
+      ? await imageThumb(r.blob)
+      : mediaKind(r.contentType) === "video"
+        ? (probe?.poster ?? null)
+        : null;
   const base = safeFileName(file.name).replace(/\.[^.]+$/, "") || "file";
   const ext =
-    r.contentType === type
+    r.contentType === type && !quickTime
       ? (file.name.match(/\.[^.]+$/)?.[0] ?? "")
       : `.${MEDIA_TYPES[r.contentType].ext}`;
   return {
@@ -248,6 +369,7 @@ export async function prepareFile(
       originalSize: file.size,
       width: r.width,
       height: r.height,
+      thumb,
     },
   };
 }

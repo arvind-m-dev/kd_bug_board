@@ -11,9 +11,14 @@ export const Route = createFileRoute("/admin_/projects")({
     ),
   validateSearch: (
     s: Record<string, unknown>,
-  ): { filter?: string | undefined; severity?: string | undefined } => ({
+  ): {
+    filter?: string | undefined;
+    severity?: string | undefined;
+    project?: string | undefined;
+  } => ({
     filter: typeof s["filter"] === "string" ? s["filter"] : undefined,
     severity: typeof s["severity"] === "string" ? s["severity"] : undefined,
+    project: typeof s["project"] === "string" && s["project"] ? s["project"] : undefined,
   }),
   component: () => <Workspace view="projects" />,
 });

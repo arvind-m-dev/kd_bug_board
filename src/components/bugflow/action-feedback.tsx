@@ -93,7 +93,15 @@ export function ConfirmAction({
         }
       }}
     >
-      <AlertDialogContent className="w-[calc(100%-2rem)] max-w-md">
+      <AlertDialogContent
+        className="w-[calc(100%-2rem)] max-w-md"
+        // Clicking outside cancels, like every other modal; never while the action is running.
+        onBackdropClick={() => {
+          if (busy) return;
+          setError("");
+          onOpenChange(false);
+        }}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>

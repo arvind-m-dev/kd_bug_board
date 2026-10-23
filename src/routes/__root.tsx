@@ -1,14 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
-  Link,
   createRootRouteWithContext,
-  useRouter,
+  useLocation,
   HeadContent,
   Scripts,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
-import { type ReactNode } from "react";
+import { Suspense, lazy, useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
@@ -19,8 +18,25 @@ import { BackToTop } from "@/components/bugflow/back-to-top";
 import { TopProgress } from "@/components/bugflow/loading";
 import { THEME_BOOT_SCRIPT } from "@/lib/appearance";
 import { Button } from "@/components/ui/button";
+import { portalHome } from "@/lib/portal-path";
+import { persistQueries } from "@/lib/query-cache";
+
+// Background uploads tray: loaded on its own so the media code stays out of the first page load.
+const UploadTray = lazy(() =>
+  import("@/components/bugflow/upload-tray").then((m) => ({ default: m.UploadTray })),
+);
+
+/** Where "Back" leads: a member stays in their own portal; everyone else goes to the workspace. */
+function useHome() {
+  const pathname = useLocation({ select: (l) => l.pathname });
+  const portal = portalHome(pathname);
+  return portal
+    ? { to: portal, label: "Back to my portal" }
+    : { to: "/", label: "Back to workspace" };
+}
 
 function NotFoundComponent() {
+  const home = useHome();
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
@@ -31,7 +47,7 @@ function NotFoundComponent() {
         </p>
         <div className="mt-6">
           <Button asChild>
-            <Link to="/">Back to workspace</Link>
+            <a href={home.to}>{home.label}</a>
           </Button>
         </div>
       </div>
@@ -41,7 +57,7 @@ function NotFoundComponent() {
 
 function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
-  const router = useRouter();
+  const home = useHome();
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -53,16 +69,17 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
           Something went wrong on our end. You can try refreshing or head back home.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
+          {/* Reloads this same address: the open tab and bug are in the URL, so the page comes back as it was. */}
           <Button
             onClick={() => {
-              router.invalidate();
               reset();
+              window.location.reload();
             }}
           >
             Try again
           </Button>
           <Button variant="outline" asChild>
-            <Link to="/">Back to workspace</Link>
+            <a href={home.to}>{home.label}</a>
           </Button>
         </div>
       </div>
@@ -127,6 +144,8 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  // Keep this tab's last loaded lists so a refresh can show them at once (restored by each page; see query-cache).
+  useEffect(() => persistQueries(queryClient), [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -138,6 +157,9 @@ function RootComponent() {
         <Decorations />
         <ScrollHints />
         <BackToTop />
+        <Suspense fallback={null}>
+          <UploadTray />
+        </Suspense>
       </ThemeProvider>
     </QueryClientProvider>
   );

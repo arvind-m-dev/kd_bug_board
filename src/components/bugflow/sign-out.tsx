@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { lockAdminAccess } from "@/lib/portal-access.functions";
 import { ConfirmAction } from "./action-feedback";
 import { forgetWorkspaceAccess } from "@/lib/admin-route-access";
+import { clearQueryCache } from "@/lib/query-cache";
 
 export function SignOutButton({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
@@ -18,6 +19,7 @@ export function SignOutButton({ className }: { className?: string }) {
     forgetWorkspaceAccess();
     await client.cancelQueries();
     client.clear();
+    clearQueryCache();
     await router.navigate({ to: "/login", replace: true });
     await router.invalidate();
   }

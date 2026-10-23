@@ -28,6 +28,7 @@ import {
   type MediaStatus,
 } from "@/lib/bug-media";
 import { ConfirmAction, ErrorNotice, actionError } from "./action-feedback";
+import { StorageUsage } from "./storage-usage";
 
 const VARS = [
   "MEDIA_S3_ENDPOINT",
@@ -441,6 +442,7 @@ export function MediaStorageCard() {
                 </div>
               </div>
             )}
+          {s.configured && <StorageUsage />}
           {s.configured && (
             <div className="bf-storage-form" aria-label="Clean-up">
               <div className="flex flex-wrap items-center gap-3">

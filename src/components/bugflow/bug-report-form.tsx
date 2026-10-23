@@ -43,9 +43,9 @@ export function BugReportForm({
   const [links, setLinks] = useState<string[]>(
     initial?.evidenceUrls.length ? initial.evidenceUrls : [""],
   );
-  // Files are compressed while the report is written and uploaded to the new bug right after it is created.
+  // Files are compressed while the report is written. On submit they move to the tab's background queue, so the
+  // report saves at once and the dialog closes while compression and upload carry on (see the uploads tray).
   const uploads = useMediaUpload(access, null);
-  const [attaching, setAttaching] = useState(false);
   const edit = useMutation({
     mutationFn: saveEdit,
     onSuccess: async () => {
@@ -64,18 +64,10 @@ export function BugReportForm({
     mutationFn: save,
     onSuccess: async (r) => {
       await client.invalidateQueries({ queryKey: ["bug-workspace"] });
-      let failed = 0;
-      if (uploads.staged) {
-        setAttaching(true);
-        try {
-          failed = await uploads.start(r.id);
-        } finally {
-          setAttaching(false);
-        }
-      }
+      const files = uploads.staged ? uploads.handoff(r.id, r.code) : 0;
       toast.success(`Bug reported · ${r.code}`, {
-        description: failed
-          ? `${failed} ${failed === 1 ? "file" : "files"} could not be attached — open the bug and try again.`
+        description: files
+          ? `${files} ${files === 1 ? "file is" : "files are"} uploading in the background (tray at the bottom left). You can raise the next bug now; keep this tab open.`
           : "Saved with the title, priority and details you entered. The bug summary is open now.",
       });
       onSaved(r.id);
@@ -121,7 +113,7 @@ export function BugReportForm({
     }
     mutation.mutate({ data: { access, report: parsed.data } });
   }
-  const busy = mutation.isPending || edit.isPending || attaching;
+  const busy = mutation.isPending || edit.isPending;
   return (
     <form className="bf-form" onSubmit={submit}>
       <fieldset disabled={busy} className="grid gap-4">
@@ -315,30 +307,33 @@ export function BugReportForm({
                   ? undefined
                   : "Media uploads are off until your Admin connects storage in Settings → Media storage. Add a Drive link instead."
               }
-              hint={`Up to ${media.maxFiles} files · uploaded to the bug as soon as it is submitted`}
+              hint={
+                uploads.compressing
+                  ? "You can submit now: compression and upload carry on in the background"
+                  : `Up to ${media.maxFiles} files · uploaded to the bug as soon as it is submitted`
+              }
               onFiles={(f) => void uploads.add(f)}
               uploads={uploads.uploads}
               onRetry={uploads.retry}
               onRemove={uploads.remove}
               onLabel={uploads.setLabel}
+              markup
             />
           )}
         </section>
       </fieldset>
       {error && <ErrorNotice message={error} />}
-      <Button type="submit" disabled={busy || uploads.busy || (!initial && projects.length === 0)}>
+      <Button type="submit" disabled={busy || (!initial && projects.length === 0)}>
         {busy ? <LoaderCircle className="animate-spin" /> : <Plus />}
         {initial
           ? edit.isPending
             ? "Saving changes…"
             : "Save changes"
-          : attaching
-            ? "Attaching files…"
-            : mutation.isPending
-              ? "Saving report…"
-              : uploads.staged
-                ? `Submit bug with ${uploads.staged} ${uploads.staged === 1 ? "file" : "files"}`
-                : "Submit bug"}
+          : mutation.isPending
+            ? "Saving report…"
+            : uploads.staged
+              ? `Submit bug with ${uploads.staged} ${uploads.staged === 1 ? "file" : "files"}`
+              : "Submit bug"}
       </Button>
     </form>
   );

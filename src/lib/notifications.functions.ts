@@ -24,3 +24,15 @@ export const updateNotifications = createServerFn({ method: "POST" })
     const a = await import("./portal-access.server");
     return a.databaseCall(() => s.markNotifications(data.kind));
   });
+export const getBugState = createServerFn({ method: "POST" })
+  .validator((v: unknown) =>
+    z
+      .object({ bugId: z.string().regex(/^[1-9]\d*$/) })
+      .strict()
+      .parse(v),
+  )
+  .handler(async ({ data }) => {
+    const s = await import("./notifications.server");
+    const a = await import("./portal-access.server");
+    return a.databaseCall(() => s.bugState(data.bugId));
+  });

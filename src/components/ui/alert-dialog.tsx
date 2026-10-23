@@ -27,10 +27,13 @@ AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName;
 
 const AlertDialogContent = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content>
->(({ className, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content> & {
+    /** Called when the dimmed backdrop is clicked (alert dialogs otherwise ignore outside clicks). */
+    onBackdropClick?: () => void;
+  }
+>(({ className, onBackdropClick, ...props }, ref) => (
   <AlertDialogPortal>
-    <AlertDialogOverlay />
+    <AlertDialogOverlay onClick={onBackdropClick} />
     <AlertDialogPrimitive.Content
       ref={ref}
       className={cn(

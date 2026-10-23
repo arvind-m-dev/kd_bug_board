@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUpRight, LoaderCircle, PenLine, Save, Square, Type, Undo2, X } from "lucide-react";
+import {
+  ArrowUpRight,
+  Eraser,
+  LoaderCircle,
+  PenLine,
+  Save,
+  Square,
+  Type,
+  Undo2,
+  X,
+} from "lucide-react";
+import { hitShape } from "@/lib/mark-hit";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +26,7 @@ import { MEDIA_NAME_MAX } from "@/lib/bug-media";
  * Draw on a screenshot or a captured video frame: pencil, boxes, arrows and text.
  * Nothing is changed in place — Save produces a new PNG that the caller attaches as its own file, linked to the original.
  */
-type Tool = "pen" | "rect" | "arrow" | "text";
+type Tool = "pen" | "rect" | "arrow" | "text" | "eraser";
 type Shape =
   | { type: "pen"; points: number[]; color: string; width: number }
   | {
@@ -43,6 +54,7 @@ const TOOLS: { id: Tool; label: string; icon: typeof PenLine }[] = [
   { id: "rect", label: "Box", icon: Square },
   { id: "arrow", label: "Arrow", icon: ArrowUpRight },
   { id: "text", label: "Text", icon: Type },
+  { id: "eraser", label: "Eraser", icon: Eraser },
 ];
 
 export type AnnotationSource = { image: CanvasImageSource; width: number; height: number };
@@ -138,12 +150,18 @@ export function AnnotationEditor({
   caption,
   onSave,
   onClose,
+  description = "Draw boxes, arrows, lines and text. Saving attaches a new file next to the original; the original is never changed.",
+  saveLabel = "Save as new file",
+  showName = true,
 }: {
   source: AnnotationSource;
   defaultName: string;
   caption: string;
   onSave: (file: File, name: string) => Promise<void>;
   onClose: () => void;
+  description?: string;
+  saveLabel?: string;
+  showName?: boolean;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
@@ -181,8 +199,31 @@ export function AnnotationEditor({
       y: Math.round((e.clientY - r.top) * (c.height / r.height)),
     };
   };
+  const erasing = useRef(false);
+  /** Eraser: removes the newest drawing under the pointer. */
+  const eraseAt = (e: React.PointerEvent) => {
+    const c = canvas.current;
+    if (!c) return;
+    const p = at(e);
+    const tolerance = 12 * (c.width / c.getBoundingClientRect().width);
+    const id = (v: number) => v;
+    setShapes((list) => {
+      for (let i = list.length - 1; i >= 0; i--) {
+        const s = list[i]!;
+        if (hitShape(s, p, id, id, s.type === "text" ? s.size : 0, tolerance))
+          return list.filter((_, j) => j !== i);
+      }
+      return list;
+    });
+  };
   const down = (e: React.PointerEvent) => {
     if (saving) return;
+    if (tool === "eraser") {
+      (e.target as Element).setPointerCapture(e.pointerId);
+      erasing.current = true;
+      eraseAt(e);
+      return;
+    }
     const p = at(e);
     if (tool === "text") {
       setTextAt(p);
@@ -197,6 +238,7 @@ export function AnnotationEditor({
     );
   };
   const move = (e: React.PointerEvent) => {
+    if (erasing.current) return eraseAt(e);
     if (!draft || draft.type === "text") return;
     const p = at(e);
     setDraft(
@@ -206,6 +248,7 @@ export function AnnotationEditor({
     );
   };
   const up = () => {
+    erasing.current = false;
     if (!draft) return;
     setShapes((list) => [...list, draft]);
     setDraft(null);
@@ -249,16 +292,14 @@ export function AnnotationEditor({
     <Dialog
       open
       onOpenChange={(o) => {
-        if (!o && !saving) onClose();
+        // Closing by clicking outside or Escape never drops a drawing silently.
+        if (!o && !saving && (!shapes.length || window.confirm("Discard your drawing?"))) onClose();
       }}
     >
       <DialogContent className="bf-annotate max-w-6xl">
         <DialogHeader>
           <DialogTitle>Mark up {caption}</DialogTitle>
-          <DialogDescription>
-            Draw boxes, arrows, lines and text. Saving attaches a new file next to the original; the
-            original is never changed.
-          </DialogDescription>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <div className="bf-annotate-tools" role="toolbar" aria-label="Drawing tools">
           <div className="bf-mode" role="radiogroup" aria-label="Tool">
@@ -350,7 +391,7 @@ export function AnnotationEditor({
           )}
         </div>
         <div className="bf-annotate-save">
-          <label className="grid min-w-0 flex-1 gap-1 text-xs">
+          <label className={showName ? "grid min-w-0 flex-1 gap-1 text-xs" : "sr-only"}>
             <span className="text-muted-foreground">Name for the marked-up copy</span>
             <input
               className="bf-input"
@@ -368,7 +409,8 @@ export function AnnotationEditor({
             disabled={saving || !shapes.length}
             onClick={() => void save()}
           >
-            {saving ? <LoaderCircle className="animate-spin" /> : <Save />}Save as new file
+            {saving ? <LoaderCircle className="animate-spin" /> : <Save />}
+            {saveLabel}
           </Button>
         </div>
       </DialogContent>
