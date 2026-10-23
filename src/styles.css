@@ -1593,6 +1593,35 @@ html[data-skin=glass] .bf-savebar { background: var(--glass-strong); -webkit-bac
   html[data-skin=glass].dark { --glass: rgb(34 37 52 / .92); --glass-strong: rgb(26 29 42 / .97); }
 }
 
+/* ───────────── Phones: bug and member tables become stacked cards ───────────── */
+@media (max-width: 640px) {
+  .bf-table-wrap :is(.bf-bug-table, .bf-member-table) { min-width: 0; display: block; }
+  .bf-table-wrap :is(.bf-bug-table, .bf-member-table) thead { display: none; }
+  .bf-table-wrap :is(.bf-bug-table, .bf-member-table) tbody { display: grid; gap: 10px; padding: 10px; }
+  .bf-table-wrap :is(.bf-bug-table, .bf-member-table) tbody > tr { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+  .bf-table-wrap :is(.bf-bug-table, .bf-member-table) tbody > tr:hover { background: var(--card); }
+  .bf-table-wrap :is(.bf-bug-table, .bf-member-table) tbody > tr[data-selected] { border-color: var(--primary); }
+  .bf-table-wrap :is(.bf-bug-table, .bf-member-table) td { display: block; grid-column: span 3; min-width: 0; max-width: none; padding: 0; border: 0; white-space: normal; }
+  .bf-table-wrap :is(.bf-bug-table, .bf-member-table) td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 3px; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-foreground); }
+  .bf-table-wrap .bf-bug-table :is(.bf-cell-select, .bf-cell-id, .bf-cell-title, .bf-cell-status), .bf-table-wrap .bf-member-table :is(td:first-child, td:last-child, [data-label="Portal link"]) { grid-column: span 6; }
+  .bf-table-wrap .bf-bug-table :is(.bf-cell-expand, .bf-cell-summary) { display: none; } /* tap the title for details; the long summary stays on larger screens */
+  .bf-table-wrap .bf-bug-table .bf-cell-action { grid-column: span 2; }
+  .bf-table-wrap .bf-bug-table .bf-cell-title .bf-bug-title { font-size: 15px; font-weight: 600; line-height: 1.35; }
+  .bf-table-wrap .bf-bug-table tbody > tr:has(> td[colspan]) { display: block; padding: 0; } /* the expanded report */
+  .bf-table-wrap .bf-bug-table td[colspan] { display: block; }
+  .bf-table-wrap .bf-sticky-table thead th { position: static; }
+}
+
+/* ───────────── Scroll boxes: bottom fade + hint, only when there is more to scroll; fades out at the end where scroll-driven animations exist ───────────── */
+.bf-ov-scroll, .bf-recent-scroll, .bf-urgent-scroll, .bf-barlist[data-scroll], .bf-ov-panel > .bf-ov-team { scroll-timeline: --bf-box block; }
+:is(.bf-ov-scroll, .bf-recent-scroll, .bf-urgent-scroll, .bf-barlist[data-scroll], .bf-ov-panel > .bf-ov-team)[data-can-scroll]::after { content: "Scroll for more"; position: sticky; bottom: 0; z-index: 1; display: grid; align-items: end; justify-items: center; height: 46px; margin-top: -46px; padding-bottom: 5px; pointer-events: none; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-foreground); background: linear-gradient(to bottom, transparent, var(--card) 72%); animation: bf-scroll-end linear both; animation-timeline: --bf-box; animation-range: 88% 100%; }
+@keyframes bf-scroll-end { to { opacity: 0; } }
+@media (max-width: 640px) { :is(.bf-ov-scroll, .bf-recent-scroll, .bf-urgent-scroll, .bf-barlist[data-scroll], .bf-ov-panel > .bf-ov-team)::after { display: none; } }
+
+/* ───────────── Keyboard: skip link (visible only when focused) ───────────── */
+.bf-skip { position: fixed; top: 10px; left: 10px; z-index: 60; padding: 8px 12px; border-radius: 8px; background: var(--primary); color: var(--primary-foreground); font-size: 13px; font-weight: 600; transform: translateY(-200%); transition: transform .15s; }
+.bf-skip:focus-visible { transform: none; outline: 2px solid var(--primary-foreground); outline-offset: 2px; }
+
 /* ───────────── Trash: floating bottom-right button into the Trash ───────────── */
 .bf-trash-fab { position: fixed; right: 22px; bottom: 22px; z-index: 40; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 999px; background: var(--primary); color: var(--primary-foreground); border: 1px solid color-mix(in oklab, var(--primary) 70%, white); box-shadow: inset 0 1px 0 rgb(255 255 255 / .25), 0 2px 6px rgb(0 0 0 / .18), 0 12px 28px -8px color-mix(in oklab, var(--primary) 70%, transparent); transition: transform .2s cubic-bezier(.22,.61,.36,1), box-shadow .2s, filter .2s; }
 .bf-trash-fab:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: inset 0 1px 0 rgb(255 255 255 / .3), 0 4px 10px rgb(0 0 0 / .2), 0 18px 36px -10px color-mix(in oklab, var(--primary) 80%, transparent); }

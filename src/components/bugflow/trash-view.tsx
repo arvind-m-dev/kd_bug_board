@@ -19,6 +19,7 @@ import { deleteForever, emptyTrash, getTrash, restoreFromTrash } from "@/lib/tra
 import { daysLeft, daysLeftLabel, type TrashItemRef } from "@/lib/trash";
 import { formatBytes } from "@/lib/bug-media";
 import { statusLabel, timeAgo, roleText } from "@/lib/format";
+import { SkeletonRows } from "./loading";
 
 type Tab = "bugs" | "members" | "files";
 type Pending = { kind: "forever"; item: TrashItemRef; label: string } | { kind: "empty" } | null;
@@ -147,9 +148,9 @@ export function TrashView() {
         </div>
       </div>
       {q.isPending && (
-        <p role="status" className="p-5 text-sm text-muted-foreground">
-          Opening the Trash…
-        </p>
+        <div className="p-5">
+          <SkeletonRows rows={4} label="Opening the Trash" />
+        </div>
       )}
       {q.isError && (
         <div className="p-5">

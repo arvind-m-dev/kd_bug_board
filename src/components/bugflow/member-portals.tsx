@@ -30,6 +30,7 @@ import { ThemedSelect } from "./themed-select";
 import { toast } from "sonner";
 import { refreshPeople } from "@/lib/refresh-people";
 import { Presence } from "./presence";
+import { SkeletonRows } from "./loading";
 const PAGE = 10;
 type Pending = { id: string; name: string; action: "deactivate" | "activate" | "delete" };
 const copyText: Record<Pending["action"], { title: string; desc: string; label: string }> = {
@@ -229,8 +230,10 @@ export function MemberPortals({ initialSearch = "" }: { initialSearch?: string }
                     </span>
                   </button>
                 </td>
-                <td>{m.role === "qa" ? "QA" : <span className="capitalize">{m.role}</span>}</td>
-                <td>
+                <td data-label="Role">
+                  {m.role === "qa" ? "QA" : <span className="capitalize">{m.role}</span>}
+                </td>
+                <td data-label="Access">
                   <span
                     className="bf-status-pill"
                     data-tone={m.active ? "success" : m.userActive ? "warning" : "neutral"}
@@ -239,7 +242,7 @@ export function MemberPortals({ initialSearch = "" }: { initialSearch?: string }
                     {!m.userActive ? "Deactivated" : m.active ? "Active" : "Revoked / expired"}
                   </span>
                 </td>
-                <td>
+                <td data-label="Portal link">
                   <div className="flex gap-1">
                     {m.active && m.copyable ? (
                       <>
@@ -324,7 +327,9 @@ export function MemberPortals({ initialSearch = "" }: { initialSearch?: string }
           </tbody>
         </table>
         {members.isPending ? (
-          <p className="p-8 text-sm">Loading members…</p>
+          <div className="p-5">
+            <SkeletonRows rows={5} label="Loading members" />
+          </div>
         ) : members.isError ? (
           <ErrorNotice
             message="Members could not be loaded."

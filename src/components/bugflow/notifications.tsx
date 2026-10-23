@@ -242,9 +242,13 @@ export function NotificationsPage() {
           </section>
         ))
       ) : (
-        <p className="rounded-md border p-8 text-center text-sm text-muted-foreground">
-          No notifications in the last {NOTIFICATION_DAYS} days.
-        </p>
+        <div className="bf-empty">
+          <Bell />
+          <h3>Nothing new</h3>
+          <p className="text-sm text-muted-foreground">
+            Bug updates from the last {NOTIFICATION_DAYS} days will appear here.
+          </p>
+        </div>
       )}
     </div>
   );

@@ -113,6 +113,7 @@ export const mediaKey = (bugId: string, id: string, contentType: MediaType) =>
 /** Display name only: no control characters or path separators, no leading dots, at most 140 characters. */
 export function safeFileName(name: string) {
   const s = name
+    // eslint-disable-next-line no-control-regex -- C0 control characters are exactly what must go
     .replace(/[\u0000-\u001f\u007f/\\]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()

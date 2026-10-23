@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/bugflow/theme-toggle";
 import { Decorations } from "@/components/bugflow/decorations";
+import { ScrollHints } from "@/components/bugflow/scroll-hints";
 import { TopProgress } from "@/components/bugflow/loading";
 import { THEME_BOOT_SCRIPT } from "@/lib/appearance";
 import { Button } from "@/components/ui/button";
@@ -134,6 +135,7 @@ function RootComponent() {
         <Outlet />
         <Toaster />
         <Decorations />
+        <ScrollHints />
       </ThemeProvider>
     </QueryClientProvider>
   );

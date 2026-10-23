@@ -274,6 +274,7 @@ export function Workspace({ view = "overview" }: { view?: View }) {
         e.preventDefault();
         setDialog("search");
       }
+      if (e.key === "Escape") setMenu(false); // closes the mobile drawer; dialogs handle Escape themselves
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -289,6 +290,9 @@ export function Workspace({ view = "overview" }: { view?: View }) {
       {menu && (
         <div className="bf-sidebar-scrim" aria-hidden="true" onClick={() => setMenu(false)} />
       )}
+      <a href="#bf-main" className="bf-skip">
+        Skip to content
+      </a>
       <aside className="bf-sidebar" data-open={menu} aria-label="Main navigation">
         <button
           type="button"
@@ -458,7 +462,7 @@ export function Workspace({ view = "overview" }: { view?: View }) {
             <SignOutButton />
           </div>
         </header>
-        <main className="bf-main">
+        <main id="bf-main" className="bf-main">
           <div className="bf-page-heading">
             <div>
               <h1>{titles[view]}</h1>

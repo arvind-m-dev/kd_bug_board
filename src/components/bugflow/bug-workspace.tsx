@@ -487,7 +487,7 @@ export function BugWorkspace({
                 <Fragment key={b.id}>
                   <tr data-selected={selected.has(b.id) || undefined}>
                     {selecting && (
-                      <td>
+                      <td className="bf-cell-select">
                         <input
                           type="checkbox"
                           aria-label={`Select ${b.code}`}
@@ -496,7 +496,7 @@ export function BugWorkspace({
                         />
                       </td>
                     )}
-                    <td>
+                    <td className="bf-cell-expand">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -515,7 +515,7 @@ export function BugWorkspace({
                         {expanded.has(b.id) ? <ChevronDown /> : <ChevronRight />}
                       </Button>
                     </td>
-                    <td>
+                    <td className="bf-cell-id">
                       <Button
                         variant="link"
                         className="h-auto p-0 font-mono text-[11.5px] text-muted-foreground"
@@ -533,7 +533,7 @@ export function BugWorkspace({
                         {b.code}
                       </Button>
                     </td>
-                    <td>
+                    <td className="bf-cell-title">
                       <Button
                         variant="link"
                         className="bf-bug-title h-auto whitespace-normal p-0 text-left text-foreground"
@@ -553,15 +553,19 @@ export function BugWorkspace({
                         <p className="bf-bug-summary">{b.description || "—"}</p>
                       </td>
                     )}
-                    <td className="bf-cell-nowrap">{b.module || "—"}</td>
-                    <td className="bf-cell-nowrap">
+                    <td className="bf-cell-nowrap" data-label="Module">
+                      {b.module || "—"}
+                    </td>
+                    <td className="bf-cell-nowrap" data-label="Priority · severity">
                       <RowRating bug={b} access={access} workspace={d} editable={isAdmin} />
                     </td>
-                    <td className="bf-cell-status">
+                    <td className="bf-cell-status" data-label="Status">
                       <RowStatus bug={b} access={access} workspace={d} />
                     </td>
-                    <td className="bf-cell-person">{person(b.reporterId, b.reporter)}</td>
-                    <td className="bf-cell-person">
+                    <td className="bf-cell-person" data-label="Reporter">
+                      {person(b.reporterId, b.reporter)}
+                    </td>
+                    <td className="bf-cell-person" data-label="Assignee">
                       {d.actor.permissions.includes("assign") ? (
                         <RowAssign bug={b} access={access} workspace={d} />
                       ) : b.assignees && b.assignees.length > 1 ? (
@@ -576,7 +580,7 @@ export function BugWorkspace({
                         <span className="text-muted-foreground">Unassigned</span>
                       )}
                     </td>
-                    <td className="bf-cell-activity">
+                    <td className="bf-cell-activity" data-label="Last activity">
                       {b.lastChange ? (
                         <span
                           className="bf-activity"
@@ -597,7 +601,7 @@ export function BugWorkspace({
                         "—"
                       )}
                     </td>
-                    <td className="bf-cell-nowrap">
+                    <td className="bf-cell-nowrap" data-label="Created">
                       <time
                         className="text-xs text-muted-foreground"
                         title={dateLabel(b.createdAt)}
@@ -605,7 +609,7 @@ export function BugWorkspace({
                         {shortDate(b.createdAt)}
                       </time>
                     </td>
-                    <td>
+                    <td className="bf-cell-action">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -620,7 +624,7 @@ export function BugWorkspace({
                         {copied === b.id ? <CopyCheck className="text-green-500" /> : <Copy />}
                       </Button>
                     </td>
-                    <td>
+                    <td className="bf-cell-action">
                       {mayEditBug(d.actor, b) ? (
                         <Button
                           variant="ghost"
@@ -640,7 +644,7 @@ export function BugWorkspace({
                       )}
                     </td>
                     {isAdmin && (
-                      <td>
+                      <td className="bf-cell-action">
                         <Button
                           variant="ghost"
                           size="icon"

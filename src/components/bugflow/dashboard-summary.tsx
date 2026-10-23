@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { SkeletonRows } from "./loading";
+import { ErrorNotice } from "./action-feedback";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
@@ -285,7 +286,17 @@ export function DashboardSummary() {
           foot={`New, reopened, retest or info · ${periodText}`}
         />
       </div>
-      {failed && <p className="mb-4 text-sm text-destructive">Bugs could not be loaded.</p>}
+      {failed && (
+        <div className="mb-4">
+          <ErrorNotice
+            message="Bugs could not be loaded."
+            onRetry={() => {
+              void stats.refetch();
+            }}
+            retrying={stats.isFetching}
+          />
+        </div>
+      )}
 
       {/* 2 · What to act on, and where work sits */}
       <div className="bf-ov-row bf-ov-row-main">

@@ -76,6 +76,14 @@ export function PersonalPortal({
   const [tab, setTab] = useState<Tab>("bugs");
   const [sheet, setSheet] = useState(false);
   const [menu, setMenu] = useState(false);
+  // Escape closes the mobile drawer.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenu(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const [focus, setFocus] = useState<Focus>({ filter: "all", label: "All bugs" });
   const navigate = useNavigate();
   // Retry transient failures; a missing portal (null) is final and is not retried.
@@ -162,6 +170,9 @@ export function PersonalPortal({
       {menu && (
         <div className="bf-sidebar-scrim" aria-hidden="true" onClick={() => setMenu(false)} />
       )}
+      <a href="#bf-main" className="bf-skip">
+        Skip to content
+      </a>
       <aside className="bf-sidebar" data-open={menu} aria-label="Portal navigation">
         <div className="bf-brand">
           <span className="bf-logo">
@@ -240,7 +251,7 @@ export function PersonalPortal({
             <ThemeToggle />
           </div>
         </header>
-        <main className="bf-main">
+        <main id="bf-main" className="bf-main">
           <section className="bf-portal-hero" aria-label="About you">
             <div>
               <span className="bf-portal-role">
