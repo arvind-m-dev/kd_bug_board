@@ -1,4 +1,7 @@
 import * as T from 'three';
+import { createSeasonalSky } from './seasonal-sky';
+import { createSeasonalLandscape } from './seasonal-landscape';
+import { createSleighJourney, seasonalWind } from '@/lib/seasonal-choreography';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { perimeterPoint, stepSnow, type LandingEdge, type SnowBody } from '@/lib/seasonal-physics';
 import { DEFAULT_SCENE, seededRandom, type Scene } from '@/lib/appearance';
@@ -16,6 +19,8 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
   host.style.display = '';
   host.append(renderer.domElement);
   const scene = new T.Scene();
+  const sky = createSeasonalSky(scene, season);
+  const landscape = createSeasonalLandscape(scene, season);
   const camera = new T.OrthographicCamera(0, innerWidth, innerHeight, 0, .1, 3000);
   camera.position.z = 1000;
   const ambient = new T.HemisphereLight(0xe5f4ff, 0x3b213d, 2.3);
@@ -54,6 +59,7 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
   const shadowTexture = new T.CanvasTexture(shadowCanvas);
   const shadowMaterial = new T.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false }); materials.add(shadowMaterial);
   const shadowPlane = new T.PlaneGeometry(1, 1); geometries.add(shadowPlane);
+  const starGold = mat(0xffcf55, .3, .25); starGold.emissive.setHex(0xffb72e); starGold.emissiveIntensity = .8;
   const stars: T.Mesh[] = [];
   const treeLights: T.Mesh[] = [];
   const groves: T.Group[] = [];
@@ -76,7 +82,7 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
         treeLights.push(bulb);
       }
     }
-    if (festive) { const star = mesh(tree, starGeometry, gold, [0, 150, 0], [1.15, 1.15, 1.15]); stars.push(star); }
+    if (festive) { const star = mesh(tree, starGeometry, starGold, [0, 150, 0], [1.15, 1.15, 1.15]); stars.push(star); }
     tree.scale.setScalar(height / 160); tree.rotation.y = -.25;
     return tree;
   }
@@ -208,13 +214,35 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
   const random = (min: number, max: number) => min + (max - min) * (0.5 * (1 - knobs.randomness) + rand() * knobs.randomness);
   type Creature = { root: T.Group; limbs: T.Group[]; wings?: T.Group[]; kind: 'bug' | 'spider' | 'bat'; n: number; thread?: T.Mesh; angle: number; motion?: { phase: 'rest' | 'flight' | 'return' | 'crawl'; until: number; retarget: number; surface: number; distance: number; direction: number; velocity: T.Vector3; target: T.Vector3; homeKind: number; seed: number } };
   const creatures: Creature[] = [];
+  const fireflyGlows: T.MeshStandardMaterial[] = [];
   function bug(index: number, spider = false): Creature {
     const root = new T.Group(), limbs: T.Group[] = [], wings: T.Group[] = [];
-    const skin = spider ? black : shell[index % 3]!;
+    const variety = index % 4;
+    const skin = spider ? black : variety === 0 ? red : shell[index % 3]!;
     mesh(root, shadowPlane, shadowMaterial, [3, -4, -5], [42, 42, 1]);
-    ball(root, skin, 0, -3, 4, spider ? 8 : 8, spider ? 10 : 12, 6);
+    ball(root, skin, 0, -3, 4, spider ? 8 : variety === 3 ? 3 : 8, spider ? 10 : variety === 3 ? 4 : 12, 6);
     ball(root, spider ? violet : black, 0, 9, 4, 5.5, 6, 5);
     if (!spider) {
+      if (variety === 0) {
+        // Round spotted ladybird shell.
+        ball(root, red, 0, -3, 4, 9.5, 11, 7);
+        for (const side of [-1, 1]) for (let k = 0; k < 3; k++) ball(root, black, side * (4 + k % 2), 3 - k * 6, 10.2, 1.5, 1.7, .65);
+      } else if (variety === 1) {
+        // Stag beetle's paired, branching mandibles.
+        for (const side of [-1, 1]) {
+          rod(root, skin, [side * 3, 12, 5], [side * 9, 22, 5], 1.5);
+          rod(root, skin, [side * 9, 22, 5], [side * 4, 28, 5], 1.1);
+          rod(root, skin, [side * 7, 19, 5], [side * 3, 21, 5], .9);
+        }
+      } else if (variety === 2) {
+        // Firefly abdomen glows without adding expensive point lights.
+        const glow = mat(0xd6ef69, .35); glow.emissive.setHex(0xa8df35); glow.emissiveIntensity = 1.2;
+        ball(root, glow, 0, -12, 6, 5.5, 5, 4); fireflyGlows.push(glow);
+      } else {
+        // A winged ant has a narrow waist and separate abdomen.
+        ball(root, black, 0, -13, 5, 6, 8, 5);
+        ball(root, skin, 0, 0, 5, 3, 4, 3);
+      }
       const membrane = new T.MeshStandardMaterial({ color: 0xe7cfa0, transparent: true, opacity: .65, roughness: .3, side: T.DoubleSide }); materials.add(membrane);
       for (const side of [-1, 1]) {
         const wing = new T.Group(); wing.position.set(side * 2, 5, 10);
@@ -262,6 +290,21 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
     for (let i = 0; i < knobs.bats; i++) creatures.push(bat(i));
   }
   creatures.forEach((c, i) => { c.motion = { phase: c.kind === 'bug' ? 'crawl' : 'rest', until: c.kind === 'bat' && c.n % 2 ? random(.2, 2) : random(5, 13) + c.n, retarget: 0, surface: i, distance: random(0, 500), direction: chance() < .5 ? -1 : 1, velocity: new T.Vector3(), target: new T.Vector3(), homeKind: -1, seed: random(0, 100) }; });
+  let landingRect: DOMRect | undefined;
+  let previousSleighPhase = '';
+  // Flight varies between visits; the creature studio's seeded arrangement stays unchanged.
+  const journey = createSleighJourney(Math.random, () => {
+    const candidates = rects.filter(r => r.width > 340 && r.top > headerBottom + 110 && r.top < height - 90);
+    landingRect = candidates[Math.floor(Math.random() * candidates.length)];
+    if (!landingRect) return { x: .4, y: 0, walkTo: .55 };
+    const left = Math.max(130, landingRect.left + 120), right = Math.min(width - 130, landingRect.right - 120);
+    const x = left + Math.random() * Math.max(0, right - left - 45);
+    return { x: x / width, y: Math.max(0, (height - landingRect.top - 5) / Math.max(100, height - headerBottom - 130)), walkTo: Math.min(right, x + 45) / width };
+  });
+  const deerBodies: T.Group[] = [];
+  const reins: T.Mesh[] = [];
+  const teamYaw = [0, 0, 0];
+  let sledYaw = 0, sledPitch = 0;
   const sleigh = new T.Group(), santaWave = new T.Group(), deerLegs: T.Group[] = [], deerHeads: T.Group[] = [];
   if (season === 'christmas') {
     const santa = new T.Group(); santa.position.set(-90, 0, 0);
@@ -279,7 +322,7 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
     ball(santa, brown, -20, 26, -3, 12, 15, 11);
     sleigh.add(santa);
     for (let i = 0; i < 3; i++) {
-      const deer = new T.Group(); deer.position.set(-18 + i * 50, 4 + i * 6, 0);
+      const deer = new T.Group(); deer.position.set(-18 + i * 50, 4, 0); deerBodies.push(deer);
       ball(deer, brown, 0, 0, 0, 17, 8, 7); ball(deer, tan, 9, -1, 4, 7, 5, 3);
       const head = new T.Group(); head.position.set(12, 9, 0); head.rotation.z = -.35;
       ball(head, brown, 0, 5, 0, 5, 12, 5); ball(head, brown, 5, 16, 0, 9, 5, 5);
@@ -293,7 +336,7 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
       }
       rod(deer, red, [-4, 7, 7], [9, -4, 7], 1); sleigh.add(deer);
     }
-    rod(sleigh, gold, [-70, 15, 10], [95, 12, 10], .45);
+    for (let i = 0; i < 3; i++) reins.push(rod(sleigh, gold, [0, 0, 0], [1, 0, 0], .45));
     sleigh.rotation.y = -.22; sleigh.scale.setScalar(.85); scene.add(sleigh);
   }
   // Six-armed snow crystals share one geometry and one instanced draw call.
@@ -313,9 +356,16 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
   const flakes = new T.InstancedMesh(isAutumn ? leafGeometry : flakeGeometry, isAutumn ? mat(0xffffff, .5) : snow, count);
   if (isAutumn) for (let i = 0; i < count; i++) flakes.setColorAt(i, new T.Color([0xd96724, 0xe5a332, 0xaf3a22, 0xf3ba57][i % 4]!)); flakes.instanceMatrix.setUsage(T.DynamicDrawUsage); flakes.frustumCulled = false; scene.add(flakes);
   const bodies: SnowBody[] = Array.from({ length: count }, (_, i) => ({ x: (i * 179.3) % innerWidth, y: (i * 67.4) % innerHeight, vx: 8, vy: 15 + i % 20, radius: isAutumn ? 6 + i % 4 : 2 + i % 3, bounces: 0, ignoreUntil: 0 }));
+  const floorCount = isAutumn ? Math.round(72 * knobs.amount) : 0;
+  const floorLeaves = new T.InstancedMesh(leafGeometry, flakes.material, floorCount);
+  floorLeaves.frustumCulled = false; floorLeaves.instanceMatrix.setUsage(T.DynamicDrawUsage); scene.add(floorLeaves);
+  const settledLeaves = Array.from({ length: floorCount }, (_, i) => ({ x: chance() * innerWidth, y: 2 + chance() * 7, angle: chance() * Math.PI * 2, size: 2 + chance() * 2, lift: 0 }));
+  for (let i = 0; i < floorCount; i++) floorLeaves.setColorAt(i, new T.Color([0xd96724, 0xe5a332, 0xaf3a22, 0xf3ba57][i % 4]!));
+  let nextLeaf = 0;
   const dummy = new T.Object3D();
   let width = innerWidth, height = innerHeight, edges: LandingEdge[] = [], rects: DOMRect[] = [];
   let sidebarRight = 236, headerBottom = 65;
+  let uiRoosts: { x: number; y: number }[] = [];
   let measured = -Infinity, time = 0, last = 0, frame = 0, disposed = false, contextLost = false;
   let dirty = true, paintedKey = '', lastPaint = 0;
   let pointer = { x: -1000, y: -1000 };
@@ -341,6 +391,11 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
     sidebarRight = sidebar && sidebar.right > 0 ? sidebar.right : 0;
     headerBottom = document.querySelector('.bf-topbar')?.getBoundingClientRect().bottom ?? 65;
     rects = [...document.querySelectorAll('.bf-table-wrap'), ...document.querySelectorAll('.bf-style, .bf-font, .bf-status-card, .bf-stat, .bf-summary-card, .bf-portal-card, .bf-panel')].map(e => e.getBoundingClientRect()).filter(r => r.width > 80 && r.height > 40 && r.top > headerBottom && r.top < height - 30 && r.right > 0 && r.left < width).slice(0, 24);
+    // Perch on outer corners rather than in labels, inputs, or the middle of a table.
+    uiRoosts = [...document.querySelectorAll('.bf-style, .bf-font, .bf-status-card, .bf-stat, .bf-summary-card, .bf-portal-card, .bf-panel, .bf-table-wrap, .bf-sidebar nav a, .bf-sidebar a, .bf-topbar')]
+      .map(element => element.getBoundingClientRect())
+      .filter(r => r.width > 80 && r.height > 25 && r.bottom > headerBottom && r.bottom < height - 50 && r.right > 35 && r.right < width + 1 && r.left >= 0)
+      .map(r => ({ x: Math.min(width - 25, r.right - 12), y: r.bottom - 2 }));
     edges = rects.map(r => ({ left: Math.max(0, r.left), right: Math.min(width, r.right), top: r.top }));
     // Visible row dividers provide lower ledges after a flake tumbles off the table rim.
     for (const row of [...document.querySelectorAll('.bf-table tbody tr')].slice(0, 14)) {
@@ -395,9 +450,12 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
       if (!dirty && key === paintedKey && now - lastPaint < 5000) return;
       dirty = false; paintedKey = key; lastPaint = now;
     }
+    const wind = moving ? seasonalWind(time) : 0;
+    landscape.update(width, time, wind);
+    sky.update(width, height, headerBottom, sidebarRight, time, moving);
     groves.forEach((g, i) => {
       g.position.set(width - 55, 0, 0); g.scale.setScalar(width < 760 ? .55 : 1);
-      g.rotation.z = moving ? Math.sin(time * .8 + i) * .018 : 0;
+      g.rotation.z = moving ? Math.sin(time * .8 + i) * .009 + wind * .0003 : 0;
       g.visible = true;
       if (moving) g.rotation.z += Math.max(0, 1 - Math.hypot(pointer.x - (width - 55), pointer.y - (height - 90)) / 160) * .025;
     });
@@ -424,6 +482,7 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
       ghost.rotation.set(Math.sin(time * .7) * .06, Math.sin(time * .4 + i) * .3, Math.sin(time * 1.3 + i) * .08);
       ghost.scale.y = (i ? .8 : 1.1) * (1 + Math.sin(time * 1.4 + i) * .06);
     });
+    fireflyGlows.forEach((glow, i) => { glow.emissiveIntensity = moving ? 1.1 + Math.sin(time * 2 + i) * .6 : 1.1; });
     pumpkinFaces.forEach((m, i) => { m.emissiveIntensity = moving ? 1.5 + Math.sin(time * 4 + i) * .25 + Math.sin(time * 11) * .1 : 1.5; });
     creatures.forEach((c, i) => {
       const compact = width < 760;
@@ -461,18 +520,20 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
       } else {
         const j = c.n, m = c.motion!;
         const scale = (width < 760 ? .46 : .65) + (m.seed % 30) / 100;
-        // Bats only ever rest on the haunted tree, so a resting bat never covers card or table text; flights cross the page briefly.
-        const perch = hauntedTree.localToWorld(roosts[j % roosts.length]!.clone());
+        // Two of every three bats favor the tree; the others explore UI ledges.
+        if (j % 3 === 2 && m.homeKind < 0 && uiRoosts.length) m.homeKind = Math.floor(chance() * uiRoosts.length);
+        const uiPerch = j % 3 === 2 && uiRoosts.length ? uiRoosts[m.homeKind % uiRoosts.length] : undefined;
+        const perch = uiPerch ? new T.Vector3(uiPerch.x, height - uiPerch.y, 28) : hauntedTree.localToWorld(roosts[j % roosts.length]!.clone());
         const home = perch.clone().add(new T.Vector3(0, -20 * scale, 7));
         c.root.visible = j < Math.min(knobs.bats, compact ? 3 : width < 1200 ? 7 : 12);
         c.root.scale.setScalar(scale);
         if (m.phase === 'rest' || !moving) {
-          c.root.position.copy(home); c.root.rotation.z = Math.PI + Math.sin(time * .9 + j) * .045; c.root.rotation.y = 0; c.angle = Math.PI;
+          c.root.position.copy(home); c.root.rotation.z = Math.PI; c.root.rotation.y = 0; c.angle = Math.PI;
           const near = Math.hypot(pointer.x - home.x, pointer.y - (height - home.y));
           c.limbs.forEach((wing, k) => { wing.rotation.y = (k ? -1 : 1) * (1.35 - Math.max(0, 1 - near / 180) * .4); wing.rotation.z = 0; });
-          if (moving && (time > m.until || near < 100)) { m.phase = 'flight'; m.until = time + random(10, 20); m.retarget = 0; }
+          if (moving && near < 100) { m.phase = 'flight'; m.until = time + random(10, 20); m.retarget = 0; if (j % 3 === 2 && uiRoosts.length) m.homeKind = Math.floor(chance() * uiRoosts.length); }
         } else {
-          if (m.phase === 'flight' && time > m.until) m.phase = 'return';
+          if (m.phase === 'flight' && time > m.until) { m.phase = 'return'; }
           if (m.phase === 'return') m.target.copy(home);
           else if (time > m.retarget || c.root.position.distanceTo(m.target) < 40) {
             // Independent waypoints sometimes leave the viewport, then lead the bat back to a new roost.
@@ -485,23 +546,77 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
           if (m.phase === 'return' && distance < 13) { m.phase = 'rest'; m.until = time + random(6, 18); m.velocity.set(0, 0, 0); }
           c.limbs.forEach((wing, k) => { wing.rotation.y = (k ? -1 : 1) * Math.sin(time * (18 + j) + j) * .95; wing.rotation.z = 0; });
         }
+        host.dataset[`batPerch${j}`] = uiPerch ? 'ui' : 'tree';
         host.dataset[`bat${j}`] = m.phase === 'rest' ? 'hanging' : m.phase;
       }
       if (c.kind !== 'bat') c.limbs.forEach((leg, j) => { leg.rotation.z = moving ? Math.sin(time * (c.kind === 'bug' ? 20 : 5) + j * Math.PI) * .16 : 0; });
     });
     if (season === 'christmas') {
-      const cycle = time % 38;
-      sleigh.visible = moving && cycle < 18;
-      sleigh.position.set(-150 + cycle / 18 * (width + 350), height - Math.max(110, headerBottom + 50) + Math.sin(time * 1.5) * 9, 70);
-      sleigh.rotation.z = Math.sin(time * .8) * .025;
-      deerLegs.forEach((l, i) => { l.rotation.z = Math.sin(time * 8 + Math.floor(i / 4) * .8 + i % 2 * Math.PI) * .65; });
-      santaWave.rotation.z = Math.sin(time * 4) * .3;
-      deerHeads.forEach((h, i) => { h.rotation.z = -.35 + Math.sin(time * 8 + i) * .08; });
+      const pose = journey(moving ? dt : 0);
+      host.dataset['sleighPhase'] = pose.phase;
+      if (moving && pose.phase === 'graze' && previousSleighPhase !== 'graze') {
+        // Gifts sit beside the landing surface, away from its table controls.
+        const x = landingRect ? Math.max(18, landingRect.left - 22) : Math.max(20, pose.x * width - 110);
+        const y = landingRect ? landingRect.top + 20 : height - 25;
+        const underneath = document.elementFromPoint(x, y);
+        if (!underneath?.closest('button, a, input, select, textarea, [role="button"], [role="checkbox"]')) {
+          host.dispatchEvent(new CustomEvent('seasonal-gift', { detail: { x, y } }));
+        }
+      }
+      previousSleighPhase = pose.phase;
+      sleigh.visible = moving && pose.phase !== 'away';
+      const scale = pose.scale * (width < 760 ? .55 : .85);
+      const groundY = 24 * scale + 5;
+      sleigh.position.set(pose.x * width, groundY + pose.y * Math.max(100, height - headerBottom - 130), 70 + pose.depth * 20);
+      sleigh.scale.setScalar(scale);
+      const angleDelta = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+      // Rudolph leads each turn; the following deer and sled respond in sequence.
+      const turnBlend = moving ? 1 - Math.exp(-dt * 4) : 0;
+      for (let i = 2; i >= 0; i--) {
+        const target = i === 2 ? pose.yaw : teamYaw[i + 1]!;
+        teamYaw[i]! += angleDelta(target, teamYaw[i]!) * turnBlend;
+      }
+      sledYaw += angleDelta(teamYaw[0]!, sledYaw) * turnBlend;
+      sledPitch += (pose.pitch - sledPitch) * turnBlend;
+      sleigh.rotation.set(pose.bank, sledYaw, sledPitch, 'YZX');
+      const walking = pose.phase === 'walk';
+      const gait = pose.airborne > .02 ? pose.airborne : walking ? .3 : 0;
+      deerLegs.forEach((l, i) => { l.rotation.z = Math.sin(time * (walking ? 5 : 8) + Math.floor(i / 4) * .8 + i % 2 * Math.PI) * .65 * gait; });
+      deerBodies.forEach((deer, i) => { deer.position.y = 4 + Math.sin(time * 8 + i) * 2 * gait;
+        const turn = angleDelta(teamYaw[i]!, sledYaw);
+        deer.rotation.y = turn;
+        deer.position.z = -Math.sin(turn) * (20 + i * 12);
+        deer.rotation.z = (pose.pitch - sledPitch) * (i + 1) / 3; });
+      reins.forEach((rein, i) => {
+        const a = i ? deerBodies[i - 1]!.position.clone() : new T.Vector3(-70, 15, 10);
+        const b = deerBodies[i]!.position.clone(); b.y += 5; b.z += 7;
+        if (i) { a.y += 5; a.z += 7; }
+        const direction = b.clone().sub(a);
+        rein.position.copy(a).add(b).multiplyScalar(.5); rein.scale.set(.45, direction.length(), .45);
+        rein.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), direction.normalize());
+      });
+      santaWave.rotation.z = Math.sin(time * 3) * .3;
+      deerHeads.forEach((h, i) => { h.position.y = 9 - pose.grazing * 12; h.rotation.z = -.35 - pose.grazing * (1.65 + Math.sin(time * 2 + i) * .12) + Math.sin(time * 8 + i) * .08 * gait; });
     }
+    settledLeaves.forEach((leaf, i) => {
+      if (moving) {
+        const gust = Math.max(0, wind - 45);
+        leaf.x = ((leaf.x + dt * gust * (.25 + i % 3 * .15)) % width + width) % width;
+        leaf.lift += (gust * Math.max(0, Math.sin(time * 1.4 + i)) * .45 - leaf.lift) * Math.min(1, dt * 2);
+        leaf.angle += dt * gust * .025;
+      }
+      dummy.position.set(leaf.x, leaf.y + leaf.lift, 49);
+      dummy.rotation.set(1.1, leaf.lift * .05, leaf.angle); dummy.scale.setScalar(leaf.size); dummy.updateMatrix(); floorLeaves.setMatrixAt(i, dummy.matrix);
+    });
+    floorLeaves.instanceMatrix.needsUpdate = true;
     flakes.visible = moving;
     if (moving) bodies.forEach((b, i) => {
-      const hit = stepSnow(b, dt, time, edges, 10 + Math.sin(time * .65) * 24);
+      const hit = stepSnow(b, dt, time, edges, wind);
       if (hit) host.dataset['lastBounce'] = String(Math.round(time * 1000));
+      if (isAutumn && b.y >= height - 5 && floorCount) {
+        const leaf = settledLeaves[nextLeaf++ % floorCount]!; leaf.x = b.x; leaf.lift = 0;
+        b.y = height + 16;
+      }
       if (b.y > height + 15 || b.x > width + 30 || b.x < -30) { b.x = (i * 173 + time * 31) % width; b.y = -12; b.vy = 10; b.bounces = 0; }
       dummy.position.set(b.x, height - b.y, 40 + i % 5); dummy.rotation.set(time * .4 + i, time * .65 + i, time * .3); dummy.scale.setScalar(b.radius / 2); dummy.updateMatrix(); flakes.setMatrixAt(i, dummy.matrix);
     });
@@ -511,7 +626,7 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
   resize();
   window.addEventListener('resize', resize); window.addEventListener('scroll', invalidate, true);
   window.addEventListener('pointermove', move, { passive: true }); window.addEventListener('pointerdown', down, { passive: true });
-  // Losing the GPU context shows the CSS scenery and pauses the loop; three.js rebuilds its state on restore and we resume.
+  // Pause and hide scenery on GPU context loss; resume the 3D scene when restored.
   const lost = (e: Event) => { e.preventDefault(); contextLost = true; cancelAnimationFrame(frame); host.dataset['ready'] = ''; host.style.display = 'none'; };
   const restored = () => { if (disposed) return; contextLost = false; host.style.display = ''; host.dataset['ready'] = 'true'; measured = -Infinity; dirty = true; last = 0; frame = requestAnimationFrame(draw); };
   renderer.domElement.addEventListener('webglcontextlost', lost);
@@ -521,6 +636,7 @@ export function createSeasonalScene(host: HTMLElement, season: string, lively: b
     disposed = true; cancelAnimationFrame(frame);
     window.removeEventListener('resize', resize); window.removeEventListener('scroll', invalidate, true); window.removeEventListener('pointermove', move); window.removeEventListener('pointerdown', down);
     renderer.domElement.removeEventListener('webglcontextlost', lost); renderer.domElement.removeEventListener('webglcontextrestored', restored);
+    sky.dispose(); landscape.dispose(); floorLeaves.dispose();
     shadowTexture.dispose(); geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); flakes.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
   };
 }

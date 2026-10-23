@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { SeasonalGifts } from './seasonal-gifts';
 import type { Scene } from '@/lib/appearance';
 
 /**
@@ -28,11 +29,11 @@ export function Seasonal3D({ season, lively, scene }: { season: string; lively: 
         dispose = createSeasonalScene(target, season, lively, JSON.parse(settled) as Scene);
         setAvailable(true);
       } catch {
-        // Existing CSS scenery remains available on devices without WebGL.
+        // Leave decorations empty on devices without WebGL; never flash legacy artwork.
         target.replaceChildren(); setAvailable(false);
       }
-    }).catch(() => { /* keep the CSS fallback */ });
+    }).catch(() => { /* Leave the workspace undecorated when loading fails. */ });
     return () => { cancelled = true; dispose?.(); };
   }, [season, lively, settled, version]);
-  return <div ref={host} className="bf-seasonal-3d" data-ready={available || undefined} aria-hidden="true" inert />;
+  return <><div ref={host} className="bf-seasonal-3d" data-ready={available || undefined} aria-hidden="true" inert />{season === 'christmas' && lively && available && <SeasonalGifts key={`${season}:${settled}:${version}`} host={host} />}</>;
 }

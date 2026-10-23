@@ -28,6 +28,7 @@ export function createBrandScene(host: HTMLElement, motion: string) {
     for (let i = 0; i < 3; i++) { legs.push(line([side * 7, 6 - i * 7, 0], [side * 17, 10 - i * 11, -1], 1.1)); line([side * 17, 10 - i * 11, -1], [side * 21, 6 - i * 11, 0], .85); }
     line([side * 3, 16, 1], [side * 8, 23, 1], .9);
   }
+  renderer.render(scene, camera);
   host.append(renderer.domElement);
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let frame = 0, last = 0, pitch = -.15, yaw = -.3, settled = false;
