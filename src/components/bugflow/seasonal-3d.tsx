@@ -41,25 +41,41 @@ export function Seasonal3D({
   useEffect(() => {
     const target = host.current;
     if (!target) return;
+    // The scene is hidden on phones and tablets and pointless with reduced motion: skip WebGL (and three.js)
+    // there entirely. Elsewhere it loads once the browser is idle, after the page has painted.
+    if (
+      window.matchMedia("(max-width: 768px)").matches ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    )
+      return;
     let cancelled = false;
     let dispose: (() => void) | undefined;
-    import("./seasonal-scene")
-      .then(({ createSeasonalScene }) => {
-        if (cancelled) return;
-        try {
-          dispose = createSeasonalScene(target, season, lively, JSON.parse(settled) as Scene);
-          setAvailable(true);
-        } catch {
-          // Leave decorations empty on devices without WebGL; never flash legacy artwork.
-          target.replaceChildren();
-          setAvailable(false);
-        }
-      })
-      .catch(() => {
-        /* Leave the workspace undecorated when loading fails. */
-      });
+    const start = () => {
+      if (cancelled) return;
+      import("./seasonal-scene")
+        .then(({ createSeasonalScene }) => {
+          if (cancelled) return;
+          try {
+            dispose = createSeasonalScene(target, season, lively, JSON.parse(settled) as Scene);
+            setAvailable(true);
+          } catch {
+            // Leave decorations empty on devices without WebGL; never flash legacy artwork.
+            target.replaceChildren();
+            setAvailable(false);
+          }
+        })
+        .catch(() => {
+          /* Leave the workspace undecorated when loading fails. */
+        });
+    };
+    const hasIdle = typeof window.requestIdleCallback === "function";
+    const idle = hasIdle
+      ? window.requestIdleCallback(start, { timeout: 3000 })
+      : window.setTimeout(start, 1500);
     return () => {
       cancelled = true;
+      if (hasIdle) window.cancelIdleCallback(idle);
+      else window.clearTimeout(idle);
       dispose?.();
     };
   }, [season, lively, settled, version]);

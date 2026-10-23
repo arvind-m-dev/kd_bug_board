@@ -1,7 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useLayoutEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useState } from "react";
 import {
   Bug,
   ChartPie,
@@ -53,20 +53,38 @@ import {
 import { toast } from "sonner";
 import { CollaboratorOnboarding } from "./collaborator-onboarding";
 import { AdminAccess } from "./admin-access";
-import { BugWorkspace } from "./bug-workspace";
 import { MemberPortals } from "./member-portals";
 import { DashboardSummary } from "./dashboard-summary";
 import { NotificationMenu, NotificationsPage } from "./notifications";
-import { DropdownOptionsEditor } from "./dropdown-options";
+// Heavy views load on demand so the first paint ships only what the current page needs.
+const BugWorkspace = lazy(() =>
+  import("./bug-workspace").then((m) => ({ default: m.BugWorkspace })),
+);
+const DropdownOptionsEditor = lazy(() =>
+  import("./dropdown-options").then((m) => ({ default: m.DropdownOptionsEditor })),
+);
+const TeamReports = lazy(() => import("./team-reports").then((m) => ({ default: m.TeamReports })));
+const AppearanceSettings = lazy(() =>
+  import("./appearance-settings").then((m) => ({ default: m.AppearanceSettings })),
+);
+const MediaStorageCard = lazy(() =>
+  import("./media-storage-settings").then((m) => ({ default: m.MediaStorageCard })),
+);
+const TrashView = lazy(() => import("./trash-view").then((m) => ({ default: m.TrashView })));
+const AiTokens = lazy(() => import("./ai-tokens").then((m) => ({ default: m.AiTokens })));
+const ViewFallback = () => (
+  <div className="bf-panel p-5 text-sm text-muted-foreground" role="status">
+    Loading…
+  </div>
+);
 import { ThemeToggle, useTheme } from "./theme-toggle";
 import { paletteById, styleById } from "@/lib/appearance";
 import { BrandMark } from "./decorations";
 import { ThemedSelect } from "./themed-select";
 import { ErrorNotice, ConfirmAction, actionError } from "./action-feedback";
-import { ActivityView, prefetchActivityPage } from "./activity-view";
-import { TeamReports } from "./team-reports";
-import { AppearanceSettings } from "./appearance-settings";
-import { MediaStorageCard } from "./media-storage-settings";
+const ActivityView = lazy(() =>
+  import("./activity-view").then((m) => ({ default: m.ActivityView })),
+);
 import { SignOutButton } from "./sign-out";
 import { SkeletonRows } from "./loading";
 import { getBugWorkspace } from "@/lib/bug-workflow.functions";
@@ -88,8 +106,6 @@ import { viewerTimeZone } from "@/lib/period";
 import { toCsv, downloadText, exportName } from "@/lib/export";
 import { HelpContent } from "./help-content";
 import { SheetExportLoader } from "./bug-sheet-export";
-import { TrashView } from "./trash-view";
-import { AiTokens } from "./ai-tokens";
 import { getTrash } from "@/lib/trash.functions";
 import {
   Breadcrumb,
@@ -371,12 +387,18 @@ export function Workspace({ view = "overview" }: { view?: View }) {
                       onClick={() => setMenu(false)}
                       onMouseEnter={
                         n.to === "/admin/activity"
-                          ? () => prefetchActivityPage(queryClient)
+                          ? () =>
+                              void import("./activity-view").then((m) =>
+                                m.prefetchActivityPage(queryClient),
+                              )
                           : undefined
                       }
                       onFocus={
                         n.to === "/admin/activity"
-                          ? () => prefetchActivityPage(queryClient)
+                          ? () =>
+                              void import("./activity-view").then((m) =>
+                                m.prefetchActivityPage(queryClient),
+                              )
                           : undefined
                       }
                     >
@@ -498,43 +520,45 @@ export function Workspace({ view = "overview" }: { view?: View }) {
             </div>
           </div>
           <AdminAccess showAccount={false}>
-            {view === "overview" ? (
-              <DashboardSummary />
-            ) : view === "bugs" ? (
-              <AdminBugs />
-            ) : view === "users" ? (
-              <UsersView />
-            ) : view === "assignments" ? (
-              <AdminBugs assignmentsOnly />
-            ) : view === "projects" ? (
-              <ProjectsView onDialog={setDialog} />
-            ) : view === "activity" ? (
-              <ActivityView />
-            ) : view === "reports" ? (
-              <TeamReports />
-            ) : view === "settings" ? (
-              <SettingsOverview />
-            ) : view === "appearance" ? (
-              <SettingsPage tab="appearance">
-                <AppearanceSettings />
-              </SettingsPage>
-            ) : view === "settings-options" ? (
-              <SettingsPage tab="settings-options">
-                <DropdownOptionsEditor onAddMember={() => setDialog("user")} />
-              </SettingsPage>
-            ) : view === "settings-storage" ? (
-              <SettingsPage tab="settings-storage">
-                <StorageSettings />
-              </SettingsPage>
-            ) : view === "settings-ai" ? (
-              <SettingsPage tab="settings-ai">
-                <AiTokensCard />
-              </SettingsPage>
-            ) : view === "trash" ? (
-              <TrashView />
-            ) : (
-              <NotificationsPage />
-            )}
+            <Suspense fallback={<ViewFallback />}>
+              {view === "overview" ? (
+                <DashboardSummary />
+              ) : view === "bugs" ? (
+                <AdminBugs />
+              ) : view === "users" ? (
+                <UsersView />
+              ) : view === "assignments" ? (
+                <AdminBugs assignmentsOnly />
+              ) : view === "projects" ? (
+                <ProjectsView onDialog={setDialog} />
+              ) : view === "activity" ? (
+                <ActivityView />
+              ) : view === "reports" ? (
+                <TeamReports />
+              ) : view === "settings" ? (
+                <SettingsOverview />
+              ) : view === "appearance" ? (
+                <SettingsPage tab="appearance">
+                  <AppearanceSettings />
+                </SettingsPage>
+              ) : view === "settings-options" ? (
+                <SettingsPage tab="settings-options">
+                  <DropdownOptionsEditor onAddMember={() => setDialog("user")} />
+                </SettingsPage>
+              ) : view === "settings-storage" ? (
+                <SettingsPage tab="settings-storage">
+                  <StorageSettings />
+                </SettingsPage>
+              ) : view === "settings-ai" ? (
+                <SettingsPage tab="settings-ai">
+                  <AiTokensCard />
+                </SettingsPage>
+              ) : view === "trash" ? (
+                <TrashView />
+              ) : (
+                <NotificationsPage />
+              )}
+            </Suspense>
           </AdminAccess>
           <footer className="bf-footer">
             <span>

@@ -8,19 +8,35 @@ export function BrandLogo3D({ motion, colorKey }: { motion: string; colorKey: st
     let cancelled = false,
       dispose: (() => void) | undefined;
     setReady(false);
-    import("./brand-scene")
-      .then(({ createBrandScene }) => {
-        if (cancelled || !target.current) return;
-        try {
-          dispose = createBrandScene(target.current, motion);
-          setReady(true);
-        } catch {
-          /* retain the accessible page's vector mark */
-        }
-      })
-      .catch(() => {});
+    // Phones and reduced motion keep the vector mark; elsewhere the WebGL sculpture (and three.js) loads
+    // once the browser is idle, never on the critical path of the first paint.
+    if (
+      window.matchMedia("(max-width: 768px)").matches ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    )
+      return;
+    const start = () => {
+      if (cancelled) return;
+      import("./brand-scene")
+        .then(({ createBrandScene }) => {
+          if (cancelled || !target.current) return;
+          try {
+            dispose = createBrandScene(target.current, motion);
+            setReady(true);
+          } catch {
+            /* retain the accessible page's vector mark */
+          }
+        })
+        .catch(() => {});
+    };
+    const hasIdle = typeof window.requestIdleCallback === "function";
+    const idle = hasIdle
+      ? window.requestIdleCallback(start, { timeout: 2500 })
+      : window.setTimeout(start, 1200);
     return () => {
       cancelled = true;
+      if (hasIdle) window.cancelIdleCallback(idle);
+      else window.clearTimeout(idle);
       dispose?.();
     };
   }, [motion, colorKey]);

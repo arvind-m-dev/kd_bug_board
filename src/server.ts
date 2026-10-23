@@ -85,6 +85,24 @@ function withPortalHeaders(request: Request, response: Response): Response {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      // Keep-warm and uptime probe: one trivial query so a pinger (every few minutes) keeps the function
+      // instance warm and Neon out of autosuspend. Needs no session and reveals nothing but latency.
+      if (request.method === "GET" && new URL(request.url).pathname === "/api/health") {
+        const { neonQuery } = await import("./lib/neon.server");
+        const started = Date.now();
+        try {
+          await neonQuery("select 1");
+          return Response.json(
+            { ok: true, db: "up", ms: Date.now() - started },
+            { headers: { "cache-control": "no-store" } },
+          );
+        } catch {
+          return Response.json(
+            { ok: false, db: "down", ms: Date.now() - started },
+            { status: 503, headers: { "cache-control": "no-store" } },
+          );
+        }
+      }
       if (request.method === "POST" && new URL(request.url).pathname === "/api/presence") {
         const { handlePresence } = await import("./lib/presence.server");
         return await handlePresence(request);
