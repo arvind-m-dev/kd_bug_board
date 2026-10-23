@@ -35,6 +35,7 @@ import { toCsv, downloadText, exportName } from '@/lib/export';
 import { HelpContent } from './help-content';
 import { SheetExportLoader } from './bug-sheet-export';
 import { TrashView } from './trash-view';
+import { AiTokens } from './ai-tokens';
 import { getTrash } from '@/lib/trash.functions';
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 
@@ -106,7 +107,7 @@ function ProjectsView({onDialog}:{onDialog:(s:string)=>void}){
  {rows.length>0&&<div className="bf-table-footer"><span>{rows.length} {rows.length===1?'project':'projects'}{state==='active'&&archivedCount?` · ${archivedCount} archived`:''}</span><span>Bug counts update live · open = not yet resolved or closed</span></div>}</div>
  <ConfirmAction open={pending!==null} onOpenChange={o=>{if(!o)setPending(null);}} title={pending?.archived?`Restore ${pending?.name}?`:`Archive ${pending?.name}?`} description={pending?.archived?'The project appears again in report forms and project choices.':'Bugs, history and member access are kept, but the project no longer appears in report forms or project choices. You can restore it any time.'} confirmLabel={pending?.archived?'Restore project':'Archive project'} onConfirm={confirmArchive}/></>;
 }
-function SettingsView({onAddMember}:{onAddMember:()=>void}){return <div className="bf-settings"><AppearanceLinkCard/><DropdownOptionsEditor onAddMember={onAddMember}/><div className="bf-panel mb-6"><div className="bf-panel-heading"><h2>Connected services</h2></div><div className="bf-setting-row"><span className="bf-stat-icon bf-tone-teal"><Database size={19}/></span><div><h3>Neon PostgreSQL</h3><p>Shared bug records, portal access, assignments, and history.<br/>Development database connected. Member portals are available.</p></div><span className="bf-tag">Connected</span></div><MediaStorageCard/></div>
+function SettingsView({onAddMember}:{onAddMember:()=>void}){return <div className="bf-settings"><AppearanceLinkCard/><DropdownOptionsEditor onAddMember={onAddMember}/><div className="bf-panel mb-6"><div className="bf-panel-heading"><h2>Connected services</h2></div><div className="bf-setting-row"><span className="bf-stat-icon bf-tone-teal"><Database size={19}/></span><div><h3>Neon PostgreSQL</h3><p>Shared bug records, portal access, assignments, and history.<br/>Development database connected. Member portals are available.</p></div><span className="bf-tag">Connected</span></div><MediaStorageCard/></div><AiTokensCard/>
  <div className="bf-panel mb-6"><div className="bf-panel-heading"><h2>Access & security</h2><LockKeyhole size={16} className="text-muted-foreground"/></div><div className="bf-setting-row"><ShieldCheck size={21} className="text-primary"/><div><h3>Private Admin access</h3><p>Admin sign-in verified. Private sessions expire after eight hours.</p></div><span className="bf-tag">Active</span></div><div className="bf-setting-row"><Link2 size={21} className="text-primary"/><div><h3>Restricted portal links</h3><p>Random, role-scoped links with expiry, revocation, and regeneration. No login screen required.</p></div></div><div className="bf-setting-row"><ShieldCheck size={21} className="text-warning"/><div><h3>Anonymous operation protection</h3><p>Every report and update verifies the active session or private portal, permissions and project scope.</p></div><span className="bf-tag">Active</span></div></div>
   <div className="bf-panel"><div className="bf-panel-heading"><h2>Workflow defaults</h2><span className="bf-tag">READ ONLY</span></div><div className="bf-setting-row"><Bug size={21} className="text-primary"/><div><h3>Permanent bug IDs</h3><p>BF-000001 · generated safely on submission and never reused.</p></div></div><div className="bf-setting-row"><ClipboardCheck size={21} className="text-info"/><div><h3>QA-controlled resolution</h3><p>New → validation → assignment → in progress → recheck → resolved. Only successful QA verification resolves a fix.</p></div></div><div className="bf-setting-row"><Upload size={21} className="text-primary"/><div><h3>Private evidence retention</h3><p>Evidence is retained after resolution. Deletion is manual, confirmed, and audited.</p></div></div></div></div>;
 }
@@ -187,3 +188,10 @@ function AppearanceLinkCard(){
  return <div className="bf-panel mb-6"><div className="bf-setting-row"><span className="bf-stat-icon bf-tone-info"><Palette size={19}/></span><div><h3>Appearance &amp; themes</h3><p>Colour palette, style (including the seasonal ones), fonts, shape, motion and what is shown. Save for the main panel or for every portal.<br/>In use: <strong>{style.name}</strong> · {palette}{workspace.membersMayCustomize?' · members may choose their own theme':''}</p></div><Button asChild size="sm" className="bf-studio-cta"><Link to="/admin/settings/appearance"><Palette/>Open Theme Studio</Link></Button></div></div>;
 }
 
+
+/** Settings panel for AI (MCP) tokens; Admin can issue one for any panel, so it loads the member list. */
+function AiTokensCard(){
+ const fetch=useServerFn(getMembers);const members=useQuery({queryKey:['members'],queryFn:()=>fetch(),retry:false,staleTime:10000});
+ const list=(members.data??[]).filter(m=>m.type!=='admin'&&m.active).map(m=>({id:m.id,name:m.name,type:m.type}));
+ return <div className="bf-panel mb-6"><div className="bf-panel-heading"><h2>AI access</h2></div><div className="p-4"><AiTokens scope={{kind:'admin'}} members={list}/></div></div>;
+}

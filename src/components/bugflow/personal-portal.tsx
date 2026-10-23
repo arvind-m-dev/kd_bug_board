@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { useNavigate } from '@tanstack/react-router';
-import { Bug, ShieldCheck, LockKeyhole, Menu, X, CircleHelp, FolderKanban, CalendarDays, Hash, CircleCheck, CircleMinus, Palette, Images, FileSpreadsheet, type LucideIcon } from 'lucide-react';
+import { Bug, ShieldCheck, LockKeyhole, Menu, X, CircleHelp, FolderKanban, CalendarDays, Hash, CircleCheck, CircleMinus, Palette, Images, FileSpreadsheet, type LucideIcon, Bot } from 'lucide-react';
 import { MediaLibrary } from './media-library';
+import { AiTokens } from './ai-tokens';
 import { SheetExportLoader } from './bug-sheet-export';
 import { rememberPortal } from './media-link';
 import { ThemeToggle, useTheme } from './theme-toggle';
@@ -24,9 +25,9 @@ import { initials, roleText } from '@/lib/format';
 import { useMemberFavicon } from '@/hooks/use-member-favicon';
 import { usePresence } from '@/hooks/use-presence';
 
-type Tab='bugs'|'media'|'access'|'theme'|'help';
+type Tab='bugs'|'media'|'access'|'ai'|'theme'|'help';
 type Focus={filter:string;label:string};
-const TABS:{id:Tab;label:string;icon:LucideIcon}[]=[{id:'bugs',label:'My bugs',icon:Bug},{id:'media',label:'My media',icon:Images},{id:'access',label:'My access',icon:ShieldCheck},{id:'theme',label:'My theme',icon:Palette},{id:'help',label:'How it works',icon:CircleHelp}];
+const TABS:{id:Tab;label:string;icon:LucideIcon}[]=[{id:'bugs',label:'My bugs',icon:Bug},{id:'media',label:'My media',icon:Images},{id:'access',label:'My access',icon:ShieldCheck},{id:'ai',label:'AI access',icon:Bot},{id:'theme',label:'My theme',icon:Palette},{id:'help',label:'How it works',icon:CircleHelp}];
 
 export function PersonalPortal({token,type}:{token:string;type:'reporter'|'qa'|'developer'|'member'}){
  const client=useQueryClient();const acknowledge=useServerFn(dismissWelcome);const welcome=useMutation({mutationFn:acknowledge,onSuccess:()=>client.invalidateQueries({queryKey:['personal-portal']})});const read=useServerFn(getMemberPortal);
@@ -66,6 +67,7 @@ export function PersonalPortal({token,type}:{token:string;type:'reporter'|'qa'|'
     {tab==='bugs'&&<><div className="mb-3 flex justify-end"><Button size="sm" variant="outline" onClick={()=>setSheet(true)}><FileSpreadsheet/>Export sheet</Button></div><Dialog open={sheet} onOpenChange={setSheet}><DialogContent><DialogHeader><DialogTitle>Export my bugs as a sheet</DialogTitle><DialogDescription>An .xlsx in the team's bug sheet layout, with colours, dropdowns and links. Only bugs you can see are included.</DialogDescription></DialogHeader><SheetExportLoader access={access} close={()=>setSheet(false)}/></DialogContent></Dialog><PortalFocus access={access} role={p.role} permissions={p.permissions} focus={focus.filter} onFocus={setFocus}/><BugWorkspace key={focus.filter} access={access} initialFilter={focus.filter} initialFilterLabel={focus.label}/></>}
     {tab==='media'&&<MediaLibrary access={access}/>}
     {tab==='access'&&<AccessPanel role={p.role} granted={p.permissions} scope={p.scope}/>}
+    {tab==='ai'&&<div className="bf-panel p-5"><AiTokens scope={{kind:'portal',token,type}}/></div>}
     {tab==='theme'&&<div className="bf-panel p-5"><ThemeStudio scope="portal" token={token} type={type}/></div>}
     {tab==='help'&&<div className="bf-panel p-5"><HelpContent audience="portal" role={p.role}/></div>}
     <footer className="bf-footer"><span>Futurist Global Bug Board · {p.name}</span><span>Private access · Shared records</span></footer>

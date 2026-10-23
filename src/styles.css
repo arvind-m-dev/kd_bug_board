@@ -1486,3 +1486,21 @@ html[data-skin=glass] .bf-savebar { background: var(--glass-strong); -webkit-bac
 .bf-trash-row strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; } .bf-trash-row small { display: block; color: var(--muted-foreground); font-size: 12px; }
 .bf-trash-left[data-soon] { color: var(--warning); border-color: color-mix(in oklab, var(--warning) 40%, var(--border)); }
 @media (max-width: 760px) { .bf-trash-row { grid-template-columns: 36px minmax(0, 1fr); } .bf-trash-row > :nth-child(3), .bf-trash-row > :nth-child(4) { grid-column: 2; justify-self: start; } }
+
+/* Only the small present buttons receive input; the full-screen layer never does. */
+.bf-seasonal-gifts { position: fixed; inset: 0; pointer-events: none; z-index: 37; }
+.bf-seasonal-gift { position: absolute; width: 30px; height: 30px; transform: translate(-50%, -50%); pointer-events: auto; border: 0; padding: 0; background: transparent; cursor: pointer; font-size: 25px; filter: drop-shadow(0 3px 2px #0005); animation: bf-gift-drop .65s ease-out; transition: scale .2s; }
+.bf-seasonal-gift:hover { scale: 1.2; }
+.bf-seasonal-gift:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: 5px; }
+body:has([role="dialog"], [role="alertdialog"], [role="listbox"]) .bf-seasonal-gifts { visibility: hidden; }
+@keyframes bf-gift-drop { 0% { translate: 0 -55px; rotate: -15deg; opacity: 0; } 60% { translate: 0 3px; rotate: 8deg; opacity: 1; } 80% { translate: 0 -7px; rotate: -4deg; } 100% { translate: 0 0; rotate: 0deg; } }
+@media (prefers-reduced-motion: reduce) { .bf-seasonal-gifts { display: none; } }
+
+/* ───────────── AI (MCP) tokens ───────────── */
+.bf-ai-tokens { display: grid; gap: 12px; }
+.bf-token-form { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in oklab, var(--muted) 45%, var(--card)); }
+.bf-token-reveal { display: grid; gap: 8px; padding: 14px; border: 1px solid color-mix(in oklab, var(--primary) 45%, var(--border)); border-radius: 10px; background: color-mix(in oklab, var(--primary) 7%, var(--card)); }
+.bf-token-secret { display: flex; align-items: center; gap: 8px; } .bf-token-secret code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); font-size: 12px; }
+.bf-token-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.bf-token-list li { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+.bf-token-list .bf-stat-icon { width: 28px; height: 28px; }
