@@ -29,6 +29,7 @@ import { Route as QaPortalTokenRouteImport } from './routes/qa.$portalToken'
 import { Route as ReporterPortalTokenRouteImport } from './routes/reporter.$portalToken'
 import { Route as AdminSettingsAiRouteImport } from './routes/admin_.settings_.ai'
 import { Route as AdminSettingsAppearanceRouteImport } from './routes/admin_.settings_.appearance'
+import { Route as AdminSettingsHealthRouteImport } from './routes/admin_.settings_.health'
 import { Route as AdminSettingsOptionsRouteImport } from './routes/admin_.settings_.options'
 import { Route as AdminSettingsStorageRouteImport } from './routes/admin_.settings_.storage'
 
@@ -132,6 +133,11 @@ const AdminSettingsAppearanceRoute = AdminSettingsAppearanceRouteImport.update({
   path: '/admin/settings/appearance',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminSettingsHealthRoute = AdminSettingsHealthRouteImport.update({
+  id: '/admin_/settings_/health',
+  path: '/admin/settings/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminSettingsOptionsRoute = AdminSettingsOptionsRouteImport.update({
   id: '/admin_/settings_/options',
   path: '/admin/settings/options',
@@ -164,6 +170,7 @@ export interface FileRoutesByFullPath {
   '/reporter/$portalToken': typeof ReporterPortalTokenRoute
   '/admin/settings/ai': typeof AdminSettingsAiRoute
   '/admin/settings/appearance': typeof AdminSettingsAppearanceRoute
+  '/admin/settings/health': typeof AdminSettingsHealthRoute
   '/admin/settings/options': typeof AdminSettingsOptionsRoute
   '/admin/settings/storage': typeof AdminSettingsStorageRoute
 }
@@ -188,6 +195,7 @@ export interface FileRoutesByTo {
   '/reporter/$portalToken': typeof ReporterPortalTokenRoute
   '/admin/settings/ai': typeof AdminSettingsAiRoute
   '/admin/settings/appearance': typeof AdminSettingsAppearanceRoute
+  '/admin/settings/health': typeof AdminSettingsHealthRoute
   '/admin/settings/options': typeof AdminSettingsOptionsRoute
   '/admin/settings/storage': typeof AdminSettingsStorageRoute
 }
@@ -213,6 +221,7 @@ export interface FileRoutesById {
   '/reporter/$portalToken': typeof ReporterPortalTokenRoute
   '/admin_/settings_/ai': typeof AdminSettingsAiRoute
   '/admin_/settings_/appearance': typeof AdminSettingsAppearanceRoute
+  '/admin_/settings_/health': typeof AdminSettingsHealthRoute
   '/admin_/settings_/options': typeof AdminSettingsOptionsRoute
   '/admin_/settings_/storage': typeof AdminSettingsStorageRoute
 }
@@ -239,6 +248,7 @@ export interface FileRouteTypes {
     | '/reporter/$portalToken'
     | '/admin/settings/ai'
     | '/admin/settings/appearance'
+    | '/admin/settings/health'
     | '/admin/settings/options'
     | '/admin/settings/storage'
   fileRoutesByTo: FileRoutesByTo
@@ -263,6 +273,7 @@ export interface FileRouteTypes {
     | '/reporter/$portalToken'
     | '/admin/settings/ai'
     | '/admin/settings/appearance'
+    | '/admin/settings/health'
     | '/admin/settings/options'
     | '/admin/settings/storage'
   id:
@@ -287,6 +298,7 @@ export interface FileRouteTypes {
     | '/reporter/$portalToken'
     | '/admin_/settings_/ai'
     | '/admin_/settings_/appearance'
+    | '/admin_/settings_/health'
     | '/admin_/settings_/options'
     | '/admin_/settings_/storage'
   fileRoutesById: FileRoutesById
@@ -312,6 +324,7 @@ export interface RootRouteChildren {
   ReporterPortalTokenRoute: typeof ReporterPortalTokenRoute
   AdminSettingsAiRoute: typeof AdminSettingsAiRoute
   AdminSettingsAppearanceRoute: typeof AdminSettingsAppearanceRoute
+  AdminSettingsHealthRoute: typeof AdminSettingsHealthRoute
   AdminSettingsOptionsRoute: typeof AdminSettingsOptionsRoute
   AdminSettingsStorageRoute: typeof AdminSettingsStorageRoute
 }
@@ -458,6 +471,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSettingsAppearanceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/settings_/health': {
+      id: '/admin_/settings_/health'
+      path: '/admin/settings/health'
+      fullPath: '/admin/settings/health'
+      preLoaderRoute: typeof AdminSettingsHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin_/settings_/options': {
       id: '/admin_/settings_/options'
       path: '/admin/settings/options'
@@ -496,6 +516,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReporterPortalTokenRoute: ReporterPortalTokenRoute,
   AdminSettingsAiRoute: AdminSettingsAiRoute,
   AdminSettingsAppearanceRoute: AdminSettingsAppearanceRoute,
+  AdminSettingsHealthRoute: AdminSettingsHealthRoute,
   AdminSettingsOptionsRoute: AdminSettingsOptionsRoute,
   AdminSettingsStorageRoute: AdminSettingsStorageRoute,
 }

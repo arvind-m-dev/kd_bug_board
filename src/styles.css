@@ -1718,6 +1718,10 @@ body:has([role="dialog"], [role="alertdialog"], [role="listbox"]) .bf-seasonal-g
 
 /* ───────────── Settings sub-pages: sub-nav and overview cards ───────────── */
 .bf-settings-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+/* Settings sections stay in view under the top bar while a long settings page scrolls. */
+.bf-settings-tabs { position: sticky; top: 65px; z-index: 15; margin-inline: -8px; padding: 10px 8px 12px; background: color-mix(in oklab, var(--background) 92%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+html[data-density=compact] .bf-settings-tabs { top: 52px; }
+@media(max-width:640px) { .bf-settings-tabs { top: 59px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .bf-settings-tabs::-webkit-scrollbar { display: none; } .bf-settings-tab { flex: none; } }
 .bf-settings-tab { display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted-foreground); font-size: 13px; font-weight: 600; background: var(--card); transition: color .15s, border-color .15s, background .15s; }
 .bf-settings-tab:hover { color: var(--foreground); border-color: color-mix(in oklab, var(--primary) 40%, var(--border)); }
 .bf-settings-tab[data-active] { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }

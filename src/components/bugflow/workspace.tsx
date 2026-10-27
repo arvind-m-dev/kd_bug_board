@@ -75,6 +75,12 @@ const MediaStorageCard = lazy(() =>
   import("./media-storage-settings").then((m) => ({ default: m.MediaStorageCard })),
 );
 const TrashView = lazy(() => import("./trash-view").then((m) => ({ default: m.TrashView })));
+const SystemHealth = lazy(() =>
+  import("./system-health").then((m) => ({ default: m.SystemHealth })),
+);
+const StorageAlarmBanner = lazy(() =>
+  import("./system-health").then((m) => ({ default: m.StorageAlarmBanner })),
+);
 const AiTokens = lazy(() => import("./ai-tokens").then((m) => ({ default: m.AiTokens })));
 const ViewFallback = () => (
   <div className="bf-panel p-5 text-sm text-muted-foreground" role="status">
@@ -133,6 +139,7 @@ type View =
   | "settings-options"
   | "settings-storage"
   | "settings-ai"
+  | "settings-health"
   | "trash"
   | "notifications";
 const navigation: {
@@ -178,6 +185,7 @@ const titles: Record<View, string> = {
   ["settings-options"]: "Options & fields",
   ["settings-storage"]: "Storage & services",
   ["settings-ai"]: "AI access (MCP)",
+  ["settings-health"]: "System health",
   trash: "Trash",
   notifications: "Notifications",
 };
@@ -188,6 +196,8 @@ const subtitles: Record<View, string> = {
   ["settings-options"]:
     "Severities, modules, environments, devices, and who bugs can be assigned to.",
   ["settings-storage"]: "Where data and private media live, and the connection status.",
+  ["settings-health"]:
+    "Live checks of the database, media bucket, encryption key, sign-in and deployment.",
   ["settings-ai"]:
     "Let AI clients (Claude, Cursor, ChatGPT) read and report bugs, and manage their tokens.",
   overview: "A clear view of your bugs, team, and everything in between.",
@@ -526,6 +536,9 @@ export function Workspace({ view = "overview" }: { view?: View }) {
             </div>
           </div>
           <AdminAccess showAccount={false}>
+            <Suspense fallback={null}>
+              <StorageAlarmBanner />
+            </Suspense>
             <Suspense fallback={<ViewFallback />}>
               {view === "overview" ? (
                 <DashboardSummary />
@@ -554,6 +567,10 @@ export function Workspace({ view = "overview" }: { view?: View }) {
               ) : view === "settings-storage" ? (
                 <SettingsPage tab="settings-storage">
                   <StorageSettings />
+                </SettingsPage>
+              ) : view === "settings-health" ? (
+                <SettingsPage tab="settings-health">
+                  <SystemHealth />
                 </SettingsPage>
               ) : view === "settings-ai" ? (
                 <SettingsPage tab="settings-ai">
@@ -924,6 +941,13 @@ const SETTINGS_TABS = [
     desc: "Database and private media storage, with connection status.",
   },
   {
+    to: "/admin/settings/health" as const,
+    view: "settings-health",
+    label: "System health",
+    icon: Activity,
+    desc: "Live status of the database, media bucket, encryption key and deployment.",
+  },
+  {
     to: "/admin/settings/ai" as const,
     view: "settings-ai",
     label: "AI access (MCP)",
@@ -1070,12 +1094,16 @@ function StorageSettings() {
         <div>
           <h3>Neon PostgreSQL</h3>
           <p>
-            Shared bug records, portal access, assignments, and history.
-            <br />
-            Development database connected. Member portals are available.
+            Shared bug records, portal access, assignments, and history. Live connection, schema and
+            bucket checks are in System health.
           </p>
         </div>
-        <span className="bf-tag">Connected</span>
+        <Button asChild variant="outline" size="sm">
+          <Link to="/admin/settings/health">
+            <Activity />
+            System health
+          </Link>
+        </Button>
       </div>
       <MediaStorageCard />
     </div>

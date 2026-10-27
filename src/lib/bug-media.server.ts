@@ -764,6 +764,12 @@ export async function saveMediaCleanup(
   return mediaStatus(false);
 }
 const R2_FREE_BYTES = 10 * 1024 ** 3;
+/** The limit storage use is measured against: Admin's own, else the R2 free plan's 10 GB on R2, else none. */
+export async function mediaLimitBytes(): Promise<number | null> {
+  const { config, stored } = await mediaConfig();
+  const isR2 = !!config && providerName(config.endpoint) === "Cloudflare R2";
+  return stored.quotaBytes ?? (isR2 ? R2_FREE_BYTES : null);
+}
 let usageCache: {
   at: number;
   bucket: string;
@@ -839,8 +845,7 @@ export async function mediaUsage(refresh = false): Promise<MediaUsage> {
         scanError = (e as Error).message;
       }
   }
-  const isR2 = !!config && providerName(config.endpoint) === "Cloudflare R2";
-  const quota = stored.quotaBytes ?? (isR2 ? R2_FREE_BYTES : null);
+  const quota = await mediaLimitBytes();
   const known = kind("image").bytes + kind("video").bytes + kind("pdf").bytes + trashBytes;
   const used = scan?.bytes ?? known;
   return {

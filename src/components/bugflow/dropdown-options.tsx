@@ -23,6 +23,14 @@ import { changeMember } from "@/lib/member-management.functions";
 import { restoreFromTrash } from "@/lib/trash.functions";
 import { moveToTrashToast } from "./trash-bin";
 import { Link } from "@tanstack/react-router";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { MemberProfile } from "./member-profile";
 
 const groups: {
   key: keyof DropdownOptions;
@@ -53,6 +61,8 @@ export function DropdownOptionsEditor({ onAddMember }: { onAddMember: () => void
   const client = useQueryClient();
   const change = useServerFn(changeMember);
   const restoreMember = useServerFn(restoreFromTrash);
+  // The member being edited from this list (user id); opens the same editor as Team & access.
+  const [profile, setProfile] = useState<string | null>(null);
   const [removing, setRemoving] = useState<{
     id: string;
     name: string;
@@ -404,7 +414,17 @@ export function DropdownOptionsEditor({ onAddMember }: { onAddMember: () => void
               <Button
                 size="icon"
                 variant="ghost"
-                className="ml-auto shrink-0 text-destructive"
+                className="ml-auto shrink-0"
+                aria-label={`Edit ${member.name}`}
+                title="Edit member: details, role, permissions, projects and portal link"
+                onClick={() => setProfile(member.id)}
+              >
+                <Pencil size={15} />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="shrink-0 text-destructive"
                 aria-label={`Delete ${member.name}`}
                 title="Delete member"
                 onClick={(e) =>
@@ -427,6 +447,27 @@ export function DropdownOptionsEditor({ onAddMember }: { onAddMember: () => void
           )}
         </div>
       )}
+      <Dialog
+        open={profile !== null}
+        onOpenChange={(o) => {
+          if (o) return;
+          setProfile(null);
+          // Role, name or project changes show up in this list and in assignment choices straight away.
+          void Promise.all(
+            ["bug-workspace", "members", "bug-detail"].map((k) =>
+              client.invalidateQueries({ queryKey: [k] }),
+            ),
+          );
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Member profile</DialogTitle>
+            <DialogDescription>Details, permissions and portal controls</DialogDescription>
+          </DialogHeader>
+          {profile && <MemberProfile id={profile} onDeleted={() => setProfile(null)} />}
+        </DialogContent>
+      </Dialog>
       <ConfirmAction
         open={removing !== null}
         onOpenChange={(o) => {
