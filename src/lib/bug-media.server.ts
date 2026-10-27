@@ -1,4 +1,5 @@
 import { neonQuery, neonExecute } from "./neon.server";
+import { getRequest } from "@tanstack/react-start/server";
 import { checkOrigin, requireAdmin } from "./portal-access.server";
 import { decryptPortal, encryptPortal } from "./portal-crypto.server";
 import { actorFor, bugDetail } from "./bug-workflow.server";
@@ -9,6 +10,7 @@ import {
   MEDIA_ON,
   MEDIA_OFF,
   MEDIA_PENDING_MINUTES,
+  MEDIA_PENDING_HOLD_MINUTES,
   MEDIA_PUT_TTL,
   MEDIA_URL_TTL,
   isMediaType,
@@ -361,9 +363,9 @@ export async function prepareUpload(access: BugAccess, data: z.infer<typeof prep
     { query: `select 1 from bugflow.bugs where id=$1 for update`, params: [data.bugId] },
     {
       query: `insert into bugflow.bug_media(id,bug_id,key,name,content_type,size,kind,uploaded_by,uploaded_via,derived_from,at_seconds)
-    select $1,$2,$3,$4,$5,$6,$7,$8,$9,$11,$12 where (select count(*) from bugflow.bug_media x where x.bug_id=$2 and x.deleted_at is null and (x.status='ready' or x.created_at>now()-interval '${MEDIA_PENDING_MINUTES} minutes'))<$10
+    select $1,$2,$3,$4,$5,$6,$7,$8,$9,$11,$12 where (select count(*) from bugflow.bug_media x where x.bug_id=$2 and x.deleted_at is null and (x.status='ready' or (x.created_at>now()-interval '${MEDIA_PENDING_HOLD_MINUTES} minutes' and x.id<>$1)))<$10
       and ($11::uuid is null or exists(select 1 from bugflow.bug_media d where d.id=$11 and d.bug_id=$2 and d.status='ready' and d.deleted_at is null))
-    on conflict (id) do update set name=excluded.name,size=excluded.size where bugflow.bug_media.uploaded_by=excluded.uploaded_by and bugflow.bug_media.bug_id=excluded.bug_id and bugflow.bug_media.content_type=excluded.content_type and bugflow.bug_media.status='pending' and bugflow.bug_media.deleted_at is null returning id`,
+    on conflict (id) do update set name=excluded.name,size=excluded.size,created_at=now() where bugflow.bug_media.uploaded_by=excluded.uploaded_by and bugflow.bug_media.bug_id=excluded.bug_id and bugflow.bug_media.content_type=excluded.content_type and bugflow.bug_media.status='pending' and bugflow.bug_media.deleted_at is null returning id`,
       params: [
         data.id,
         data.bugId,
@@ -926,6 +928,7 @@ export async function mediaStatus(test: boolean): Promise<MediaStatus> {
     bytes: Number(r["bytes"] ?? 0),
     awaitingPurge: Number(r["awaiting"] ?? 0),
     pending: Number(r["pending"] ?? 0),
+    appOrigins: appOrigins(),
     test: null,
   };
   if (!test || !config) return base;
@@ -941,13 +944,18 @@ export async function mediaStatus(test: boolean): Promise<MediaStatus> {
     );
     await sweep().catch(() => undefined);
     const again = await mediaStatus(false);
+    const ms = Date.now() - started;
+    const corsBlocked = await corsBlockedOrigins(config, again.appOrigins);
     return {
       ...again,
-      test: {
-        ok: true,
-        ms: Date.now() - started,
-        message: `Bucket ${config.bucket} answered in ${Date.now() - started} ms.`,
-      },
+      test: corsBlocked.length
+        ? {
+            ok: false,
+            ms,
+            corsBlocked,
+            message: `Bucket ${config.bucket} answered, but its CORS rule blocks uploads from ${corsBlocked.join(", ")}. Add ${corsBlocked.length > 1 ? "these addresses" : "this address"} to AllowedOrigins (see the setup guide below).`,
+          }
+        : { ok: true, ms, message: `Bucket ${config.bucket} answered in ${ms} ms.` },
     };
   } catch (e) {
     return {
@@ -955,6 +963,53 @@ export async function mediaStatus(test: boolean): Promise<MediaStatus> {
       test: { ok: false, ms: Date.now() - started, message: (e as Error).message },
     };
   }
+}
+/** The addresses people open this app at: the current request's, plus the production URL when Vercel provides it. */
+function appOrigins(): string[] {
+  const list: string[] = [];
+  try {
+    list.push(new URL(getRequest().url).origin);
+  } catch {
+    /* outside a request */
+  }
+  const prod = process.env["VERCEL_PROJECT_PRODUCTION_URL"];
+  if (prod) list.push(`https://${prod.replace(/^https?:\/\//, "").replace(/\/.*$/, "")}`);
+  return [...new Set(list)];
+}
+/**
+ * Uploads go straight from the browser to the bucket, so the bucket's CORS rule must allow each app address. This
+ * asks the bucket the same preflight question a browser asks (no credentials, nothing written) and returns the
+ * addresses it refuses. A bucket that cannot be asked counts as allowing, so the check never blocks a working setup.
+ */
+export async function corsBlockedOrigins(cfg: Config, origins: string[]): Promise<string[]> {
+  const base = cfg.forcePathStyle
+    ? `${cfg.endpoint.replace(/\/$/, "")}/${cfg.bucket}`
+    : (() => {
+        const u = new URL(cfg.endpoint);
+        u.hostname = `${cfg.bucket}.${u.hostname}`;
+        return u.origin;
+      })();
+  const probe = `${base}/bugs/cors-check.jpg`;
+  const blocked = await Promise.all(
+    origins.map(async (origin) => {
+      try {
+        const r = await fetch(probe, {
+          method: "OPTIONS",
+          headers: {
+            Origin: origin,
+            "Access-Control-Request-Method": "PUT",
+            "Access-Control-Request-Headers": "content-type,if-none-match",
+          },
+          signal: AbortSignal.timeout(5000),
+        });
+        const allow = r.headers.get("access-control-allow-origin");
+        return r.ok && (allow === "*" || allow === origin) ? null : origin;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return blocked.filter((o): o is string => o !== null);
 }
 /** Settings → Media storage: save the workspace bucket (secret encrypted at rest) and test it, or fall back to the hosting bucket. */
 export async function saveMediaStorage(

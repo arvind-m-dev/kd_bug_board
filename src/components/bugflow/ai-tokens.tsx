@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { shareOrigin } from "@/lib/share-origin";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -151,7 +152,7 @@ function TokenReveal({
 export function AiTokens({ scope, members = [] }: { scope: Scope; members?: Member[] }) {
   const client = useQueryClient();
   const isAdmin = scope.kind === "admin";
-  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const origin = shareOrigin();
   const key = isAdmin ? ["ai-tokens"] : ["ai-tokens", scope.kind === "portal" ? scope.token : ""];
   const readAdmin = useServerFn(getAiTokens);
   const readPortal = useServerFn(getPortalAiTokens);

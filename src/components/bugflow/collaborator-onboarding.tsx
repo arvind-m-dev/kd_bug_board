@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { shareOrigin, warnIfLocalLink } from "@/lib/share-origin";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sparkles, Copy, Link2, LoaderCircle } from "lucide-react";
@@ -58,7 +59,7 @@ export function CollaboratorOnboarding() {
           welcome: text,
         },
       });
-      setLink(window.location.origin + result.path);
+      setLink(shareOrigin() + result.path);
       await Promise.all([
         client.invalidateQueries({ queryKey: ["members"] }),
         client.invalidateQueries({ queryKey: ["bug-workspace"] }),
@@ -303,6 +304,7 @@ export function CollaboratorOnboarding() {
               try {
                 await navigator.clipboard.writeText(link);
                 toast.success("Portal link copied");
+                warnIfLocalLink(link);
               } catch {
                 toast.error("Clipboard unavailable");
               }

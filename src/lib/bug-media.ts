@@ -34,6 +34,7 @@ export const thumbKey = (key: string) => `${key}.thumb.jpg`;
 export const MEDIA_URL_TTL = 600; // seconds a signed view link lasts
 export const MEDIA_PUT_TTL = 900; // seconds a signed upload link lasts
 export const MEDIA_PENDING_MINUTES = 120; // an upload that never finished is forgotten after this
+export const MEDIA_PENDING_HOLD_MINUTES = 30; // an unfinished upload keeps its slot in the per-bug limit this long
 export const MEDIA_MAX_EDGE = 1920; // images are resized to this longest edge in the browser
 export const MEDIA_QUALITY = 0.82;
 
@@ -338,7 +339,15 @@ export type MediaStatus = {
   bytes: number;
   awaitingPurge: number;
   pending: number;
-  test: { ok: boolean; ms: number; message: string } | null;
+  /** Addresses this app is opened at (this one, plus the production URL when the host tells us); the CORS rule needs each. */
+  appOrigins: string[];
+  test: {
+    ok: boolean;
+    ms: number;
+    message: string;
+    /** App addresses the bucket's CORS rule refuses: browser uploads from there fail before they start. */
+    corsBlocked?: string[];
+  } | null;
 };
 /** Settings → Media storage → Usage. Sizes in bytes; counts are files. */
 export type MediaUsage = {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { shareOrigin } from "@/lib/share-origin";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { FileSpreadsheet, LoaderCircle } from "lucide-react";
@@ -43,7 +44,7 @@ export function BugSheetExport({
       const blob = await buildBugSheet(
         bugs,
         { categories: workspace.options.modules, builds: workspace.options.environments, people },
-        window.location.origin,
+        shareOrigin(),
       );
       const project =
         projectId === "all"

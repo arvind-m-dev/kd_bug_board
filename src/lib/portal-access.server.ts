@@ -11,11 +11,19 @@ import {
   randomToken,
   equalSecret,
   portalTypesByRole,
+  ADMIN_SIGNED_OUT,
+  ADMIN_EXPIRED,
   type saveMemberSchema,
   type unlockSchema,
   type portalReadSchema,
 } from "./portal-access";
 import { encryptPortal } from "./portal-crypto.server";
+import {
+  assertSignInAllowed,
+  clearSignInFailures,
+  clientKey,
+  recordSignInFailure,
+} from "./sign-in-throttle.server";
 import { portalAppearanceSchema } from "./appearance";
 import type { z } from "zod";
 
@@ -53,8 +61,7 @@ const adminCache = new Map<
 >();
 export async function requireAdmin() {
   const token = getCookie("bugflow_admin");
-  if (!token || !/^[a-f0-9]{64}$/.test(token))
-    throw new Error("Unlock private Admin access in Settings first.");
+  if (!token || !/^[a-f0-9]{64}$/.test(token)) throw new Error(ADMIN_SIGNED_OUT);
   const key = await hashToken(token);
   const hit = adminCache.get(key);
   if (hit && hit.until > Date.now()) return hit.admin;
@@ -64,8 +71,7 @@ export async function requireAdmin() {
     [key],
   );
   const admin = rows[0];
-  if (!admin)
-    throw new Error("Admin access has expired or was revoked. Unlock access in Settings.");
+  if (!admin) throw new Error(ADMIN_EXPIRED);
   const result = {
     id: String(admin["id"]),
     userId: String(admin["user_id"]),
@@ -88,9 +94,15 @@ export async function unlockAdmin(data: z.infer<typeof unlockSchema>) {
   const password = process.env["BUGFLOW_ADMIN_PASSWORD"];
   const email = process.env["BUGFLOW_ADMIN_EMAIL"];
   if (!password || !email) throw new Error("Admin sign-in is not configured.");
+  const attempt = clientKey(getRequest().headers);
+  assertSignInAllowed(attempt);
   const passwordValid = await equalSecret(data.password, password);
   const emailValid = await equalSecret(data.email.toLowerCase(), email.toLowerCase());
-  if (!passwordValid || !emailValid) throw new Error("Incorrect email or password.");
+  if (!passwordValid || !emailValid) {
+    recordSignInFailure(attempt);
+    throw new Error("Incorrect email or password.");
+  }
+  clearSignInFailures(attempt);
   const userId = crypto.randomUUID();
   const portalId = crypto.randomUUID();
   const session = randomToken();

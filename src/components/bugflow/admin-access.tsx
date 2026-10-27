@@ -13,10 +13,13 @@ export function AdminAccess({
   children,
   signInPage = false,
   showAccount = true,
+  returnTo,
 }: {
   children?: React.ReactNode;
   signInPage?: boolean;
   showAccount?: boolean;
+  /** Same-site path to open after sign-in (already checked by the login route). */
+  returnTo?: string | undefined;
 }) {
   const router = useRouter();
   const client = useQueryClient();
@@ -45,7 +48,10 @@ export function AdminAccess({
         );
       setPassword("");
       client.setQueryData(["admin-access"], verified);
-      if (signInPage) await router.navigate({ to: "/admin", replace: true });
+      if (signInPage)
+        await (returnTo
+          ? router.navigate({ href: returnTo, replace: true })
+          : router.navigate({ to: "/admin", replace: true }));
       else await client.invalidateQueries();
     } catch (e) {
       setError(actionError(e, "Admin sign-in is temporarily unavailable. Please try again."));

@@ -6,39 +6,37 @@ import { Button } from "@/components/ui/button";
 import { BugDetails } from "./bug-workspace";
 import { BrandMark } from "./decorations";
 import { ThemeToggle } from "./theme-toggle";
-import { getBugWorkspace } from "@/lib/bug-workflow.functions";
+import { getBugDetail, getBugWorkspace } from "@/lib/bug-workflow.functions";
 import type { BugAccess, BugWorkspaceData } from "@/lib/bug-workflow";
+import { mediaLinkPath } from "@/lib/bug-media";
 
 export const PORTAL_MEMORY_KEY = "bugflow-portal";
-/** The portal last opened in this browser, so in-app media links can open without pasting the portal link again. */
+const MAX_REMEMBERED = 5;
+type Remembered = { type: "reporter" | "qa" | "developer" | "member"; token: string };
+function readRemembered(): Remembered[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(PORTAL_MEMORY_KEY) ?? "null") as unknown;
+    // Older builds kept a single { type, token } object.
+    const list = Array.isArray(v) ? v : v ? [v] : [];
+    return list.filter(
+      (x): x is Remembered =>
+        !!x &&
+        typeof x.token === "string" &&
+        /^[a-f0-9]{64}$/.test(x.token) &&
+        ["reporter", "qa", "developer", "member"].includes(x.type),
+    );
+  } catch {
+    return [];
+  }
+}
+/** Portals opened in this browser (most recent first), so in-app media links open without pasting the portal link again. */
 export function rememberPortal(type: string, token: string) {
   try {
-    localStorage.setItem(PORTAL_MEMORY_KEY, JSON.stringify({ type, token }));
+    const list = [{ type, token }, ...readRemembered().filter((p) => p.token !== token)];
+    localStorage.setItem(PORTAL_MEMORY_KEY, JSON.stringify(list.slice(0, MAX_REMEMBERED)));
   } catch {
     /* storage unavailable */
   }
-}
-function rememberedPortal(): BugAccess | null {
-  try {
-    const v = JSON.parse(localStorage.getItem(PORTAL_MEMORY_KEY) ?? "null") as {
-      type?: string;
-      token?: string;
-    } | null;
-    if (
-      v &&
-      typeof v.token === "string" &&
-      /^[a-f0-9]{64}$/.test(v.token) &&
-      ["reporter", "qa", "developer", "member"].includes(v.type ?? "")
-    )
-      return {
-        kind: "portal",
-        token: v.token,
-        type: v.type as "reporter" | "qa" | "developer" | "member",
-      };
-  } catch {
-    /* ignore */
-  }
-  return null;
 }
 
 /**
@@ -48,6 +46,7 @@ function rememberedPortal(): BugAccess | null {
  */
 export function MediaLinkPage({ bugId, mediaId }: { bugId: string; mediaId?: string | undefined }) {
   const fetch = useServerFn(getBugWorkspace);
+  const detail = useServerFn(getBugDetail);
   const [state, setState] = useState<
     { access: BugAccess; workspace: BugWorkspaceData } | "loading" | "denied"
   >("loading");
@@ -55,12 +54,15 @@ export function MediaLinkPage({ bugId, mediaId }: { bugId: string; mediaId?: str
     let cancelled = false;
     (async () => {
       // A signed-in Admin always sees the Admin view (with Admin navigation), even in a browser where a member
-      // portal was opened once; members without an Admin session fall through to their remembered portal.
-      const candidates: BugAccess[] = [{ kind: "admin" }];
-      const portal = rememberedPortal();
-      if (portal) candidates.push(portal);
+      // portal was opened; otherwise the first remembered portal that can see this bug opens it (people who test
+      // with several portals in one browser get the right one, not just the last one opened).
+      const candidates: BugAccess[] = [
+        { kind: "admin" },
+        ...readRemembered().map((p) => ({ kind: "portal" as const, ...p })),
+      ];
       for (const access of candidates) {
         try {
+          await detail({ data: { access, id: bugId } });
           const workspace = await fetch({ data: { access } });
           if (!cancelled) setState({ access, workspace });
           return;
@@ -73,7 +75,7 @@ export function MediaLinkPage({ bugId, mediaId }: { bugId: string; mediaId?: str
     return () => {
       cancelled = true;
     };
-  }, [fetch]);
+  }, [fetch, detail, bugId]);
   const back =
     state !== "loading" && state !== "denied"
       ? state.access.kind === "portal"
@@ -117,7 +119,9 @@ export function MediaLinkPage({ bugId, mediaId }: { bugId: string; mediaId?: str
               again.
             </p>
             <Button asChild className="mt-4">
-              <Link to="/login">Admin sign-in</Link>
+              <Link to="/login" search={{ redirect: mediaLinkPath(bugId, mediaId) }}>
+                Admin sign-in
+              </Link>
             </Button>
           </div>
         )}

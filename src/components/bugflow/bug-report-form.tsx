@@ -39,6 +39,8 @@ export function BugReportForm({
   const save = useServerFn(createBug);
   const saveEdit = useServerFn(editBug);
   const [requestId] = useState(() => crypto.randomUUID());
+  // After reporting, priority and severity are Admin decisions; the server refuses other changes.
+  const adminOnly = !!initial && access.kind !== "admin";
   const [error, setError] = useState("");
   const [links, setLinks] = useState<string[]>(
     initial?.evidenceUrls.length ? initial.evidenceUrls : [""],
@@ -193,6 +195,7 @@ export function BugReportForm({
                 name="priority"
                 label="Priority"
                 initial={initial?.priority ?? "P3"}
+                disabled={adminOnly}
                 options={PRIORITIES.map((p) => ({ value: p, label: `${p} · ${priorityNames[p]}` }))}
               />
             </label>
@@ -202,6 +205,7 @@ export function BugReportForm({
                 name="severity"
                 label="Severity"
                 initial={initial?.severity ?? "Medium"}
+                disabled={adminOnly}
                 options={[
                   ...new Set([...(initial ? [initial.severity] : []), ...options.severities]),
                 ].map((s) => ({ value: s, label: s }))}
@@ -367,11 +371,13 @@ function FormSelect({
   label,
   initial,
   options,
+  disabled = false,
 }: {
   name: string;
   label: string;
   initial: string;
   options: { value: string; label: string }[];
+  disabled?: boolean;
 }) {
   const [value, setValue] = useState(initial);
   return (
@@ -382,6 +388,7 @@ function FormSelect({
         onChange={setValue}
         label={label}
         options={options}
+        disabled={disabled}
         className="w-full min-w-0"
       />
     </>

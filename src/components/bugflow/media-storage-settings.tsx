@@ -160,7 +160,10 @@ export function MediaStorageCard() {
         : state === "untested"
           ? "text-warning"
           : "";
-  const showGuide = guide || state === "off";
+  const corsBlocked = s?.test?.corsBlocked ?? [];
+  const showGuide = guide || state === "off" || corsBlocked.length > 0;
+  // Every address the app is opened at must be in the bucket's CORS rule, or uploads from there fail in the browser.
+  const corsOrigins = [...new Set([origin, ...(s?.appOrigins ?? [])])];
   const set = (patch: Partial<Form>) => {
     setTouched(true);
     setForm((f) => ({ ...f, ...patch }));
@@ -560,12 +563,14 @@ export function MediaStorageCard() {
               <li>
                 <strong>Allow the browser to upload and read</strong>: bucket → Settings → CORS
                 policy, add this rule (uploads go straight from the browser to the bucket; GET lets
-                screenshots and recordings be marked up):
+                screenshots and recordings be marked up). List every address your team opens this
+                app at — for example both the live site and <code>http://localhost:8080</code> — or
+                uploads from a missing address fail:
                 <pre>
                   {JSON.stringify(
                     [
                       {
-                        AllowedOrigins: [origin],
+                        AllowedOrigins: corsOrigins,
                         AllowedMethods: ["PUT", "GET"],
                         AllowedHeaders: ["content-type", "if-none-match"],
                         ExposeHeaders: ["ETag"],

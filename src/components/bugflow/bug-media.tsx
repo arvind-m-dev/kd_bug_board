@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { shareOrigin, warnIfLocalLink } from "@/lib/share-origin";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -54,7 +55,7 @@ export { useMediaUpload, type UploadMeta, type UploadState } from "./media-queue
 
 /** Copies an in-app link to a bug's files (or one file). It opens for whoever is signed in or has their portal open. */
 export async function copyMediaLink(bugId: string, mediaId?: string) {
-  const url = `${window.location.origin}${mediaLinkPath(bugId, mediaId)}`;
+  const url = `${shareOrigin()}${mediaLinkPath(bugId, mediaId)}`;
   try {
     await navigator.clipboard.writeText(url);
     toast.success("Link copied", {
@@ -62,6 +63,7 @@ export async function copyMediaLink(bugId: string, mediaId?: string) {
         ? "Opens this file on the bug for anyone with access to it."
         : "Opens the bug with all its files for anyone with access to it.",
     });
+    warnIfLocalLink(url);
   } catch {
     toast.error("The link could not be copied.", { description: url });
   }

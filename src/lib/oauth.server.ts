@@ -1,6 +1,11 @@
 import { neonQuery, neonExecute } from "./neon.server";
 import { hashToken, randomToken, equalSecret } from "./portal-access";
 import { formatAiToken } from "./ai-tokens";
+import {
+  assertSignInAllowed,
+  clearSignInFailures,
+  recordSignInFailure,
+} from "./sign-in-throttle.server";
 
 /**
  * OAuth 2.1 (authorization code + PKCE S256) for the MCP endpoint, so connectors that cannot paste a token
@@ -118,6 +123,8 @@ export async function approveAuthorize(p: {
     | { kind: "admin"; email: string; password: string }
     | { kind: "portal"; token: string; type: string };
   clientName: string;
+  /** Client address for the Admin password attempt limit. */
+  attemptKey: string;
 }) {
   await validateAuthorize(p);
   let portalId: string | undefined;
@@ -125,13 +132,17 @@ export async function approveAuthorize(p: {
   if (p.login.kind === "admin") {
     const password = process.env["BUGFLOW_ADMIN_PASSWORD"];
     const email = process.env["BUGFLOW_ADMIN_EMAIL"];
+    assertSignInAllowed(p.attemptKey);
     if (
       !password ||
       !email ||
       !(await equalSecret(p.login.password, password)) ||
       !(await equalSecret(p.login.email.toLowerCase(), email.toLowerCase()))
-    )
+    ) {
+      recordSignInFailure(p.attemptKey);
       throw new Error("Incorrect email or password.");
+    }
+    clearSignInFailures(p.attemptKey);
     portalId = await findAdminPortal();
     label = `OAuth · ${p.clientName || "AI client"} · Admin`;
   } else {

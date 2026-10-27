@@ -415,15 +415,22 @@ export async function editBugReport(access: BugAccess, data: BugEdit) {
   const { bug } = await bugDetail(access, data.id);
   if (!mayEditBug(actor, bug))
     throw new Error("You can only edit open bugs you reported or are assigned to.");
+  // Priority and severity are Admin decisions once a bug exists (the status panel enforces the same rule).
+  if (actor.role !== "admin" && (data.priority !== bug.priority || data.severity !== bug.severity))
+    throw new Error("Only Admin can change priority or severity after a bug is reported.");
   if (
     data.severity !== bug.severity &&
     !(await dropdownOptions()).severities.includes(data.severity)
   )
     throw new Error("Choose a severity from the list.");
   const evidence = actor.permissions.includes("evidence") || actor.role === "admin";
+  // The audit row is written by the same statement as the version-checked update, so it exists only when this
+  // edit won; the detail and step writes below depend on it and never apply a stale edit's leftovers.
+  const editId = crypto.randomUUID();
+  const applied = (n: number) => `exists(select 1 from bugflow.activity where id=$${n}::uuid)`;
   const { results } = await neonExecute<{ results: { rows: Record<string, unknown>[] }[] }>([
     {
-      query: `update bugflow.bugs set title=$3,priority=$4,severity=$5,description=$6,expected=$7,actual=$8,browser_device=$9,environment=$10,updated_at=clock_timestamp() where id=$1 and updated_at=$2::timestamptz returning id`,
+      query: `with old as (select priority,severity from bugflow.bugs where id=$1), u as (update bugflow.bugs set title=$3,priority=$4,severity=$5,description=$6,expected=$7,actual=$8,browser_device=$9,environment=$10,updated_at=clock_timestamp() where id=$1 and updated_at=$2::timestamptz and deleted_at is null returning id) insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $11,u.id,$12,'bug.edited',jsonb_strip_nulls(jsonb_build_object('title',$3::text,'previousPriority',case when old.priority<>$4 then old.priority end,'priority',case when old.priority<>$4 then $4::text end,'previousSeverity',case when old.severity<>$5 then old.severity end,'severity',case when old.severity<>$5 then $5::text end)) from u cross join old returning bug_id`,
       params: [
         data.id,
         data.version,
@@ -435,23 +442,21 @@ export async function editBugReport(access: BugAccess, data: BugEdit) {
         data.actual,
         data.browserDevice,
         data.environment,
+        editId,
+        actor.userId,
       ],
     },
     {
-      query: `update bugflow.bug_details set module_name=$2,evidence_urls=case when $4::boolean then $3::jsonb else evidence_urls end where bug_id=$1 and exists(select 1 from bugflow.bugs where id=$1 and updated_at>$5::timestamptz)`,
-      params: [data.id, data.module, JSON.stringify(data.evidenceUrls), evidence, data.version],
+      query: `update bugflow.bug_details set module_name=$2,evidence_urls=case when $4::boolean then $3::jsonb else evidence_urls end where bug_id=$1 and ${applied(5)}`,
+      params: [data.id, data.module, JSON.stringify(data.evidenceUrls), evidence, editId],
     },
     {
-      query: `delete from bugflow.steps where bug_id=$1 and exists(select 1 from bugflow.bugs where id=$1 and updated_at>$2::timestamptz)`,
-      params: [data.id, data.version],
+      query: `delete from bugflow.steps where bug_id=$1 and ${applied(2)}`,
+      params: [data.id, editId],
     },
     {
-      query: `insert into bugflow.steps(bug_id,position,content) select $1,s.ordinality::int,s.value from jsonb_array_elements_text($2::jsonb) with ordinality s(value,ordinality) where exists(select 1 from bugflow.bugs where id=$1 and updated_at>$3::timestamptz)`,
-      params: [data.id, JSON.stringify(data.steps), data.version],
-    },
-    {
-      query: `insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $1,$2,$3,'bug.edited',jsonb_build_object('title',$4::text) where exists(select 1 from bugflow.bugs where id=$2 and updated_at>$5::timestamptz)`,
-      params: [crypto.randomUUID(), data.id, actor.userId, data.title, data.version],
+      query: `insert into bugflow.steps(bug_id,position,content) select $1,s.ordinality::int,s.value from jsonb_array_elements_text($2::jsonb) with ordinality s(value,ordinality) where ${applied(3)}`,
+      params: [data.id, JSON.stringify(data.steps), editId],
     },
   ]);
   if (!results[0]?.rows.length)

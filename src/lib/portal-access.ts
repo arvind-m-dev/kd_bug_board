@@ -7,6 +7,11 @@ export const portalTypesByRole = {
   qa: "qa",
   other: "member",
 } as const;
+/** Server messages for a missing or expired Admin session; the client sends the person back to sign-in on these. */
+export const ADMIN_SIGNED_OUT = "Unlock private Admin access in Settings first.";
+export const ADMIN_EXPIRED = "Admin access has expired or was revoked. Unlock access in Settings.";
+export const isAdminSessionError = (e: unknown) =>
+  e instanceof Error && (e.message === ADMIN_SIGNED_OUT || e.message === ADMIN_EXPIRED);
 export const unlockSchema = z
   .object({ password: z.string().min(1).max(256), email: z.string().trim().email().max(254) })
   .strict();

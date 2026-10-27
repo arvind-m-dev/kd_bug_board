@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { shareOrigin, warnIfLocalLink } from "@/lib/share-origin";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Copy, KeyRound, Ban, Trash2, Save, UserRound } from "lucide-react";
@@ -75,10 +76,11 @@ function ProfileEditor({ profile: p, onDeleted }: { profile: Profile; onDeleted:
     setError("");
     try {
       const r = await change({ data: { id: p.id, action: "copy" } });
-      const value = window.location.origin + r.path;
+      const value = shareOrigin() + r.path;
       setLink(value);
       await navigator.clipboard.writeText(value);
       toast.success("Private portal link copied");
+      warnIfLocalLink(value);
     } catch (e) {
       setError(actionError(e, "The portal link could not be copied."));
     }
@@ -98,7 +100,7 @@ function ProfileEditor({ profile: p, onDeleted }: { profile: Profile; onDeleted:
       await mutation.mutateAsync({ data });
     } else if (pending === "replace") {
       const r = await replace({ data: { id: p.id, regenerate: true } });
-      setLink(window.location.origin + r.path);
+      setLink(shareOrigin() + r.path);
       await refresh();
       toast.success("Portal link replaced");
     } else if (pending === "delete") {

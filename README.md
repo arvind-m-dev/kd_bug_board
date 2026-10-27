@@ -22,6 +22,7 @@ npm run dev                  # http://localhost:8080
 | `BUGFLOW_ADMIN_EMAIL` | yes | Admin sign-in email |
 | `BUGFLOW_ADMIN_PASSWORD` | yes | Admin sign-in password |
 | `BUGFLOW_PORTAL_ENCRYPTION_KEY` | yes | Encrypts saved member portal links (`openssl rand -hex 32`) |
+| `VITE_SITE_URL` | recommended | Live site address. Portal, file and MCP links copied on a local dev server use it instead of `localhost` |
 | `AI_API_KEY` | no | Enables AI welcome drafts. Defaults to Google Gemini; free key at https://aistudio.google.com/apikey |
 | `AI_BASE_URL` / `AI_MODEL` | no | Use another OpenAI-compatible provider, e.g. `https://api.openai.com/v1` + `gpt-5-mini` |
 | `MEDIA_S3_ENDPOINT` / `MEDIA_S3_BUCKET` / `MEDIA_S3_ACCESS_KEY_ID` / `MEDIA_S3_SECRET_ACCESS_KEY` | no | All four together enable private screenshot, recording and PDF uploads to an S3-compatible bucket (Cloudflare R2 free tier; guide in Settings → Media storage) | These are only a hosting fallback: the workspace bucket Admin enters in Settings → Media storage (secret stored encrypted with `BUGFLOW_PORTAL_ENCRYPTION_KEY`) is the default for every portal and takes precedence.

@@ -1,3 +1,4 @@
+import { clientKey } from "./sign-in-throttle.server";
 import {
   approveAuthorize,
   authServerMetadata,
@@ -94,7 +95,12 @@ export async function handleOauth(request: Request): Promise<Response | null> {
                 return { kind: "portal", token: p.token, type: p.type };
               })()
             : { kind: "admin" as const, email: g("email"), password: g("password") };
-        const { code } = await approveAuthorize({ ...base, login, clientName: name });
+        const { code } = await approveAuthorize({
+          ...base,
+          login,
+          clientName: name,
+          attemptKey: clientKey(request.headers),
+        });
         const state = g("state");
         return redirectBack(
           `code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ""}`,

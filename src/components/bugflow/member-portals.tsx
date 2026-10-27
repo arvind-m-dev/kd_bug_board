@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { shareOrigin, warnIfLocalLink } from "@/lib/share-origin";
 import { useUrlParam } from "@/hooks/use-url-param";
 import { useHighlight } from "@/hooks/use-highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -91,13 +92,15 @@ export function MemberPortals({ initialSearch = "" }: { initialSearch?: string }
   const visible = rows.slice(current * PAGE, current * PAGE + PAGE);
   async function portalPath(id: string) {
     const r = await change({ data: { id, action: "copy" } });
-    return window.location.origin + r.path;
+    return shareOrigin() + r.path;
   }
   async function copyLink(id: string) {
     setError("");
     try {
-      await navigator.clipboard.writeText(await portalPath(id));
+      const url = await portalPath(id);
+      await navigator.clipboard.writeText(url);
       toast.success("Private portal link copied");
+      warnIfLocalLink(url);
     } catch (e) {
       setError(actionError(e, "Portal link could not be copied."));
     }
@@ -107,7 +110,8 @@ export function MemberPortals({ initialSearch = "" }: { initialSearch?: string }
     const w = window.open("about:blank", "_blank");
     if (w) w.opener = null;
     try {
-      const url = new URL(await portalPath(id), window.location.origin).href;
+      // Opened here (this server), whatever address copies use.
+      const url = window.location.origin + new URL(await portalPath(id)).pathname;
       if (w) w.location.href = url;
       else
         toast("Your browser blocked the new tab", {
@@ -442,13 +446,14 @@ function ReplaceLinkButton({
     setArmed(false);
     try {
       const r = await replace({ data: { id, regenerate: true } });
-      const url = window.location.origin + r.path;
+      const url = shareOrigin() + r.path;
       await refreshPeople(client);
       try {
         await navigator.clipboard.writeText(url);
         toast.success(`New link for ${name} copied`, {
           description: "The old link no longer works. Paste the new one to them.",
         });
+        warnIfLocalLink(url);
       } catch {
         toast.success(`New link created for ${name}`, {
           description: "Use Copy to share it. The old link no longer works.",
