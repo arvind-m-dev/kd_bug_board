@@ -2,6 +2,13 @@
 
 Newest first. Earlier history: `git log` and `roadmap.md`.
 
+## 2026-10-28 — Phase 2.2: sprints (Admin)
+- **Feature**: a Sprints page (`/admin/sprints`, in the Bugs nav group). Create a sprint for a project (name, goal, start/end), add/remove bugs, Start it (one active sprint per project, enforced by a partial unique index) and Close it — optionally carrying still-open bugs into another open sprint, recorded with `carried_from_sprint_id`. Each card shows committed / added / open / done / carried, computed from membership history (`summarizeSprint`). A bug can be in only one open sprint at a time.
+- **Data**: migration `022_sprints.sql` — `sprints`, `sprint_items`. Applied to Neon and verified.
+- **Rules** (`src/lib/sprints.ts`): `maySprint`, `canChangeSprintState`, `summarizeSprint`, `carryCandidates`, zod schemas. Server (`sprints.server.ts`): create/update/start/close/add/remove, Admin-gated, audited to `activity` as `sprint.*` (item add/remove are quiet in the bell via `sprint.item_`).
+- **Scope**: Admin-only for now (it is an `/admin` route). Member/`plan`-holder planning from a portal, a read-only "current sprint" portal tab, and the `get_sprint` MCP tool are still pending.
+- **Tests**: `sprints.test.ts` (6); 216/216 pass, tsc clean, lint 0 errors / 18 warnings, build OK. Not clicked through in a browser.
+
 ## 2026-10-28 — Phase 2.1b (part): due-date calendar + retest skill
 - **Feature**: All Bugs gets a **Calendar** toggle (`?cal=1`). A month grid (shadcn `Calendar`/react-day-picker) marks days that hold an open bug with a due date, overdue days in red; picking a day filters the list to bugs due then (`?due=YYYY-MM-DD`, survives refresh), Clear day resets. Marks come from the loaded page, matching the other client-side filters.
 - **Skill**: `.claude/skills/retest/SKILL.md` — runs the automated gates (tsc/test/lint/build), DB re-apply check, and a per-feature manual browser checklist for everything on this branch.

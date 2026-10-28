@@ -46,6 +46,14 @@ The agent cannot open a GUI here (terminal only; no Playwright installed; dev se
 - [ ] A non-planner editing a bug cannot change its due date (field absent; server ignores any value).
 - [ ] All Bugs → Calendar toggle shows a month grid; days with open due bugs are dotted, overdue days red; picking a day filters the list to that day and the choice survives a refresh (`?cal=1&due=`); Clear day resets.
 
+**Sprints (Phase 2.2)**
+- [ ] `/admin/sprints`: create a sprint for a project; it starts as Planned.
+- [ ] Add a bug by number — only bugs in the sprint's project are accepted, and a bug already in an open sprint is refused.
+- [ ] Start the sprint; starting a second sprint in the same project is refused until the first is closed.
+- [ ] After start, bugs added later count as "Added"; the card shows committed / added / open / done.
+- [ ] Close the sprint with a carry-to target — still-open bugs appear in the target marked "carried"; a closed sprint is read-only.
+- [ ] Sprint create/start/close show in the bell; add/remove do not (they stay on the bug's activity log).
+
 **View state across refresh**
 - [ ] Page through the bug table, the member table, and the Overview urgent list, then refresh — the same page stays (URL has `?page=` / `?urgent=`).
 - [ ] Switch a Trash tab, refresh — the same tab stays (`?tab=`).

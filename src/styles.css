@@ -920,6 +920,18 @@ html:root .bf-report-grid-raised, html:root .bf-report-grid-wide { grid-template
 .bf-status-note[data-status=RECHECK] { --n: var(--success); }
 .bf-tz-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
 .bf-tz-card .bf-input { padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--foreground); font: inherit; font-size: 13px; min-width: 200px; }
+/* ── Sprints ── */
+.bf-sprint-state { margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; vertical-align: middle; border: 1px solid var(--border); color: var(--muted-foreground); }
+.bf-sprint-state[data-state=active] { color: var(--primary); border-color: color-mix(in oklab, var(--primary) 40%, transparent); background: var(--accent); }
+.bf-sprint-state[data-state=closed] { opacity: .7; }
+.bf-sprint-stats { display: flex; flex-wrap: wrap; gap: 18px; padding: 8px 16px 12px; }
+.bf-sprint-stat { display: flex; flex-direction: column; }
+.bf-sprint-stat strong { font-size: 18px; line-height: 1; }
+.bf-sprint-stat span { font-size: 11px; color: var(--muted-foreground); }
+.bf-sprint-items { border-top: 1px solid var(--border); }
+.bf-sprint-carry { margin-left: 8px; padding: 0 6px; border-radius: 999px; font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--primary); background: var(--accent); }
+.bf-sprint-add { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+.bf-sprint-add input { max-width: 320px; }
 .bf-due-cal { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
 .bf-due-cal-side { flex: 1; min-width: 180px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding-top: 6px; }
 /* Days that carry an open bug with a due date get a dot; overdue days turn red. */

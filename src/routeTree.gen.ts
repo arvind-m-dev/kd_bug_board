@@ -20,6 +20,7 @@ import { Route as AdminNotificationsRouteImport } from './routes/admin_.notifica
 import { Route as AdminProjectsRouteImport } from './routes/admin_.projects'
 import { Route as AdminReportsRouteImport } from './routes/admin_.reports'
 import { Route as AdminSettingsRouteImport } from './routes/admin_.settings'
+import { Route as AdminSprintsRouteImport } from './routes/admin_.sprints'
 import { Route as AdminTrashRouteImport } from './routes/admin_.trash'
 import { Route as AdminUsersRouteImport } from './routes/admin_.users'
 import { Route as DeveloperPortalTokenRouteImport } from './routes/developer.$portalToken'
@@ -86,6 +87,11 @@ const AdminReportsRoute = AdminReportsRouteImport.update({
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
   id: '/admin_/settings',
   path: '/admin/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSprintsRoute = AdminSprintsRouteImport.update({
+  id: '/admin_/sprints',
+  path: '/admin/sprints',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminTrashRoute = AdminTrashRouteImport.update({
@@ -161,6 +167,7 @@ export interface FileRoutesByFullPath {
   '/admin/projects': typeof AdminProjectsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/sprints': typeof AdminSprintsRoute
   '/admin/trash': typeof AdminTrashRoute
   '/admin/users': typeof AdminUsersRoute
   '/developer/$portalToken': typeof DeveloperPortalTokenRoute
@@ -186,6 +193,7 @@ export interface FileRoutesByTo {
   '/admin/projects': typeof AdminProjectsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/sprints': typeof AdminSprintsRoute
   '/admin/trash': typeof AdminTrashRoute
   '/admin/users': typeof AdminUsersRoute
   '/developer/$portalToken': typeof DeveloperPortalTokenRoute
@@ -212,6 +220,7 @@ export interface FileRoutesById {
   '/admin_/projects': typeof AdminProjectsRoute
   '/admin_/reports': typeof AdminReportsRoute
   '/admin_/settings': typeof AdminSettingsRoute
+  '/admin_/sprints': typeof AdminSprintsRoute
   '/admin_/trash': typeof AdminTrashRoute
   '/admin_/users': typeof AdminUsersRoute
   '/developer/$portalToken': typeof DeveloperPortalTokenRoute
@@ -239,6 +248,7 @@ export interface FileRouteTypes {
     | '/admin/projects'
     | '/admin/reports'
     | '/admin/settings'
+    | '/admin/sprints'
     | '/admin/trash'
     | '/admin/users'
     | '/developer/$portalToken'
@@ -264,6 +274,7 @@ export interface FileRouteTypes {
     | '/admin/projects'
     | '/admin/reports'
     | '/admin/settings'
+    | '/admin/sprints'
     | '/admin/trash'
     | '/admin/users'
     | '/developer/$portalToken'
@@ -289,6 +300,7 @@ export interface FileRouteTypes {
     | '/admin_/projects'
     | '/admin_/reports'
     | '/admin_/settings'
+    | '/admin_/sprints'
     | '/admin_/trash'
     | '/admin_/users'
     | '/developer/$portalToken'
@@ -315,6 +327,7 @@ export interface RootRouteChildren {
   AdminProjectsRoute: typeof AdminProjectsRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminSprintsRoute: typeof AdminSprintsRoute
   AdminTrashRoute: typeof AdminTrashRoute
   AdminUsersRoute: typeof AdminUsersRoute
   DeveloperPortalTokenRoute: typeof DeveloperPortalTokenRoute
@@ -406,6 +419,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/settings'
       fullPath: '/admin/settings'
       preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin_/sprints': {
+      id: '/admin_/sprints'
+      path: '/admin/sprints'
+      fullPath: '/admin/sprints'
+      preLoaderRoute: typeof AdminSprintsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin_/trash': {
@@ -507,6 +527,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminProjectsRoute: AdminProjectsRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
+  AdminSprintsRoute: AdminSprintsRoute,
   AdminTrashRoute: AdminTrashRoute,
   AdminUsersRoute: AdminUsersRoute,
   DeveloperPortalTokenRoute: DeveloperPortalTokenRoute,
