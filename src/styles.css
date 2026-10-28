@@ -228,10 +228,15 @@
 .bf-settings-fixed { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--border); }
 .bf-assignee-directory { display: grid; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); gap: 0 22px; max-height: 260px; overflow-y: auto; border-block: 1px solid var(--border); }
 .bf-settings .bf-panel { border: 0; border-radius: 0; background: transparent; box-shadow: none; margin-bottom: 28px; }
-.bf-settings .bf-panel-heading { padding: 0 0 16px; }
-.bf-settings .bf-setting-row { padding: 18px 0; }
+.bf-settings .bf-panel-heading { padding: 16px 20px; }
+.bf-settings .bf-setting-row { padding: 18px 20px; }
 .bf-settings .bf-setting-row > div { min-width: 0; }
 .bf-settings .bf-setting-row p { overflow-wrap: anywhere; }
+/* Shared icon slots: icons keep their own column and never collapse into adjacent labels. */
+:is(.bf-setting-row, .bf-settings-card, .bf-nav-link, .bf-settings-tab, .bf-person-item, .bf-recent-item, .bf-trash-row, .bf-upload-tray-head, .bf-upload-tray-row, .bf-section-heading, .bf-panel-heading) > svg { flex: 0 0 auto; }
+.bf-setting-row > svg { width: 22px; height: 22px; margin-top: 2px; }
+.bf-setting-row > .bf-stat-icon { flex: 0 0 auto; margin-top: 0; }
+.bf-setting-row > div:not(.bf-media-guide):not(.bf-token-form):not(.bf-token-list):not(.bf-mcp-endpoint) { flex: 1 1 auto; }
 .bf-mobile-menu { display: none; }
 .bf-access { max-width: 620px; margin: 80px auto; text-align: center; }
 .bf-access h1 { font-size: 27px; font-weight: 800; margin: 20px 0 12px; }
@@ -1511,7 +1516,8 @@ html[data-motion=off] .bf-surface-effects { display: none; }
 .bf-help-preview p { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin: 8px 0 0; color: var(--muted-foreground); font-size: 11.5px; }
 
 /* A transparent, lit WebGL diorama. Every layer is inert and below dialogs. */
-.bf-seasonal-3d { position: fixed; inset: 0; z-index: -1; pointer-events: none !important; user-select: none; overflow: hidden; contain: strict; transition: opacity .18s ease; } /* behind panels and text: the scene lives in the page background and margins */
+.bf-seasonal-3d { position: fixed; inset: 0; z-index: 0; pointer-events: none !important; user-select: none; overflow: hidden; contain: strict; transition: opacity .18s ease; } /* above the body paint, below the complete workspace shell */
+body:has(.bf-seasonal-3d) .bf-shell { position: relative; z-index: 1; }
 /* Scenery and creature layer: above panels, sidebar and topbar, below controls (37), the bin (40) and dialogs (50); never takes clicks. */
 .bf-seasonal-front { position: fixed; inset: 0; z-index: 36; pointer-events: none !important; user-select: none; overflow: hidden; contain: strict; transition: opacity .18s ease; }
 .bf-seasonal-front canvas { display: block; pointer-events: none !important; width: 100%; height: 100%; }
@@ -1738,7 +1744,8 @@ body:has([role="dialog"], [role="alertdialog"], [role="listbox"]) .bf-seasonal-g
 .bf-settings-tabs { position: sticky; top: 65px; z-index: 15; margin-inline: -8px; padding: 10px 8px 12px; background: color-mix(in oklab, var(--background) 92%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 html[data-density=compact] .bf-settings-tabs { top: 52px; }
 @media(max-width:640px) { .bf-settings-tabs { top: 59px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .bf-settings-tabs::-webkit-scrollbar { display: none; } .bf-settings-tab { flex: none; } }
-.bf-settings-tab { display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted-foreground); font-size: 13px; font-weight: 600; background: var(--card); transition: color .15s, border-color .15s, background .15s; }
+.bf-settings-tab { display: inline-flex; align-items: center; gap: 8px; padding: 7px 13px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted-foreground); font-size: 13px; font-weight: 600; background: var(--card); transition: color .15s, border-color .15s, background .15s; }
+.bf-settings-tab > svg { width: 16px; height: 16px; }
 .bf-settings-tab:hover { color: var(--foreground); border-color: color-mix(in oklab, var(--primary) 40%, var(--border)); }
 .bf-settings-tab[data-active] { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
 .bf-settings-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
@@ -1746,6 +1753,13 @@ html[data-density=compact] .bf-settings-tabs { top: 52px; }
 .bf-settings-card:hover { border-color: color-mix(in oklab, var(--primary) 45%, var(--border)); transform: translateY(-1px); }
 .bf-settings-card h3 { margin: 0 0 3px; font-size: 14px; } .bf-settings-card p { margin: 0; font-size: 12.5px; color: var(--muted-foreground); line-height: 1.45; }
 .bf-settings-info { display: grid; gap: 16px; margin-top: 18px; }
+.bf-settings-info > .bf-panel { overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-panel); }
+.bf-settings-info > .bf-panel .bf-panel-heading { margin: 0; }
+
+@media (max-width: 480px) {
+  .bf-settings .bf-panel-heading, .bf-settings .bf-setting-row { padding-inline: 16px; }
+  .bf-setting-row { gap: 13px; }
+}
 
 /* Highlighted settings tabs (Theme Lab, AI access) draw the eye with a soft gradient; the active state still wins. */
 .bf-settings-tab[data-highlight]:not([data-active]) { background: linear-gradient(135deg, color-mix(in oklab, var(--primary) 16%, var(--card)), color-mix(in oklab, var(--brand-2) 16%, var(--card))); border-color: color-mix(in oklab, var(--primary) 40%, var(--border)); color: var(--foreground); box-shadow: inset 0 1px 0 color-mix(in oklab, var(--primary) 20%, transparent); }

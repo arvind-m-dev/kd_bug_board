@@ -353,14 +353,13 @@ export function createSeasonalLandscape(scene: T.Scene, season: string) {
       if (width < 760) root.position.x = width - 222;
       const localX = (x: number) => (x - root.position.x) / root.scale.x;
       distantTrees.forEach(({ tree, u, size }, i) => {
-        const treeX = season === "winter" ? width * 0.61 + width * 0.37 * u : width * u;
-        tree.position.set(localX(treeX), 8 + (i % 3) * 3, i % 3 ? -50 : -23);
+        tree.position.set(localX(width * u), 8 + (i % 3) * 3, i % 3 ? -50 : -23);
         tree.rotation.z = Math.sin(time * 0.7 + i) * Math.abs(wind) * 0.0005;
         tree.scale.setScalar((width < 760 ? 0.65 : 1) * (i % 3 ? 0.65 : 1));
       });
       skaters.forEach(({ person, legs, phase, lane }, i) => {
         const angle = time * (0.22 + lane * 0.035) + phase;
-        const screenX = width * 0.79 + Math.cos(angle) * Math.min(72, width * 0.065);
+        const screenX = width * 0.62 + Math.cos(angle) * Math.min(105, width * 0.1);
         person.position.set(
           localX(screenX),
           15 + Math.sin(angle) * (5 + lane * 1.5),
@@ -375,17 +374,15 @@ export function createSeasonalLandscape(scene: T.Scene, season: string) {
         person.rotation.x = Math.sin(time * 0.45 + i) * 0.025;
       });
       terrainLayers.forEach((layer) => {
-        const scenicWidth = season === "winter" ? Math.min(760, width * 0.42) : width;
-        layer.position.x = localX(width - scenicWidth);
-        layer.scale.x = scenicWidth / 1000 / root.scale.x;
+        layer.position.x = localX(0);
+        layer.scale.x = width / 1000 / root.scale.x;
       });
       stones.forEach((stone, i) => {
         stone.position.x = localX((width * (i + 0.3 + 0.25 * Math.sin(i * 5))) / 16);
         stone.position.y = 4 + (i % 3);
       });
       grassTufts.forEach(({ blade, u, offset, height }, i) => {
-        const grassX = season === "winter" ? width * (0.62 + u * 0.36) : width * u;
-        blade.position.set(localX(grassX) + offset, height / 2 + 2, 22);
+        blade.position.set(localX(width * u) + offset, height / 2 + 2, 22);
         // Rotation about the base makes blades bend without sliding out of the ground.
         const lean =
           wind * 0.006 + Math.sin(time * 1.7 + i * 0.7) * Math.min(0.18, Math.abs(wind) * 0.008);
