@@ -2,6 +2,11 @@
 
 Newest first. Earlier history: `git log` and `roadmap.md`.
 
+## 2026-10-28 — Seasonal creatures don't reset on refresh
+- **Change**: in the 3D worlds the bats, bugs, ghosts and sleigh snapped back to the same starting spot and replayed the same motion on every reload, because the animation clock started at 0 and each creature's phase/timers were seeded deterministically. Now a per-load `startOffset = Math.random()*600` seeds the clock, and each creature's start timer, wander phase (`seed`), drift distance and direction take a `Math.random` offset. The scene *layout* stays seeded (Theme Studio Shuffle unchanged); only the motion varies per visit, so a refresh looks like the creatures kept wandering rather than resetting. Same offset added to the geometry world's clock.
+- **Files**: `src/components/bugflow/seasonal-scene.ts`, `minimal-geometry-scene.ts`. No schema/server changes.
+- **Tests**: 210/210 pass (seasonal choreography/physics tests use injected RNG, unaffected), tsc clean, lint 0 errors / 18 warnings, build OK. Not clicked through in a browser.
+
 ## 2026-10-28 — No theme flash on refresh
 - **Fix**: on reload the default theme flashed for a frame before the chosen one applied. The boot script painted the cached theme pre-paint, but `ThemeProvider` initialised its state to `DEFAULT_APPEARANCE`, so React's first apply-effect overwrote the boot theme with the default until the mount effect read the cache. Now `dark`, `workspace` and `personal` are seeded from the cache in their `useState` initialisers (SSR-safe: `read()` returns null server-side), so the first client paint already matches the boot script.
 - `ThemeToggle` shows the SSR default (dark) icon until `ready` to avoid a hydration mismatch from the lazily-read mode.

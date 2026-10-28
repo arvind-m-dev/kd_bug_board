@@ -75,6 +75,8 @@ export function createMinimalGeometryScene(
   addEventListener("resize", resize, { passive: true });
 
   const clock = new T.Clock();
+  // Start the clock at a random point so a refresh doesn't snap every shape back to the same drift phase.
+  const startOffset = Math.random() * 600;
   let frame = 0;
   let lastFrame = 0;
   const render = (now = 0) => {
@@ -82,7 +84,7 @@ export function createMinimalGeometryScene(
     if (document.hidden || now - lastFrame < (lively ? limits.activeFrameMs : limits.calmFrameMs))
       return;
     lastFrame = now;
-    const time = clock.getElapsedTime() * knobs.speed;
+    const time = (startOffset + clock.getElapsedTime()) * knobs.speed;
     for (const mesh of meshes) {
       const phase = mesh.userData["phase"] as number;
       const spin = mesh.userData["spin"] as number;

@@ -527,6 +527,9 @@ export function createSeasonalScene(
   // Seeded: Shuffle in the Theme Studio picks a new seed. Randomness 0 keeps every wait and choice at its middle value; 1 is fully random.
   const rand = seededRandom(knobs.seed * 31 + 7);
   const chance = () => rand();
+  // The scene layout is seeded (stable), but the clock and each creature's phase start at a fresh random point every
+  // load, so a refresh never snaps the bats, bugs, ghosts and sleigh back to the same spot — they carry on wandering.
+  const startOffset = Math.random() * 600;
   const random = (min: number, max: number) =>
     min + (max - min) * (0.5 * (1 - knobs.randomness) + rand() * knobs.randomness);
   type Creature = {
@@ -690,17 +693,22 @@ export function createSeasonalScene(
     for (let i = 0; i < knobs.bats; i++) creatures.push(bat(i));
   }
   creatures.forEach((c, i) => {
+    // Timers are relative to the random clock start (so the first behaviour change is staggered, not all at once),
+    // and the wander phase/offset use Math.random so the same seed still wanders differently on each visit.
     c.motion = {
       phase: c.kind === "bug" ? "crawl" : "rest",
-      until: c.kind === "bat" && c.n % 2 ? random(0.2, 2) : random(5, 13) + c.n,
+      until:
+        startOffset +
+        (c.kind === "bat" && c.n % 2 ? random(0.2, 2) : random(5, 13) + c.n) +
+        Math.random() * 6,
       retarget: 0,
       surface: i,
-      distance: random(0, 500),
-      direction: chance() < 0.5 ? -1 : 1,
+      distance: random(0, 500) + Math.random() * 500,
+      direction: Math.random() < 0.5 ? -1 : 1,
       velocity: new T.Vector3(),
       target: new T.Vector3(),
       homeKind: -1,
-      seed: random(0, 100),
+      seed: random(0, 100) + Math.random() * 6.283,
     };
   });
   let landingRect: DOMRect | undefined;
@@ -879,7 +887,7 @@ export function createSeasonalScene(
     headerBottom = 65;
   let uiRoosts: { x: number; y: number }[] = [];
   let measured = -Infinity,
-    time = 0,
+    time = startOffset,
     last = 0,
     frame = 0,
     disposed = false,
