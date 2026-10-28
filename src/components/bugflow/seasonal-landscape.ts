@@ -211,15 +211,69 @@ export function createSeasonalLandscape(scene: T.Scene, season: string) {
   });
   materials.push(windowGlow);
   const chimneys: T.Vector3[] = [];
-  for (let i = 0; i < 2; i++) {
-    const x = 215 + i * 75;
-    add(new T.BoxGeometry(34, 27, 24), timber, x, 18, 15);
-    const top = add(new T.ConeGeometry(29, 22, 4), roof, x, 41, 15);
+  const villageSize = snowy ? 5 : 2;
+  for (let i = 0; i < villageSize; i++) {
+    const x = 72 + i * 58 + (i % 2) * 9;
+    const depth = -4 - (i % 3) * 9;
+    const size = 0.72 + (i % 3) * 0.12;
+    add(new T.BoxGeometry(34 * size, 27 * size, 24 * size), timber, x, 14 + 14 * size, depth);
+    const top = add(new T.ConeGeometry(29 * size, 22 * size, 4), roof, x, 27 + 25 * size, depth);
     top.rotation.y = Math.PI / 4;
-    add(new T.BoxGeometry(7, 16, 7), rock, x + 12, 49, 13);
-    add(new T.BoxGeometry(7, 10, 1), windowGlow, x - 8, 20, 28);
-    add(new T.BoxGeometry(8, 17, 1), timber, x + 6, 13, 28);
-    chimneys.push(new T.Vector3(x + 12, 57, 13));
+    add(
+      new T.BoxGeometry(6 * size, 15 * size, 6 * size),
+      rock,
+      x + 10 * size,
+      34 + 22 * size,
+      depth - 2,
+    );
+    add(
+      new T.BoxGeometry(6 * size, 8 * size, 1),
+      windowGlow,
+      x - 8 * size,
+      15 + 14 * size,
+      depth + 13 * size,
+    );
+    add(
+      new T.BoxGeometry(7 * size, 15 * size, 1),
+      timber,
+      x + 6 * size,
+      11 + 12 * size,
+      depth + 13 * size,
+    );
+    chimneys.push(new T.Vector3(x + 10 * size, 41 + 22 * size, depth - 2));
+  }
+  // Tiny people circle a distant frozen pond in Winter. Simple jointed silhouettes read at their small scale.
+  const skaters: { person: T.Group; legs: T.Mesh[]; phase: number; lane: number }[] = [];
+  if (season === "winter") {
+    const coats = [material(0xb83f52), material(0x315f92), material(0xd58b38), material(0x526f55)];
+    const skin = material(0xe6b78e),
+      trousers = material(0x28354b),
+      skate = material(0xb9d5df, 0.35);
+    for (let i = 0; i < 7; i++) {
+      const person = new T.Group();
+      root.add(person);
+      const part = (
+        geometry: T.BufferGeometry,
+        material: T.Material,
+        x: number,
+        y: number,
+        z: number,
+      ) => {
+        geometries.push(geometry);
+        const object = new T.Mesh(geometry, material);
+        object.position.set(x, y, z);
+        person.add(object);
+        return object;
+      };
+      part(new T.ConeGeometry(2.3, 7, 7), coats[i % coats.length]!, 0, 8, 0);
+      part(new T.SphereGeometry(2, 8, 6), skin, 0, 13, 0);
+      const left = part(new T.BoxGeometry(1.1, 6, 1.2), trousers, -1.1, 3.5, 0);
+      const right = part(new T.BoxGeometry(1.1, 6, 1.2), trousers, 1.1, 3.5, 0);
+      part(new T.BoxGeometry(4, 0.45, 0.8), skate, -1.2, 0.3, 0.4);
+      part(new T.BoxGeometry(4, 0.45, 0.8), skate, 1.2, 0.3, 0.4);
+      person.scale.setScalar(0.58 + (i % 2) * 0.08);
+      skaters.push({ person, legs: [left, right], phase: (i / 7) * Math.PI * 2, lane: i % 2 });
+    }
   }
   const candleFlames: T.Mesh[] = [];
   if (season === "halloween") {
@@ -299,20 +353,39 @@ export function createSeasonalLandscape(scene: T.Scene, season: string) {
       if (width < 760) root.position.x = width - 222;
       const localX = (x: number) => (x - root.position.x) / root.scale.x;
       distantTrees.forEach(({ tree, u, size }, i) => {
-        tree.position.set(localX(width * u), 8 + (i % 3) * 3, i % 3 ? -50 : -23);
+        const treeX = season === "winter" ? width * 0.61 + width * 0.37 * u : width * u;
+        tree.position.set(localX(treeX), 8 + (i % 3) * 3, i % 3 ? -50 : -23);
         tree.rotation.z = Math.sin(time * 0.7 + i) * Math.abs(wind) * 0.0005;
         tree.scale.setScalar((width < 760 ? 0.65 : 1) * (i % 3 ? 0.65 : 1));
       });
+      skaters.forEach(({ person, legs, phase, lane }, i) => {
+        const angle = time * (0.22 + lane * 0.035) + phase;
+        const screenX = width * 0.79 + Math.cos(angle) * Math.min(72, width * 0.065);
+        person.position.set(
+          localX(screenX),
+          15 + Math.sin(angle) * (5 + lane * 1.5),
+          18 + lane * 4,
+        );
+        // Face into the route in depth while remaining upright on screen.
+        person.rotation.y = -angle + Math.PI / 2;
+        person.rotation.z = Math.sin(time * 1.4 + phase) * 0.035;
+        const stride = Math.sin(time * 3.2 + phase) * 0.28;
+        legs[0]!.rotation.z = stride;
+        legs[1]!.rotation.z = -stride;
+        person.rotation.x = Math.sin(time * 0.45 + i) * 0.025;
+      });
       terrainLayers.forEach((layer) => {
-        layer.position.x = localX(0);
-        layer.scale.x = width / 1000 / root.scale.x;
+        const scenicWidth = season === "winter" ? Math.min(760, width * 0.42) : width;
+        layer.position.x = localX(width - scenicWidth);
+        layer.scale.x = scenicWidth / 1000 / root.scale.x;
       });
       stones.forEach((stone, i) => {
         stone.position.x = localX((width * (i + 0.3 + 0.25 * Math.sin(i * 5))) / 16);
         stone.position.y = 4 + (i % 3);
       });
       grassTufts.forEach(({ blade, u, offset, height }, i) => {
-        blade.position.set(localX(width * u) + offset, height / 2 + 2, 22);
+        const grassX = season === "winter" ? width * (0.62 + u * 0.36) : width * u;
+        blade.position.set(localX(grassX) + offset, height / 2 + 2, 22);
         // Rotation about the base makes blades bend without sliding out of the ground.
         const lean =
           wind * 0.006 + Math.sin(time * 1.7 + i * 0.7) * Math.min(0.18, Math.abs(wind) * 0.008);

@@ -27,6 +27,7 @@ import {
   MINIMAL_HIDE,
   PALETTES,
   STYLES,
+  WORLDS,
   fontById,
   paletteById,
   portalAppearanceSchema,
@@ -50,6 +51,47 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 const omitSwitch = ({ membersMayCustomize: _switch, ...rest }: Appearance): PortalAppearance =>
   rest;
 const PREVIEW_FONTS_ID = "bf-fonts-preview";
+const SCENE_PRESETS: { name: string; values: Partial<Scene> }[] = [
+  {
+    name: "Calm",
+    values: {
+      amount: 0.55,
+      speed: 0.7,
+      randomness: 0.25,
+      bats: 3,
+      bugs: 2,
+      spiders: 1,
+      webs: 1,
+      pumpkins: 2,
+    },
+  },
+  {
+    name: "Balanced",
+    values: {
+      amount: 1,
+      speed: 1,
+      randomness: 0.5,
+      bats: 7,
+      bugs: 5,
+      spiders: 2,
+      webs: 2,
+      pumpkins: 3,
+    },
+  },
+  {
+    name: "Full",
+    values: {
+      amount: 1.65,
+      speed: 1.25,
+      randomness: 0.8,
+      bats: 11,
+      bugs: 8,
+      spiders: 4,
+      webs: 3,
+      pumpkins: 5,
+    },
+  },
+];
 
 /** Settings → Appearance: the Admin's Theme Studio, saved for the whole workspace. */
 export function AppearanceSettings() {
@@ -121,10 +163,10 @@ export function ThemeStudio(props: Scope) {
       return { kind: "portal" as const, value };
     },
     onSuccess: (r) => {
-      preview(null);
       if (r.kind === "workspace") {
         setWorkspace(r.value);
         setDraft(r.value);
+        preview(null);
         setConfirmAll(false);
         toast.success(r.all ? "Theme saved for all portals" : "Theme saved for the main panel", {
           description: r.all
@@ -141,6 +183,7 @@ export function ThemeStudio(props: Scope) {
           ? { ...workspace, ...r.value, membersMayCustomize: workspace.membersMayCustomize }
           : workspace,
       );
+      preview(null);
       void client.invalidateQueries({ queryKey: ["personal-portal"] });
       toast.success(r.value ? "Your theme is saved" : "Back to the workspace theme", {
         description: r.value
@@ -165,6 +208,9 @@ export function ThemeStudio(props: Scope) {
       style: id,
       fonts: null,
       ...(s.palette && draft.palette !== "custom" ? { palette: s.palette } : {}),
+      ...(["halloween", "winter", "christmas", "autumn"].includes(id)
+        ? { world: id as Appearance["world"] }
+        : {}),
     });
   };
   const hidden = (key: string) => draft.hide.includes(key);
@@ -188,15 +234,29 @@ export function ThemeStudio(props: Scope) {
           </span>
         </div>
       </div>
-      <Seg
-        label="Light or dark mode"
-        value={dark ? "dark" : "light"}
-        onChange={(v) => setDark(v === "dark")}
-        options={[
-          { value: "light", label: "Light", icon: <Sun size={14} /> },
-          { value: "dark", label: "Dark", icon: <Moon size={14} /> },
-        ]}
-      />
+      <div className="bf-theme-heading-actions">
+        {!forWorkspace && personal && !dirty && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={save.isPending}
+            onClick={() => save.mutate(null)}
+          >
+            <RotateCcw />
+            Use workspace theme
+          </Button>
+        )}
+        <Seg
+          label="Light or dark mode"
+          value={dark ? "dark" : "light"}
+          onChange={(v) => setDark(v === "dark")}
+          options={[
+            { value: "light", label: "Light", icon: <Sun size={14} /> },
+            { value: "dark", label: "Dark", icon: <Moon size={14} /> },
+          ]}
+        />
+      </div>
     </div>
   );
 
@@ -439,17 +499,80 @@ export function ThemeStudio(props: Scope) {
             ]}
           />
         </Row>
-        {style.decorated && style.id !== "terminal" && (
+        <Row
+          title="3D world"
+          hint="Choose a scene independently from the surface style. It stays decorative and never blocks workspace controls."
+        >
+          <div className="bf-styles" role="radiogroup" aria-label="3D world">
+            {WORLDS.map((world) => {
+              const on = draft.world === world.id;
+              return (
+                <button
+                  key={world.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  className="bf-style bf-world"
+                  onClick={() => set({ world: world.id as Appearance["world"] })}
+                >
+                  <span className="bf-world-sample" data-world={world.id} aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  <strong>
+                    {world.name}
+                    {on && <Check size={14} />}
+                  </strong>
+                  <small>{world.description}</small>
+                </button>
+              );
+            })}
+          </div>
+          {draft.world !== "none" && (
+            <div className="mt-3">
+              <Seg
+                label="3D quality"
+                value={draft.quality}
+                onChange={(value) => set({ quality: value as Appearance["quality"] })}
+                options={[
+                  { value: "auto", label: "Auto" },
+                  { value: "low", label: "Low" },
+                  { value: "high", label: "High" },
+                ]}
+              />
+              <p className="mt-2 text-xs text-muted-foreground">
+                Auto lowers resolution and animation rate on constrained devices or data-saving
+                connections.
+              </p>
+            </div>
+          )}
+        </Row>
+        {draft.world !== "none" && (
           <Row
             title="Scene"
             hint={
-              style.id === "halloween"
+              draft.world === "halloween"
                 ? "How much is going on: how many bats, bugs, spiders, webs and pumpkins, how big the bugs are, how fast everything moves, and how random the placement is. Shuffle rolls new positions."
                 : "How much falls, how fast, and how random the placement is. Shuffle rolls new positions."
             }
           >
+            <div className="bf-scene-presets" aria-label="Scene presets">
+              <span>Preset</span>
+              {SCENE_PRESETS.map((preset) => (
+                <Button
+                  key={preset.name}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => scene(preset.values)}
+                >
+                  {preset.name}
+                </Button>
+              ))}
+            </div>
             <div className="bf-knobs">
-              {style.id === "halloween" ? (
+              {draft.world === "halloween" ? (
                 <>
                   <Knob
                     label="Bats"
@@ -608,26 +731,10 @@ export function ThemeStudio(props: Scope) {
         Status, severity and priority colours and chart colours stay the same in every theme, so
         their meaning never changes.
       </p>
-      {(dirty || (!forWorkspace && personal)) && (
-        <div className="bf-savebar" role="status">
-          {dirty ? (
-            <strong>Previewing — not saved yet</strong>
-          ) : (
-            <strong>Your own theme is on</strong>
-          )}
-          <span className="ml-auto flex flex-wrap gap-2">
-            {!forWorkspace && personal && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={save.isPending}
-                onClick={() => save.mutate(null)}
-              >
-                <RotateCcw />
-                Use workspace theme
-              </Button>
-            )}
+      {dirty && (
+        <div className="bf-savebar" role="status" aria-live="polite">
+          <strong>Theme changes not saved</strong>
+          <span className="flex flex-wrap gap-2">
             {dirty && (
               <Button
                 type="button"
@@ -640,7 +747,7 @@ export function ThemeStudio(props: Scope) {
                 Discard
               </Button>
             )}
-            {dirty && forWorkspace && (
+            {forWorkspace && (
               <Button
                 type="button"
                 variant="outline"
@@ -652,17 +759,15 @@ export function ThemeStudio(props: Scope) {
                 Save for all portals
               </Button>
             )}
-            {dirty && (
-              <Button
-                type="button"
-                size="sm"
-                disabled={save.isPending}
-                onClick={() => save.mutate(draft)}
-              >
-                <Save />
-                {forWorkspace ? "Save for main panel" : "Save my theme"}
-              </Button>
-            )}
+            <Button
+              type="button"
+              size="sm"
+              disabled={save.isPending}
+              onClick={() => save.mutate(draft)}
+            >
+              <Save />
+              {forWorkspace ? "Save theme" : "Save my theme"}
+            </Button>
           </span>
         </div>
       )}

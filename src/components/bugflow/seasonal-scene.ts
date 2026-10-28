@@ -5,6 +5,7 @@ import { createSleighJourney, seasonalWind } from "@/lib/seasonal-choreography";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { perimeterPoint, stepSnow, type LandingEdge, type SnowBody } from "@/lib/seasonal-physics";
 import { DEFAULT_SCENE, seededRandom, type Scene } from "@/lib/appearance";
+import { sceneQualityLimits, type SceneQuality } from "./scene-quality";
 
 /**
  * Small real 3D dioramas in screen space, lit from above and the left.
@@ -16,14 +17,16 @@ export function createSeasonalScene(
   season: string,
   lively: boolean,
   knobs: Scene = DEFAULT_SCENE,
+  quality: SceneQuality = "auto",
 ) {
+  const limits = sceneQualityLimits(quality);
   const renderer = new T.WebGLRenderer({
     alpha: true,
     antialias: true,
     powerPreference: "low-power",
   });
   renderer.setClearColor(0x000000, 0);
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+  renderer.setPixelRatio(limits.pixelRatio);
   renderer.outputColorSpace = T.SRGBColorSpace;
   host.style.display = "";
   host.append(renderer.domElement);
@@ -40,6 +43,7 @@ export function createSeasonalScene(
     powerPreference: "low-power",
   });
   frontRenderer.setClearColor(0x000000, 0);
+  frontRenderer.setPixelRatio(limits.pixelRatio);
   frontRenderer.outputColorSpace = T.SRGBColorSpace;
   front.append(frontRenderer.domElement);
   document.body.append(front);
@@ -1045,10 +1049,12 @@ export function createSeasonalScene(
       last = now;
       return;
     }
-    if (now - last < (lively && !reduced.matches ? 32 : 100)) return;
-    const dt = Math.min((now - (last || now)) / 1000, 0.05) * knobs.speed;
+    if (now - last < (lively && !reduced.matches ? limits.activeFrameMs : limits.calmFrameMs))
+      return;
+    const dt = Math.min((now - (last || now)) / 1000, 0.1) * knobs.speed;
     last = now;
-    const moving = lively && !reduced.matches;
+    // Santa and the distant skaters keep roaming on Subtle; Lively animates every seasonal world.
+    const moving = (lively || season === "christmas" || season === "winter") && !reduced.matches;
     if (moving) time += dt;
     if (now - measured > 650) {
       measure();

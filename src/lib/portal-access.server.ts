@@ -24,7 +24,7 @@ import {
   clientKey,
   recordSignInFailure,
 } from "./sign-in-throttle.server";
-import { portalAppearanceSchema } from "./appearance";
+import { normalizePortalAppearance } from "./appearance";
 import type { z } from "zod";
 
 export async function databaseCall<T>(work: () => Promise<T>): Promise<T> {
@@ -326,10 +326,7 @@ export async function changePortal(id: string, regenerate: boolean) {
   if (!row) throw new Error("Member portal not found.");
   return { path: token ? `/${String(row["type"])}/${token}` : "" };
 }
-const parsePortalAppearance = (v: unknown) => {
-  const r = portalAppearanceSchema.safeParse(v);
-  return r.success ? r.data : null;
-};
+const parsePortalAppearance = (v: unknown) => normalizePortalAppearance(v);
 export async function readPortal(data: z.infer<typeof portalReadSchema>) {
   const { rows } = await neonQuery(
     "select p.id,p.user_id,p.type,to_json(p.created_at) as since,p.welcome_seen_at,p.appearance,u.name,o.welcome,o.permissions,o.scope_note,o.collaborator_role from bugflow.portals p join bugflow.users u on u.id=p.user_id join bugflow.portal_onboarding o on o.portal_id=p.id where p.token_hash=$1 and p.type<>'admin' and p.active and u.active and u.deleted_at is null and p.revoked_at is null and (p.expires_at is null or p.expires_at>now()) limit 1",

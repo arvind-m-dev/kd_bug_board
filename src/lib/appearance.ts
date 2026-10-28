@@ -482,6 +482,48 @@ export const STYLES: Style[] = [
 ];
 export const styleById = (id: string | null | undefined) =>
   STYLES.find((s) => s.id === id) ?? STYLES[0]!;
+
+/** 3D worlds are independent from skins, so any surface style can carry any scene. */
+export type World = {
+  id: string;
+  name: string;
+  description: string;
+  seasonal?: boolean;
+};
+export const WORLDS: World[] = [
+  { id: "none", name: "None", description: "Keep the workspace clear and still." },
+  {
+    id: "geometry",
+    name: "Minimal geometry",
+    description: "Floating glass, chrome and brand-colour forms drift behind the workspace.",
+  },
+  {
+    id: "halloween",
+    name: "Halloween",
+    description: "Beetles, spiders, bats and pumpkins.",
+    seasonal: true,
+  },
+  {
+    id: "winter",
+    name: "Winter",
+    description: "Snow-covered firs and bouncing snowflakes.",
+    seasonal: true,
+  },
+  {
+    id: "christmas",
+    name: "Christmas",
+    description: "Trees, stars, a sleigh and reindeer.",
+    seasonal: true,
+  },
+  {
+    id: "autumn",
+    name: "Autumn",
+    description: "A copper canopy and tumbling leaves.",
+    seasonal: true,
+  },
+];
+export const worldById = (id: string | null | undefined) =>
+  WORLDS.find((world) => world.id === id) ?? WORLDS[0]!;
 /** Legacy: 'sketch' used to be a palette; it is a style now. */
 export const skinOf = (id: string | null | undefined) => (id === "sketch" ? "sketch" : null);
 
@@ -559,6 +601,8 @@ export const appearanceSchema = z
     radius: z.enum(["sharp", "soft", "round"]).default("soft"),
     density: z.enum(["comfortable", "compact"]).default("comfortable"),
     motion: z.enum(["off", "subtle", "lively"]).default("subtle"),
+    quality: z.enum(["auto", "low", "high"]).default("auto"),
+    world: z.enum(ids(WORLDS)).default("none"),
     hide: z.array(z.enum(HIDE_KEYS)).max(20).default([]),
     membersMayCustomize: z.boolean().default(true),
     scene: sceneSchema.default(() => sceneSchema.parse({})),
@@ -577,8 +621,31 @@ export function normalizeAppearance(raw: unknown): Appearance {
     v["palette"] = "graphite";
     v["style"] = v["style"] ?? "sketch";
   }
+  // Before worlds were independent, these skins implicitly selected their matching scene.
+  if (
+    !("world" in v) &&
+    ["halloween", "winter", "christmas", "autumn"].includes(String(v["style"]))
+  )
+    v["world"] = v["style"];
   const r = appearanceSchema.safeParse(v);
   return r.success ? r.data : DEFAULT_APPEARANCE;
+}
+
+/** Parses a saved member theme with the same legacy migration as a workspace theme. */
+export function normalizePortalAppearance(raw: unknown): PortalAppearance | null {
+  if (!raw || typeof raw !== "object") return null;
+  const portal = { ...(raw as Record<string, unknown>) };
+  if (portal["palette"] === "sketch") {
+    portal["palette"] = "graphite";
+    portal["style"] = portal["style"] ?? "sketch";
+  }
+  if (
+    !("world" in portal) &&
+    ["halloween", "winter", "christmas", "autumn"].includes(String(portal["style"]))
+  )
+    portal["world"] = portal["style"];
+  const result = portalAppearanceSchema.safeParse(portal);
+  return result.success ? result.data : null;
 }
 
 /** The member's own appearance, if any, over the workspace one; the workspace switch is never overridable. */

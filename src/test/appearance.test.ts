@@ -15,6 +15,7 @@ import {
   effectiveAppearance,
   fontById,
   normalizeAppearance,
+  normalizePortalAppearance,
   paletteById,
   paletteVars,
   portalAppearanceSchema,
@@ -52,6 +53,8 @@ describe("palettes, styles and fonts", () => {
 describe("appearance schema", () => {
   it("accepts known ids and custom hex colours, rejects anything else", () => {
     expect(appearanceSchema.safeParse({ palette: "emerald" }).success).toBe(true);
+    expect(appearanceSchema.parse({}).quality).toBe("auto");
+    expect(appearanceSchema.safeParse({ quality: "ultra" }).success).toBe(false);
     expect(
       appearanceSchema.safeParse({ palette: "custom", accent: "#0e4f63", partner: "#e9c868" })
         .success,
@@ -74,6 +77,8 @@ describe("appearance schema", () => {
     });
     expect(normalizeAppearance(null)).toEqual(DEFAULT_APPEARANCE);
     expect(normalizeAppearance({ palette: "neon" })).toEqual(DEFAULT_APPEARANCE);
+    expect(normalizeAppearance({ palette: "pumpkin", style: "halloween" }).world).toBe("halloween");
+    expect(normalizePortalAppearance({ palette: "ocean", style: "winter" })?.world).toBe("winter");
   });
   it("a member choice overrides the workspace only while the Admin allows it", () => {
     const ws = appearanceSchema.parse({ palette: "teal", membersMayCustomize: true });
