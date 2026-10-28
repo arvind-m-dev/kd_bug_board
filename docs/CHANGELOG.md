@@ -2,6 +2,13 @@
 
 Newest first. Earlier history: `git log` and `roadmap.md`.
 
+## 2026-10-28 — Phase 2.1b (part): due-date calendar + retest skill
+- **Feature**: All Bugs gets a **Calendar** toggle (`?cal=1`). A month grid (shadcn `Calendar`/react-day-picker) marks days that hold an open bug with a due date, overdue days in red; picking a day filters the list to bugs due then (`?due=YYYY-MM-DD`, survives refresh), Clear day resets. Marks come from the loaded page, matching the other client-side filters.
+- **Skill**: `.claude/skills/retest/SKILL.md` — runs the automated gates (tsc/test/lint/build), DB re-apply check, and a per-feature manual browser checklist for everything on this branch.
+- **Files**: `bug-workspace.tsx` (`DueCalendar`, `dayKey`), `styles.css`. No schema/server changes.
+- **Tests**: 210/210 pass, tsc clean, lint 0 errors / 18 warnings, build OK. Not clicked through in a browser.
+- **Pending (2.1b)**: notification-bell due reminders (needs per-viewer scoping; the current bell is Admin activity-based).
+
 ## 2026-10-28 — Seasonal creatures don't reset on refresh
 - **Change**: in the 3D worlds the bats, bugs, ghosts and sleigh snapped back to the same starting spot and replayed the same motion on every reload, because the animation clock started at 0 and each creature's phase/timers were seeded deterministically. Now a per-load `startOffset = Math.random()*600` seeds the clock, and each creature's start timer, wander phase (`seed`), drift distance and direction take a `Math.random` offset. The scene *layout* stays seeded (Theme Studio Shuffle unchanged); only the motion varies per visit, so a refresh looks like the creatures kept wandering rather than resetting. Same offset added to the geometry world's clock.
 - **Files**: `src/components/bugflow/seasonal-scene.ts`, `minimal-geometry-scene.ts`. No schema/server changes.

@@ -1,0 +1,64 @@
+---
+name: retest
+description: Re-verify the Bug Board build — run the automated gates (types, tests, lint, build) and walk the manual browser checklist for every feature shipped on this branch (Phase 2 due dates, URL view-state, theme flash, seasonal motion, sidebar). Use when the user says "retest", "re-verify", "check everything still works", or after a batch of changes.
+---
+
+# Retest Bug Board
+
+Verify nothing regressed. Run the automated gates first; they are the source of truth for logic. Then do the manual browser checklist for anything visual (the automated gates never open a page).
+
+## 1. Automated gates (always run, in this order)
+
+```bash
+npx tsc --noEmit          # types: must be clean
+npm test                  # vitest: all files pass (currently 210 tests / 41 files)
+npm run lint              # eslint: 0 errors; ~18 react-refresh warnings are the known baseline
+npm run build             # vite build: must exit 0
+```
+
+Report each result plainly (pass / fail with the first error). A warning count above the baseline (18) is a regression — name the new ones. Do **not** claim a browser was checked; these gates do not open one.
+
+If a pure rule changed, the matching unit test must still cover it: `due-dates.test.ts`, `bug-edit.test.ts`, `bug-sheet.test.ts`, `seasonal-choreography.test.ts`, `seasonal-physics.test.ts`, `appearance.test.ts`, plus the rest under `src/test/`.
+
+## 2. Database (only if a migration was touched)
+
+Migrations are idempotent. To re-apply the latest and confirm:
+
+```bash
+npm run db:migrate -- database/021_due_dates.sql   # or the file changed
+```
+
+Verify with a read-only probe (never write workspace settings from a script — the user runs the app live on :8080):
+
+```bash
+node --env-file=.env.local -e "import('@neondatabase/serverless').then(async ({neon})=>{const s=neon(process.env.DATABASE_URL);console.log(await s\`select column_name from information_schema.columns where table_schema='bugflow' and table_name='bugs' and column_name='due_on'\`)})"
+```
+
+## 3. Manual browser checklist (needs a human or an enabled browser tool)
+
+The agent cannot open a GUI here (terminal only; no Playwright installed; dev server usually down). Start it with `npm run dev` (serves :8080) and either walk these yourself or drive an enabled browser tool. Check on Admin plus one developer and one QA portal where scope matters.
+
+**Due dates (Phase 2.1a)**
+- [ ] Report/edit a bug as Admin or a `plan` holder: the Due date field shows; a non-planner (plain reporter) never sees it.
+- [ ] A past date on an open bug shows a red "Overdue Nd" badge; due today/tomorrow shows an amber badge; a closed bug (Resolved/Duplicate/Not a bug/Won't fix) shows none.
+- [ ] Overview shows an "Overdue" card with a count; clicking it filters the list to overdue bugs. The count matches the list.
+- [ ] Settings → Options → Workspace time zone: changing it shifts what counts as "today"/overdue.
+- [ ] A non-planner editing a bug cannot change its due date (field absent; server ignores any value).
+- [ ] All Bugs → Calendar toggle shows a month grid; days with open due bugs are dotted, overdue days red; picking a day filters the list to that day and the choice survives a refresh (`?cal=1&due=`); Clear day resets.
+
+**View state across refresh**
+- [ ] Page through the bug table, the member table, and the Overview urgent list, then refresh — the same page stays (URL has `?page=` / `?urgent=`).
+- [ ] Switch a Trash tab, refresh — the same tab stays (`?tab=`).
+
+**Theme (no flash)**
+- [ ] Pick a non-default theme (and a light theme), refresh several times — the chosen theme paints immediately, no flash to the default. The light/dark toggle icon settles a beat after load (expected).
+
+**Seasonal worlds (random, refresh-stable)**
+- [ ] On Halloween/Christmas/geometry themes, refresh repeatedly — the bats, bugs, ghosts and sleigh start in different places and keep wandering; they do not snap back to the same opening. Nothing starts stuck mid-screen.
+- [ ] Theme Studio → Shuffle still gives a repeatable layout for the same seed.
+
+**Sidebar**
+- [ ] Section titles read as quiet headers; the sub-tabs under them are inset with a guide line and clearly nested. Collapsed sidebar centers the icons (no stray indent).
+
+## 4. Report format
+State: gates (pass/fail each), DB (if touched), and which manual items you could not check (say so — do not assume). End with anything that regressed or needs a human eye.

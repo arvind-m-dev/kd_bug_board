@@ -920,6 +920,13 @@ html:root .bf-report-grid-raised, html:root .bf-report-grid-wide { grid-template
 .bf-status-note[data-status=RECHECK] { --n: var(--success); }
 .bf-tz-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
 .bf-tz-card .bf-input { padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--foreground); font: inherit; font-size: 13px; min-width: 200px; }
+.bf-due-cal { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+.bf-due-cal-side { flex: 1; min-width: 180px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding-top: 6px; }
+/* Days that carry an open bug with a due date get a dot; overdue days turn red. */
+.bf-cal-due:not(.rdp-selected) { position: relative; font-weight: 700; }
+.bf-cal-due:not(.rdp-selected)::after { content: ""; position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 999px; background: var(--primary); }
+.bf-cal-overdue:not(.rdp-selected) { color: var(--destructive); }
+.bf-cal-overdue:not(.rdp-selected)::after { background: var(--destructive); }
 .bf-due-badge { --n: var(--warning); display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 1px 7px 1px 5px; border-radius: 999px; border: 1px solid color-mix(in oklab, var(--n) 35%, transparent); background: color-mix(in oklab, var(--n) 12%, transparent); font-size: 11px; font-weight: 600; color: color-mix(in oklab, var(--n) 75%, var(--foreground)); }
 .bf-due-badge[data-tone=danger] { --n: var(--destructive); }
 .bf-due-badge svg { flex-shrink: 0; }
