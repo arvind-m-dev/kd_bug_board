@@ -2,6 +2,14 @@
 
 Newest first. Earlier history: `git log` and `roadmap.md`.
 
+## 2026-10-28 — Verification: theme worlds and R2 bucket
+- **Theme worlds**: all 5 worlds (geometry, halloween, winter, christmas, autumn) route to `Seasonal3D`; "3D quality" control saves `quality` (auto/low/high) and reaches both scene builders. tsc clean, 200/200 tests, build OK. Not viewed in a browser (no headless browser installed; dev server was down).
+- **R2 bucket** (`bugboard-media`, custom source): CORS preflight PUT/GET allowed for `http://localhost:8080` and `https://kd-bug-board.vercel.app`; signed PUT (with `If-None-Match: *`) → 200, signed GET → 200 with matching body, delete → 404, using the stored encrypted credentials. Probe object under `bugs/_probe/` removed. No app rows written.
+- **Still open**: click-through in the real app (upload with thumbnail, compression, mark-up; 3D worlds per quality level).
+
+## 2026-10-28 — Doc drift fixed
+- `README.md` migration range now `001 … 020`; `roadmap.md` marks media uploads done (real-bucket test still pending) and splits a merged line; removed both items from "Known issues" in `PROJECT_CONTEXT.md`. Docs only.
+
 ## 2026-10-28 — Nav bar stays on top when scrolling
 - **Fix**: `.bf-bulk-bar` z-index 30 → 19 and `.bf-armed-hint` 20 → 10 in `src/styles.css`, so they scroll under the sticky `.bf-topbar` (z 20) instead of over it; the bulk bar also no longer covers the mobile sidebar (30) / scrim (29).
 - **Rule**: in-page content must stay below z-index 20. Fixed overlays (save bar, FABs, upload tray, dialogs/popovers) and pointer-less seasonal effects stay above on purpose.
