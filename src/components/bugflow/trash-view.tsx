@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useUrlParam } from "@/hooks/use-url-param";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -38,7 +39,10 @@ export function TrashView() {
     staleTime: 5000,
     refetchInterval: 30000,
   });
-  const [tab, setTab] = useState<Tab>("bugs");
+  // Active tab in the URL (?tab=) so a refresh reopens the same Trash tab.
+  const [tabParam, setTabParam] = useUrlParam("tab");
+  const tab: Tab = tabParam === "members" || tabParam === "files" ? tabParam : "bugs";
+  const setTab = (t: Tab) => setTabParam(t === "bugs" ? null : t);
   const [pending, setPending] = useState<Pending>(null);
   const refresh = () =>
     Promise.all(REFRESH.map((k) => client.invalidateQueries({ queryKey: [k] })));

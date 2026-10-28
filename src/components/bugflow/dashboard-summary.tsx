@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useUrlNumber } from "@/hooks/use-url-param";
 import { SkeletonRows } from "./loading";
 import { ErrorNotice } from "./action-feedback";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -143,7 +144,8 @@ export function DashboardSummary() {
       /* storage unavailable */
     }
   }, []);
-  const [pageRaw, setPage] = useState(0);
+  // Urgent-list page index in the URL (?urgent=) so a refresh of Overview stays on the same page.
+  const [pageRaw, setPage] = useUrlNumber("urgent");
   const setPerPage = (n: number) => {
     setPerPageState(n);
     setPage(0);

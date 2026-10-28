@@ -2,6 +2,12 @@
 
 Newest first. Earlier history: `git log` and `roadmap.md`.
 
+## 2026-10-28 — View state survives a refresh
+- **Fix**: table page numbers and tabs no longer reset on reload. Added `useUrlNumber` (built on `useUrlParam`) and moved to the URL: the bug table page (`?page=`), the member table page (`?page=`), the Overview urgent-list page (`?urgent=`), and the Trash tab (`?tab=`). A refresh or shared link reopens the same page/tab.
+- **Scope**: Activity log pagination left as-is (cursor-based — a page index alone can't be restored). Bug-list filter/severity/search already round-trip through the route's search params.
+- **Files**: `src/hooks/use-url-param.ts`, `bug-workspace.tsx`, `member-portals.tsx`, `dashboard-summary.tsx`, `trash-view.tsx`. No schema, no server changes.
+- **Tests**: 210/210 pass, tsc clean, lint 0 errors / 18 warnings, build OK. Not clicked through in a browser.
+
 ## 2026-10-28 — Phase 2.1a: bug due dates
 - **Feature**: an optional due date per bug. Overdue (date past, bug still open) and due-soon badges in the bug list; an **Overdue** Overview card and list filter; "today" is computed in a new **workspace time zone** (Settings → Options). Only planners set dates — new `plan` permission (Admin always; added to the QA preset).
 - **Data**: migration `021_due_dates.sql` — `bugs.due_on date` + partial index. Applied to Neon and verified.

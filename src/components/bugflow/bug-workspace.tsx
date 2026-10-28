@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { RoleTag } from "./role-tag";
-import { useUrlParam } from "@/hooks/use-url-param";
+import { useUrlParam, useUrlNumber } from "@/hooks/use-url-param";
 import { SkeletonRows } from "./loading";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -111,7 +111,8 @@ export function BugWorkspace({
   const navigate = useNavigate();
   const [cursor, setCursor] = useState<string>();
   const [pages, setPages] = useState<(string | undefined)[]>([]);
-  const [page, setPage] = useState(0);
+  // The page index lives in the URL (?page=) so a refresh or shared link reopens the same page of the table.
+  const [page, setPage] = useUrlNumber("page");
   const data = useQuery({
     queryKey: ["bug-workspace", access, cursor],
     queryFn: () => fetch({ data: { access, cursor } }),
