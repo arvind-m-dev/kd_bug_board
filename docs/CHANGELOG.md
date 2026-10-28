@@ -2,6 +2,12 @@
 
 Newest first. Earlier history: `git log` and `roadmap.md`.
 
+## 2026-10-28 — No theme flash on refresh
+- **Fix**: on reload the default theme flashed for a frame before the chosen one applied. The boot script painted the cached theme pre-paint, but `ThemeProvider` initialised its state to `DEFAULT_APPEARANCE`, so React's first apply-effect overwrote the boot theme with the default until the mount effect read the cache. Now `dark`, `workspace` and `personal` are seeded from the cache in their `useState` initialisers (SSR-safe: `read()` returns null server-side), so the first client paint already matches the boot script.
+- `ThemeToggle` shows the SSR default (dark) icon until `ready` to avoid a hydration mismatch from the lazily-read mode.
+- **Files**: `src/components/bugflow/theme-toggle.tsx`. No schema/server changes.
+- **Tests**: 210/210 pass, tsc clean, lint 0 errors / 18 warnings, build OK. Not clicked through in a browser.
+
 ## 2026-10-28 — View state survives a refresh
 - **Fix**: table page numbers and tabs no longer reset on reload. Added `useUrlNumber` (built on `useUrlParam`) and moved to the URL: the bug table page (`?page=`), the member table page (`?page=`), the Overview urgent-list page (`?urgent=`), and the Trash tab (`?tab=`). A refresh or shared link reopens the same page/tab.
 - **Scope**: Activity log pagination left as-is (cursor-based — a page index alone can't be restored). Bug-list filter/severity/search already round-trip through the route's search params.
