@@ -50,7 +50,7 @@ export function checkOrigin() {
   }
   const origin = request.headers.get("origin");
   if (origin && origin !== new URL(request.url).origin)
-    throw new Error("This request must come from your Futurist Global Bug Board workspace.");
+    throw new Error("This request must come from your Bug Board workspace.");
 }
 // Verified Admin sessions are remembered briefly per server instance so each request skips a database round trip.
 // Sign-out clears the entry; other revocations take effect within ADMIN_CACHE_MS.

@@ -7,7 +7,7 @@ export const Route = createFileRoute("/admin_/notifications")({
   head: () =>
     pageHead(
       "Notifications",
-      "Notifications in Futurist Global Bug Board: manual QA, scoped bug tracking and collaboration.",
+      "Notifications in Bug Board: manual QA, scoped bug tracking and collaboration.",
     ),
   validateSearch: (
     s: Record<string, unknown>,

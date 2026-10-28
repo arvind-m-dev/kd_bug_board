@@ -5,7 +5,7 @@ Concise source of truth for a new coding session. Details live in the linked doc
 Last verified: 2026-10-28 on branch `feat/theme-worlds` (commit `c1c9bb6` + uncommitted user edit to `src/components/bugflow/seasonal-sky.ts`).
 
 ## What this is
-Futurist Global Bug Board ("BugFlow"): bug reporting, triage, assignment and QA verification. One Admin (env-configured) manages projects and members; members (tester, developer, QA, other) work through private portal links. AI clients connect over MCP. See [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md).
+Bug Board ("BugFlow"): bug reporting, triage, assignment and QA verification. One Admin (env-configured) manages projects and members; members (tester, developer, QA, other) work through private portal links. AI clients connect over MCP. See [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md).
 
 ## Stack
 TanStack Start (React 19, file routes in `src/routes`), Tailwind + shadcn/ui, Neon Postgres (`bugflow` schema), S3-compatible media (Cloudflare R2), Vercel.

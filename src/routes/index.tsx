@@ -7,7 +7,7 @@ export const Route = createFileRoute("/")({
   head: () =>
     pageHead(
       "Overview",
-      "Futurist Global Bug Board manual QA workspace overview, team portals and shared bug tracking.",
+      "Bug Board manual QA workspace overview, team portals and shared bug tracking.",
     ),
   component: () => <Workspace />,
 });

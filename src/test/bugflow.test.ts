@@ -14,7 +14,7 @@ const bug: Bug = {
   comments: ["Reproduced"],
   evidence: [{ name: "Screenshot", url: "https://example.test/private-evidence/1" }],
 };
-describe("Futurist Global Bug Board rules", () => {
+describe("Bug Board rules", () => {
   it("counts every record including resolved records", () =>
     expect(counts([bug, { ...bug, status: "RESOLVED" }]).total).toBe(2));
   it("open means new, validated, assigned and in progress", () =>

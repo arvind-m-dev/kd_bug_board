@@ -7,7 +7,7 @@ export const Route = createFileRoute("/admin_/bugs")({
   head: () =>
     pageHead(
       "All bugs",
-      "All bugs in Futurist Global Bug Board: manual QA, scoped bug tracking and collaboration.",
+      "All bugs in Bug Board: manual QA, scoped bug tracking and collaboration.",
     ),
   validateSearch: (
     s: Record<string, unknown>,

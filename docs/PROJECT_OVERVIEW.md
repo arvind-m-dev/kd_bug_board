@@ -1,7 +1,7 @@
 # Project overview
 
 ## Purpose
-Futurist Global Bug Board is a QA workspace: people report bugs with evidence, QA triages and assigns them, developers fix, and QA verifies the fix before a bug is resolved.
+Bug Board is a QA workspace: people report bugs with evidence, QA triages and assigns them, developers fix, and QA verifies the fix before a bug is resolved.
 
 ## Technologies
 - **Frontend/SSR**: TanStack Start + TanStack Router (file-based routes), React 19, TanStack Query, Tailwind CSS, shadcn/ui (Radix), Three.js scenes for decorative backgrounds.

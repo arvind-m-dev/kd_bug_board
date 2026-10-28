@@ -6,11 +6,7 @@ import { pageHead } from "@/lib/bugflow";
 import { safeReturnPath } from "@/lib/admin-route-access";
 
 export const Route = createFileRoute("/login")({
-  head: () =>
-    pageHead(
-      "Admin sign in",
-      "Sign in securely to your Futurist Global Bug Board Admin workspace.",
-    ),
+  head: () => pageHead("Admin sign in", "Sign in securely to your Bug Board Admin workspace."),
   validateSearch: (s: Record<string, unknown>): { redirect?: string | undefined } => ({
     redirect: safeReturnPath(s["redirect"]),
   }),
@@ -31,7 +27,7 @@ function LoginPage() {
         <span className="bf-logo">
           <BrandMark />
         </span>
-        Futurist Global Bug Board<span className="text-primary">.</span>
+        Bug Board<span className="text-primary">.</span>
       </div>
       <div className="w-full max-w-md">
         <AdminAccess signInPage returnTo={returnTo} />
