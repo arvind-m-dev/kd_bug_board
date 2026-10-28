@@ -1556,11 +1556,11 @@ html[data-motion=off] .bf-studio-cta { animation: none; }
 
 /* ───────────── Glass: frosted translucent surfaces over a colour wash, light catching the edges ───────────── */
 html[data-skin=glass] { --background: oklch(.955 .012 262); --card: oklch(.995 .003 262); --foreground: oklch(.21 .02 265); --muted: oklch(.93 .012 262); --muted-foreground: oklch(.45 .02 265); --secondary: oklch(.94 .012 262); --border: oklch(.86 .015 262);
-  --glass: rgb(255 255 255 / .46); --glass-strong: rgb(255 255 255 / .72); --glass-line: rgb(255 255 255 / .55); --glass-edge: rgb(255 255 255 / .92); --glass-rim: rgb(255 255 255 / .22);
-  --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / .5) 0%, rgb(255 255 255 / .1) 16%, rgb(255 255 255 / 0) 55%);
+  --glass: rgb(255 255 255 / .32); --glass-strong: rgb(255 255 255 / .54); --glass-readable: rgb(255 255 255 / .78); --glass-line: rgb(255 255 255 / .48); --glass-edge: rgb(255 255 255 / .88); --glass-rim: rgb(255 255 255 / .18);
+  --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / .45) 0%, rgb(255 255 255 / .08) 18%, rgb(255 255 255 / 0) 56%);
   --glass-shadow: 0 2px 6px rgb(20 30 60 / .05), 0 10px 28px -8px rgb(20 30 70 / .16), 0 28px 60px -24px rgb(20 30 70 / .24); --glass-row: rgb(255 255 255 / .35); }
 html[data-skin=glass].dark { --background: oklch(.16 .02 268); --card: oklch(.22 .02 268); --foreground: oklch(.97 .005 265); --muted: oklch(.27 .02 268); --muted-foreground: oklch(.76 .02 265); --secondary: oklch(.25 .02 268); --border: oklch(.34 .02 268);
-  --glass: rgb(40 44 60 / .4); --glass-strong: rgb(26 29 42 / .72); --glass-line: rgb(255 255 255 / .14); --glass-edge: rgb(255 255 255 / .28); --glass-rim: rgb(255 255 255 / .09);
+  --glass: rgb(34 39 58 / .28); --glass-strong: rgb(22 26 40 / .54); --glass-readable: rgb(24 28 42 / .8); --glass-line: rgb(255 255 255 / .13); --glass-edge: rgb(255 255 255 / .25); --glass-rim: rgb(255 255 255 / .08);
   --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / .14) 0%, rgb(255 255 255 / .03) 16%, rgb(255 255 255 / 0) 55%);
   --glass-shadow: 0 2px 6px rgb(0 0 0 / .3), 0 14px 36px -10px rgb(0 0 0 / .5), 0 30px 70px -24px rgb(0 0 0 / .7); --glass-row: rgb(255 255 255 / .06); }
 /* The wash the glass refracts: soft blobs of the palette's colours fixed behind the page. */
@@ -1576,13 +1576,13 @@ html[data-skin=glass].dark body { background-image:
   radial-gradient(36% 40% at 18% 88%, color-mix(in oklab, oklch(.5 .15 345) 24%, transparent), transparent 70%); }
 html[data-skin=glass] :is(.bf-panel, .bf-stat, .bf-kpi, .bf-status-card, .bf-summary-card, .bf-portal-card, .bf-portal-hero, .bf-identity, .bf-option-group, .bf-library-group, .bf-help-topic, .bf-style, .bf-font, .bf-storage-choice > *, .bf-storage-form, .bf-login > div:last-child) {
   background-color: var(--glass); background-image: var(--glass-sheen); border-color: var(--glass-line); box-shadow: inset 0 1px 0 var(--glass-edge), inset 0 0 0 1px var(--glass-rim), inset 0 -8px 24px -16px var(--glass-edge), var(--glass-shadow);
-  -webkit-backdrop-filter: blur(30px) saturate(1.5) brightness(1.04); backdrop-filter: blur(30px) saturate(1.5) brightness(1.04); }
+  -webkit-backdrop-filter: blur(38px) saturate(1.75) brightness(1.04); backdrop-filter: blur(38px) saturate(1.75) brightness(1.04); }
 html[data-skin=glass] .bf-rc-card { background-color: color-mix(in srgb, var(--glass) 100%, transparent); background-image: linear-gradient(90deg, color-mix(in oklab, var(--t) 10%, transparent), transparent 55%), var(--glass-sheen); box-shadow: inset 0 1px 0 var(--glass-edge), var(--glass-shadow); -webkit-backdrop-filter: blur(18px) saturate(1.7); backdrop-filter: blur(18px) saturate(1.7); }
 html[data-skin=glass]:not([data-radius=sharp]) :is(.bf-panel, .bf-stat, .bf-kpi, .bf-status-card, .bf-summary-card, .bf-portal-card, .bf-portal-hero, .bf-identity, .bf-option-group, .bf-library-group, .bf-rc-card, .bf-help-topic, .bf-style, .bf-font, .bf-login > div:last-child) { border-radius: 22px; }
 /* Bars stay frosted but nearly opaque, so whatever scrolls under them blurs away instead of showing through. */
-html[data-skin=glass] .bf-sidebar { background: var(--glass-strong); border-right: 1px solid var(--glass-line); box-shadow: inset -1px 0 0 var(--glass-edge); -webkit-backdrop-filter: blur(32px) saturate(1.8); backdrop-filter: blur(32px) saturate(1.8); }
-html[data-skin=glass] .bf-topbar { background: var(--glass-strong); border-bottom: 1px solid var(--glass-line); box-shadow: inset 0 -1px 0 var(--glass-edge); -webkit-backdrop-filter: blur(32px) saturate(1.8); backdrop-filter: blur(32px) saturate(1.8); }
-html[data-skin=glass] .bf-sticky-table thead th { background: var(--glass-strong); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6); }
+html[data-skin=glass] .bf-sidebar { background: var(--glass-strong); border-right: 1px solid var(--glass-line); box-shadow: inset -1px 0 0 var(--glass-edge); -webkit-backdrop-filter: blur(44px) saturate(1.9); backdrop-filter: blur(44px) saturate(1.9); }
+html[data-skin=glass] .bf-topbar { background: var(--glass-strong); border-bottom: 1px solid var(--glass-line); box-shadow: inset 0 -1px 0 var(--glass-edge); -webkit-backdrop-filter: blur(44px) saturate(1.9); backdrop-filter: blur(44px) saturate(1.9); }
+html[data-skin=glass] .bf-sticky-table thead th { background: var(--glass-readable); -webkit-backdrop-filter: blur(28px) saturate(1.6); backdrop-filter: blur(28px) saturate(1.6); }
 html[data-skin=glass] .bf-table tbody tr:hover { background: var(--glass-row); }
 html[data-skin=glass] .bf-nav-link[data-status=active] { background: var(--glass); color: var(--primary); box-shadow: inset 0 1px 0 var(--glass-edge), 0 4px 14px -6px rgb(20 30 70 / .3); }
 html[data-skin=glass] .bf-nav-link[data-status=active]::before { display: none; }
@@ -1592,24 +1592,24 @@ html[data-skin=glass]:not([data-radius=sharp]) :is(.bf-nav-link) { border-radius
 html[data-skin=glass]:not([data-radius=sharp]) :is(button.inline-flex, .bf-tag, .bf-status-pill, .bf-nav-count, .bf-pill-select button) { border-radius: 999px; }
 html[data-skin=glass] button.inline-flex.bg-primary { background-image: linear-gradient(180deg, rgb(255 255 255 / .22), rgb(255 255 255 / 0)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 6px 16px -6px color-mix(in oklab, var(--primary) 70%, transparent); }
 html[data-skin=glass] button.inline-flex.border { background: var(--glass); border-color: var(--glass-line); box-shadow: inset 0 1px 0 var(--glass-edge); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
-html[data-skin=glass] :is(.bf-search input, .bf-select, input.flex, textarea, .bf-input) { background: var(--glass); border-color: var(--glass-line); box-shadow: inset 0 1px 2px rgb(0 0 0 / .05); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+html[data-skin=glass] :is(.bf-search input, .bf-select, input.flex, textarea, .bf-input) { background: var(--glass-readable); border-color: var(--glass-line); box-shadow: inset 0 1px 2px rgb(0 0 0 / .05); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4); }
 html[data-skin=glass]:not([data-radius=sharp]) :is(.bf-search input, .bf-select, input.flex, textarea, .bf-input) { border-radius: 12px; }
 /* Dialogs, menus and pickers are thicker glass with a softer, blurred backdrop. */
-html[data-skin=glass] :is([role=dialog], [role=alertdialog]).fixed { background: var(--glass-strong); border-color: var(--glass-line); box-shadow: inset 0 1px 0 var(--glass-edge), inset 0 0 0 1px var(--glass-rim), 0 30px 80px -24px rgb(10 15 40 / .5); -webkit-backdrop-filter: blur(40px) saturate(1.6) brightness(1.05); backdrop-filter: blur(40px) saturate(1.6) brightness(1.05); }
+html[data-skin=glass] :is([role=dialog], [role=alertdialog]).fixed { background: var(--glass-readable); border-color: var(--glass-line); box-shadow: inset 0 1px 0 var(--glass-edge), inset 0 0 0 1px var(--glass-rim), 0 30px 80px -24px rgb(10 15 40 / .5); -webkit-backdrop-filter: blur(44px) saturate(1.65) brightness(1.05); backdrop-filter: blur(44px) saturate(1.65) brightness(1.05); }
 html[data-skin=glass]:not([data-radius=sharp]) :is([role=dialog], [role=alertdialog]).fixed { border-radius: 24px; }
 html[data-skin=glass] .fixed.inset-0.z-50[data-state] { background: rgb(10 15 35 / .28); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
-html[data-skin=glass] [data-radix-popper-content-wrapper] > * { background: var(--glass-strong); border-color: var(--glass-line); box-shadow: inset 0 1px 0 var(--glass-edge), inset 0 0 0 1px var(--glass-rim), 0 18px 44px -16px rgb(10 15 40 / .45); -webkit-backdrop-filter: blur(34px) saturate(1.6) brightness(1.05); backdrop-filter: blur(34px) saturate(1.6) brightness(1.05); }
+html[data-skin=glass] [data-radix-popper-content-wrapper] > * { background: var(--glass-readable); border-color: var(--glass-line); box-shadow: inset 0 1px 0 var(--glass-edge), inset 0 0 0 1px var(--glass-rim), 0 18px 44px -16px rgb(10 15 40 / .45); -webkit-backdrop-filter: blur(38px) saturate(1.65) brightness(1.05); backdrop-filter: blur(38px) saturate(1.65) brightness(1.05); }
 html[data-skin=glass]:not([data-radius=sharp]) [data-radix-popper-content-wrapper] > * { border-radius: 16px; }
 html[data-skin=glass] .bf-logo { background: linear-gradient(145deg, rgb(255 255 255 / .55), color-mix(in oklab, var(--primary) 40%, transparent)); box-shadow: inset 0 1px 0 var(--glass-edge), 0 6px 18px -8px color-mix(in oklab, var(--primary) 70%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 html[data-skin=glass] .bf-avatar { background: linear-gradient(145deg, color-mix(in oklab, var(--primary) 30%, var(--glass)), color-mix(in oklab, var(--brand-2) 30%, var(--glass))); box-shadow: inset 0 1px 0 var(--glass-edge); }
 html[data-skin=glass] .bf-page-heading h1 { letter-spacing: -.02em; font-weight: 700; }
-html[data-skin=glass] .bf-savebar { background: color-mix(in oklab, var(--glass-strong) 94%, var(--primary)); -webkit-backdrop-filter: blur(28px) saturate(1.8); backdrop-filter: blur(28px) saturate(1.8); }
+html[data-skin=glass] .bf-savebar { background: color-mix(in oklab, var(--glass-readable) 94%, var(--primary)); -webkit-backdrop-filter: blur(32px) saturate(1.8); backdrop-filter: blur(32px) saturate(1.8); }
 /* The Theme Studio card previews the frosted look. */
 .bf-style[data-skin=glass] { background-image: radial-gradient(70% 90% at 0% 0%, color-mix(in oklab, oklch(.6 .2 258) 22%, transparent), transparent 70%), radial-gradient(70% 90% at 100% 100%, color-mix(in oklab, oklch(.6 .2 290) 20%, transparent), transparent 70%); box-shadow: inset 0 1px 0 rgb(255 255 255 / .5); }
 /* Without backdrop-filter support the glass falls back to near-solid surfaces so text stays readable. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  html[data-skin=glass] { --glass: rgb(255 255 255 / .9); --glass-strong: rgb(255 255 255 / .96); }
-  html[data-skin=glass].dark { --glass: rgb(34 37 52 / .92); --glass-strong: rgb(26 29 42 / .97); }
+  html[data-skin=glass] { --glass: rgb(255 255 255 / .9); --glass-strong: rgb(255 255 255 / .96); --glass-readable: rgb(255 255 255 / .98); }
+  html[data-skin=glass].dark { --glass: rgb(34 37 52 / .92); --glass-strong: rgb(26 29 42 / .97); --glass-readable: rgb(24 28 42 / .98); }
 }
 
 /* ───────────── Phones: bug and member tables become stacked cards ───────────── */
