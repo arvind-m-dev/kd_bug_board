@@ -2,6 +2,14 @@
 
 Newest first. Earlier history: `git log` and `roadmap.md`.
 
+## 2026-10-28 — Phase 2.1a: bug due dates
+- **Feature**: an optional due date per bug. Overdue (date past, bug still open) and due-soon badges in the bug list; an **Overdue** Overview card and list filter; "today" is computed in a new **workspace time zone** (Settings → Options). Only planners set dates — new `plan` permission (Admin always; added to the QA preset).
+- **Data**: migration `021_due_dates.sql` — `bugs.due_on date` + partial index. Applied to Neon and verified.
+- **Rules** (`bugflow.ts`): `isOverdue`, `dueSoon`, `dueBadge`, `CLOSED_STATUSES`; `maySetDue` (`bug-workflow.ts`). Due date flows through `reportBug`/`editBugReport` (version-checked, audited in `bug.edited`; non-planners' values dropped/ignored server-side).
+- **UI**: date field in the report/edit form (planners only); `DueBadge` in rows; `TimeZoneCard` in options settings; `saveTimeZone` server function.
+- **Tests**: `due-dates.test.ts` (10 new); 210/210 pass, tsc clean, lint 0 errors / 18 warnings (baseline), build OK. Not yet clicked through in a browser.
+- **Pending (2.1b)**: calendar view and notification-bell due reminders.
+
 ## 2026-10-28 — Verification: theme worlds and R2 bucket
 - **Theme worlds**: all 5 worlds (geometry, halloween, winter, christmas, autumn) route to `Seasonal3D`; "3D quality" control saves `quality` (auto/low/high) and reaches both scene builders. tsc clean, 200/200 tests, build OK. Not viewed in a browser (no headless browser installed; dev server was down).
 - **R2 bucket** (`bugboard-media`, custom source): CORS preflight PUT/GET allowed for `http://localhost:8080` and `https://kd-bug-board.vercel.app`; signed PUT (with `If-None-Match: *`) → 200, signed GET → 200 with matching body, delete → 404, using the stored encrypted credentials. Probe object under `bugs/_probe/` removed. No app rows written.

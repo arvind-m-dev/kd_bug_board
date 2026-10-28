@@ -81,6 +81,18 @@ export const saveOptions = createServerFn({ method: "POST" })
     const a = await import("./portal-access.server");
     return a.databaseCall(() => s.saveDropdownOptions(data));
   });
+export const saveTimeZone = createServerFn({ method: "POST" })
+  .validator((v: unknown) =>
+    z
+      .object({ timeZone: z.string().trim().min(1).max(64) })
+      .strict()
+      .parse(v),
+  )
+  .handler(async ({ data }) => {
+    const s = await import("./bug-workflow.server");
+    const a = await import("./portal-access.server");
+    return a.databaseCall(() => s.saveWorkspaceTimeZone(data.timeZone));
+  });
 export const deleteBug = createServerFn({ method: "POST" })
   .validator((v: unknown) =>
     z

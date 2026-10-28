@@ -915,6 +915,11 @@ html:root .bf-report-grid-raised, html:root .bf-report-grid-wide { grid-template
 .bf-status-note { --n: var(--warning); display: flex; align-items: center; gap: 5px; max-width: 220px; margin-top: 4px; font-size: 12px; color: var(--muted-foreground); }
 .bf-status-note[data-status=REOPENED] { --n: var(--destructive); }
 .bf-status-note[data-status=RECHECK] { --n: var(--success); }
+.bf-tz-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+.bf-tz-card .bf-input { padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--foreground); font: inherit; font-size: 13px; min-width: 200px; }
+.bf-due-badge { --n: var(--warning); display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 1px 7px 1px 5px; border-radius: 999px; border: 1px solid color-mix(in oklab, var(--n) 35%, transparent); background: color-mix(in oklab, var(--n) 12%, transparent); font-size: 11px; font-weight: 600; color: color-mix(in oklab, var(--n) 75%, var(--foreground)); }
+.bf-due-badge[data-tone=danger] { --n: var(--destructive); }
+.bf-due-badge svg { flex-shrink: 0; }
 .bf-status-note svg { flex-shrink: 0; color: var(--n); }
 .bf-status-note b { flex-shrink: 0; font-weight: 600; color: var(--n); }
 .bf-status-note-box { --n: var(--warning); display: flex; gap: 12px; margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; border: 1px solid color-mix(in oklab, var(--n) 35%, transparent); background: color-mix(in oklab, var(--n) 10%, transparent); }

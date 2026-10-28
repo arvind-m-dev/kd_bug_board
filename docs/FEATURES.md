@@ -78,7 +78,7 @@ Status key: **Implemented** = code present with unit tests or verified per `road
 | Timestamped text comments on recordings | Planned — undecided | Timed drawn marks exist (migration 018); text comments at a time do not |
 | Media end-to-end test against the real R2 bucket incl. production origin CORS | Partial — bucket verified 2026-10-28 | CORS preflight PUT/GET OK for `localhost:8080` and `kd-bug-board.vercel.app`; signed PUT/GET/delete round-trip with stored credentials OK. Full in-app upload (thumbnails, compression, mark-up) not yet clicked through in a browser |
 | Published deep-link checks | Deferred | Needs publishing approval (`roadmap.md`) |
-| Phase 2.1 Due dates, overdue, calendar | Planned | [phase-2 plan](../.lovable/plan/phase-2-plan-2026-10-28.md) |
+| Phase 2.1 Due dates, overdue, filter, workspace time zone | Partial — 2.1a shipped (migration 021); calendar + bell reminders (2.1b) pending | `due_on`, `isOverdue`/`dueBadge` in `bugflow.ts`, `maySetDue`, `plan` permission |
 | Phase 2.2 Sprints (plan/start/close, carry-over) | Planned | same plan; new `plan` permission |
 | Phase 2.3 Scrum board (rule-bound drag) | Planned | same plan |
 | Phase 2.4 Agile backlog (epics/stories/tasks via `bugs.kind`) | Planned | same plan |

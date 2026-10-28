@@ -59,8 +59,10 @@ import {
   priorityTone,
   priorityNames,
   mayEditBug,
+  maySetDue,
   severityLevel,
 } from "@/lib/bug-workflow";
+import { isOverdue, dueBadge } from "@/lib/bugflow";
 import { useNavigate } from "@tanstack/react-router";
 import { getMembers } from "@/lib/portal-access.functions";
 import { MemberProfile } from "./member-profile";
@@ -262,7 +264,9 @@ export function BugWorkspace({
   const rows = d.bugs.filter(
     (b) =>
       (!assignmentsOnly || b.assigneeId !== null) &&
-      matchesFilter(filter, b, d.actor.userId) &&
+      (filter === "overdue"
+        ? isOverdue(b.status, b.dueOn, d.today)
+        : matchesFilter(filter, b, d.actor.userId)) &&
       (severity === "all" || b.severity === severity) &&
       (priority === "all" || b.priority === priority) &&
       `${b.code} ${b.title} ${b.project} ${b.reporter} ${b.assignee}`
@@ -313,6 +317,9 @@ export function BugWorkspace({
       tone: "info",
     },
     ...counts.groups.map((g) => ({ key: g.key, label: g.label, count: g.count, tone: g.tone })),
+    ...(!assignmentsOnly && d.overdue > 0
+      ? [{ key: "overdue", label: "Overdue", count: d.overdue, tone: "danger" }]
+      : []),
   ];
   async function quickChange(b: LiveBug, change: Partial<BugChange>, done: string) {
     try {
@@ -343,6 +350,7 @@ export function BugWorkspace({
     { value: "owned", label: "Assigned to me" },
     { value: "open", label: "Open bugs" },
     { value: "unassigned", label: "Unassigned" },
+    { value: "overdue", label: "Overdue" },
     ...STATUS_GROUPS.map((g) => ({ value: g.key, label: `${g.label} (group)` })),
     ...ALL_STATUSES.map((v) => ({ value: v, label: statusLabel(v) })),
   ];
@@ -582,6 +590,7 @@ export function BugWorkspace({
                       >
                         {b.title}
                       </Button>
+                      <DueBadge bug={b} today={d.today} />
                       {b.statusNote && NOTE_STATUSES.includes(b.status) && (
                         <StatusNoteLine status={b.status} note={b.statusNote} />
                       )}
@@ -835,6 +844,7 @@ export function BugWorkspace({
             projects={d.projects}
             options={d.options}
             media={d.media}
+            canPlan={maySetDue(d.actor)}
             onSaved={(saved) => {
               setReport(false);
               setId(saved);
@@ -984,6 +994,7 @@ export function BugDetails({
           options={workspace.options}
           media={workspace.media}
           initial={b}
+          canPlan={maySetDue(actor)}
           onSaved={() => setEditing(false)}
         />
       </div>
@@ -1326,6 +1337,17 @@ const NOTE_SHORT: Record<string, string> = {
   WONT_FIX: "Won’t fix",
   RECHECK: "Fix note",
 };
+/** A small overdue / due-soon badge shown under a bug title. Nothing renders when the date is clear or far off. */
+function DueBadge({ bug, today }: { bug: LiveBug; today: string }) {
+  const badge = dueBadge(bug.status, bug.dueOn, today);
+  if (!badge) return null;
+  return (
+    <span className="bf-due-badge" data-tone={badge.tone} title={`Due ${bug.dueOn}`}>
+      <CalendarClock size={12} aria-hidden="true" />
+      {badge.text}
+    </span>
+  );
+}
 function StatusNoteLine({
   status,
   note,

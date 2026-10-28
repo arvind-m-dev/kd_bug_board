@@ -20,13 +20,13 @@ No secret values belong in this file.
 - Scope: `portal_projects` limits visible projects.
 
 ## Permissions (`src/lib/onboarding.ts`)
-`view`, `view_all` (read all project bugs), `report`, `comment`, `evidence`, `validate`, `assign`, `verify`, `progress`, `recheck`, `disposition`.
+`view`, `view_all` (read all project bugs), `report`, `comment`, `evidence`, `validate`, `assign`, `verify`, `progress`, `recheck`, `disposition`, `plan` (set due dates / sprints).
 
 | Role preset | Permissions |
 | --- | --- |
 | tester / other | view, view_all, report, comment, evidence |
 | developer | + progress, recheck, disposition |
-| qa | + validate, assign, verify |
+| qa | + validate, assign, verify, plan |
 
 Admin bypasses permission lists but not transition rules.
 

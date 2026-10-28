@@ -37,6 +37,7 @@ const bug: ExportBug = {
   createdAt: "2026-10-10T09:00:00.000Z",
   updatedAt: "2026-10-12T09:00:00.000Z",
   version: "v",
+  dueOn: null,
   steps: ["Open login", "Look"],
   evidenceUrls: ["https://drive.google.com/x"],
   module: "Functionality",
