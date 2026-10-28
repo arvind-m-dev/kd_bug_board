@@ -13,6 +13,9 @@ Tests live in `src/test/` (setup `src/test/setup.ts`, config `vitest.config.ts`)
 ## Coverage map (selected)
 Workflow `bug-workflow.test.ts`, `status-groups.test.ts` · edits `bug-edit.test.ts` · access `admin-route-access.test.ts`, `portal-access.test.ts`, `sign-in-throttle.test.ts`, `oauth.test.ts` · media `bug-media.test.ts`, `media-cors.test.ts`, `media-endpoint.test.ts`, `mp4-faststart.test.ts`, `video-marks.test.ts`, `mark-hit.test.ts` · trash `trash.test.ts`, `trash-bin-feedback.test.tsx` · members `member-management.test.ts`, `onboarding.test.ts` · reports/export `person-reports.test.ts`, `bug-sheet.test.ts`, `export.test.ts`, `period.test.ts` · notifications `notifications.test.ts` · theme `appearance.test.ts`, `color.test.ts` · seasonal scenes `seasonal-*.test.ts`.
 
+## Added tests
+- 2026-10-28 `demo-login.test.ts`: flag on only for exactly `1`; `demoUnlockAdmin` refuses while off. Suite now 40 files / 200 tests.
+
 ## Manual end-to-end scenarios (run in `npm run dev`)
 1. Admin sign-in → create project → create QA, developer, tester portals.
 2. Tester reports bug with screenshot → QA validates → assigns developer.
