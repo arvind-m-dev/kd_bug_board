@@ -65,7 +65,7 @@ export function useMemberFavicon(member: { name: string; code: string; panel?: s
       attributeFilter: ["href"],
     });
     const title = document.title;
-    document.title = `${name} · ${panelLabel(panel)} · Futurist Global Bug Board`;
+    document.title = `${name} · ${panelLabel(panel)} · Bug Board`;
     return () => {
       observer.disconnect();
       for (const [l, [h, t]] of previous) {

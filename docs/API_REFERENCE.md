@@ -21,7 +21,7 @@ Called by the app as RPC (`createServerFn`). Bug functions take `access` (`acces
 | --- | --- |
 | `bug-workflow.functions.ts` | getBugWorkspace, getBugExport, createBug, getBugDetail, updateBug (status/priority/severity/assign/comment/verify; `version` + request ID), editBug, saveOptions |
 | `bug-media.functions.ts` | prepareMediaUpload, finishMediaUpload, saveVideoMarks, deleteMedia, restoreMedia, deleteMediaForever, getMediaTrash, renameMedia, getMediaLibrary, saveMediaStorage, clearBugMedia, getMediaUsage, saveMediaQuota, saveMediaCleanup, getMediaStatus |
-| `portal-access.functions.ts` | getAdminStatus, unlockAdminAccess, lockAdminAccess, getMembers, getProjects, getProjectSummary, addProject, archiveProject, createMemberPortal, manageMemberPortal, getMemberPortal |
+| `portal-access.functions.ts` | getAdminStatus (now also returns `demo: boolean`), unlockAdminAccess, demoAdminAccess (no input; refuses unless `BUGFLOW_DEMO_LOGIN=1`), lockAdminAccess, getMembers, getProjects, getProjectSummary, addProject, archiveProject, createMemberPortal, manageMemberPortal, getMemberPortal |
 | `member-management.functions.ts` | getMemberProfile, saveMemberProfile, changeMember, dismissWelcome, savePortalAppearance |
 | `trash.functions.ts` | getTrash, restoreFromTrash, deleteForever, emptyTrash |
 | `ai-tokens.functions.ts` | createAiToken, getAiTokens, revokeAiToken, createPortalAiToken, getPortalAiTokens, revokePortalAiToken |

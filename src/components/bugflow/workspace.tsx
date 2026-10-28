@@ -336,12 +336,12 @@ export function Workspace({ view = "overview" }: { view?: View }) {
         >
           {collapsed ? <ChevronRight /> : <ChevronLeft />}
         </button>
-        <Link to="/" className="bf-brand" title="Futurist Global Bug Board">
+        <Link to="/" className="bf-brand" title="Bug Board">
           <span className="bf-logo">
             <BrandMark />
           </span>
           <span className="bf-brand-name">
-            Futurist Global Bug Board<span className="text-primary">.</span>
+            Bug Board<span className="text-primary">.</span>
           </span>
         </Link>
 
@@ -585,7 +585,7 @@ export function Workspace({ view = "overview" }: { view?: View }) {
           </AdminAccess>
           <footer className="bf-footer">
             <span>
-              Futurist Global Bug Board <span className="mx-1">·</span> Every bug. One place.
+              Bug Board <span className="mx-1">·</span> Every bug. One place.
             </span>
             <span className="flex items-center gap-2">
               <ShieldCheck size={12} />
@@ -1133,7 +1133,7 @@ function WorkspaceDialog({ kind, close }: { kind: string | null; close: () => vo
             ? "Download or copy the change history for a period."
             : kind === "search"
               ? "Find a bug or a team member anywhere in the workspace."
-              : "How the Futurist Global Bug Board works";
+              : "How the Bug Board works";
   return (
     <Dialog
       open={kind !== null}

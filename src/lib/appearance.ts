@@ -23,7 +23,7 @@ export type Palette = {
 export const PALETTES: Palette[] = [
   {
     id: "teal",
-    name: "Futurist Teal",
+    name: "Teal",
     description: "Calm teal with an indigo partner — the original look.",
     light: {
       primary: "oklch(0.5 0.1 192)",

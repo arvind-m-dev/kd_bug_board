@@ -1,6 +1,6 @@
-# Futurist Global Bug Board
+# Bug Board
 
-Bug reporting, assignment and QA verification for Futurist Global teams. Admins manage projects and members; reporters, QA and developers work through private portal links.
+Bug reporting, assignment and QA verification for your team. Admins manage projects and members; reporters, QA and developers work through private portal links.
 
 ## Stack
 

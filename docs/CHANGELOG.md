@@ -2,6 +2,26 @@
 
 Newest first. Earlier history: `git log` and `roadmap.md`.
 
+## 2026-10-28 — Nav bar stays on top when scrolling
+- **Fix**: `.bf-bulk-bar` z-index 30 → 19 and `.bf-armed-hint` 20 → 10 in `src/styles.css`, so they scroll under the sticky `.bf-topbar` (z 20) instead of over it; the bulk bar also no longer covers the mobile sidebar (30) / scrim (29).
+- **Rule**: in-page content must stay below z-index 20. Fixed overlays (save bar, FABs, upload tray, dialogs/popovers) and pointer-less seasonal effects stay above on purpose.
+- **Tests**: CSS only; build OK. Not checked in a browser.
+- **Follow-up (seasonal 3D themes)**: with a 3D theme on, panel headings, toolbars, pagers and form buttons are lifted to z 37 (above the 3D layer) and slid over the nav bar (reported with a screenshot of Overview → "Needs your attention"). Added `body:has(.bf-seasonal-3d)` overrides: settings tabs and bulk bar 38, nav bar 39, mobile scrim 42, sidebar 43. Build OK; not checked in a browser.
+
+## 2026-10-28 — Temporary one-click Admin sign-in
+- **Change**: `/login` shows a "Login without credentials" link under Sign in when `BUGFLOW_DEMO_LOGIN=1`. Server-side `demoUnlockAdmin` reuses `unlockAdmin` with env credentials; `adminStatus` returns an extra `demo` flag. Password form unchanged.
+- **Reason**: Open access while marketing material is made; the user chose to enable it on the live site, understanding that anyone with the URL becomes Admin.
+- **Files**: `src/lib/portal-access.server.ts`, `src/lib/portal-access.functions.ts`, `src/components/bugflow/admin-access.tsx`, `src/test/demo-login.test.ts`, `.env.example`. No migrations.
+- **Tests**: 200/200 pass (2 new), tsc clean, lint 0 errors / 18 warnings, build OK; env var name absent from client bundle. Not clicked through in a browser.
+- **Remove later**: unset `BUGFLOW_DEMO_LOGIN` (Vercel + `.env.local`) and redeploy; optionally delete the code above.
+
+## 2026-10-28 — Neutral "Bug Board" branding
+- **Change**: Removed "Futurist Global" from all user-facing text, page titles/meta, share previews, MCP instructions, AI onboarding prompt, origin-check error and README; product now reads "Bug Board". "for Futurist Global teams" → "for your team". Theme palette display name "Futurist Teal" → "Teal" (palette `id: "teal"` unchanged, so saved themes still work).
+- **Reason**: Company name to be added back later.
+- **Files**: `src/lib/bugflow.ts` (`SHARE_TITLE`, `pageHead`), `src/routes/*` metadata, `workspace.tsx`, `personal-portal.tsx`, `sign-out.tsx`, `use-member-favicon.tsx`, `mcp.server.ts`, `onboarding.server.ts`, `portal-access.server.ts`, `appearance.ts`, `src/test/bugflow.test.ts` (describe label), README, docs. Text only; no logic, routes or schema changed. No migrations.
+- **Tests**: 198/198 pass, tsc clean, lint 0 errors / 18 warnings (baseline), build OK.
+- **Re-adding the name later**: search for `Bug Board`; most page titles derive from `pageHead` in `src/lib/bugflow.ts`, but headers, portal and sign-out text are separate literals.
+
 ## 2026-10-28 — Planned features recorded
 - Added the remaining items from the 2026-10-22 media/theme brief to "Planned / deferred" in `docs/FEATURES.md` after checking the code (Drive is a "Coming later" placeholder; no text comments on recordings). Docs only; no code or tests changed.
 

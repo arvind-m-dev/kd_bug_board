@@ -92,16 +92,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Futurist Global Bug Board · Issue control" },
+      { title: "Bug Board · Issue control" },
       {
         name: "description",
-        content: "Futurist Global Bug Board manual QA and bug tracking workspace.",
+        content: "Bug Board manual QA and bug tracking workspace.",
       },
-      { property: "og:title", content: "Futurist Global Bug Board" },
+      { property: "og:title", content: "Bug Board" },
       {
         property: "og:description",
-        content:
-          "Report, assign and verify bugs in one shared QA workspace for Futurist Global teams.",
+        content: "Report, assign and verify bugs in one shared QA workspace for your team.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

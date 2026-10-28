@@ -87,14 +87,14 @@ export function exportMarkdown(bugs: Bug[]) {
     .join("\n\n---\n\n");
 }
 // Link previews use one brand title and the dashboard image: shared links land unsigned on /login, and private page details should not leak.
-const SHARE_TITLE = "Futurist Global Bug Board";
+const SHARE_TITLE = "Bug Board";
 const SHARE_DESCRIPTION =
-  "Report, assign and verify bugs in one shared QA workspace for Futurist Global teams.";
+  "Report, assign and verify bugs in one shared QA workspace for your team.";
 const OG_IMAGE = `${import.meta.env["VITE_SITE_URL"] ?? ""}/og-image.jpg`;
 export function pageHead(title: string, description: string) {
   return {
     meta: [
-      { title: `${title} · Futurist Global Bug Board` },
+      { title: `${title} · Bug Board` },
       { name: "description", content: description },
       { property: "og:title", content: SHARE_TITLE },
       { property: "og:description", content: SHARE_DESCRIPTION },
@@ -102,7 +102,7 @@ export function pageHead(title: string, description: string) {
       { property: "og:image", content: OG_IMAGE },
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
-      { property: "og:image:alt", content: "Futurist Global Bug Board dashboard" },
+      { property: "og:image:alt", content: "Bug Board dashboard" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: SHARE_TITLE },
       { name: "twitter:description", content: SHARE_DESCRIPTION },

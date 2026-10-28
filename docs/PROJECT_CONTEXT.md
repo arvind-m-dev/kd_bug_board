@@ -5,7 +5,7 @@ Concise source of truth for a new coding session. Details live in the linked doc
 Last verified: 2026-10-28 on branch `feat/theme-worlds` (commit `c1c9bb6` + uncommitted user edit to `src/components/bugflow/seasonal-sky.ts`).
 
 ## What this is
-Futurist Global Bug Board ("BugFlow"): bug reporting, triage, assignment and QA verification. One Admin (env-configured) manages projects and members; members (tester, developer, QA, other) work through private portal links. AI clients connect over MCP. See [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md).
+Bug Board ("BugFlow"): bug reporting, triage, assignment and QA verification. One Admin (env-configured) manages projects and members; members (tester, developer, QA, other) work through private portal links. AI clients connect over MCP. See [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md).
 
 ## Stack
 TanStack Start (React 19, file routes in `src/routes`), Tailwind + shadcn/ui, Neon Postgres (`bugflow` schema), S3-compatible media (Cloudflare R2), Vercel.
@@ -26,7 +26,7 @@ TanStack Start (React 19, file routes in `src/routes`), Tailwind + shadcn/ui, Ne
 - Migrations through `020_media_thumbs.sql`.
 
 ## Baseline (2026-10-28)
-`npm test` 198/198 pass (39 files) · `tsc --noEmit` clean · `eslint .` 0 errors, 18 warnings (react-refresh) · `vite build` OK. See [TESTING.md](TESTING.md).
+`npm test` 200/200 pass (40 files) · `tsc --noEmit` clean · `eslint .` 0 errors, 18 warnings (react-refresh) · `vite build` OK. See [TESTING.md](TESTING.md).
 
 ## Commands
 `npm run dev` (port 8080, loads `.env.local`) · `npm test` · `npx tsc --noEmit` · `npm run lint` · `npm run build` · `npm run db:migrate`.
@@ -40,6 +40,7 @@ TanStack Start (React 19, file routes in `src/routes`), Tailwind + shadcn/ui, Ne
 - Never record secrets in docs or code. User runs dev server on :8080 while agents work; do not save workspace settings from scripts.
 
 ## Known issues / drift
+- **Temporary security exception:** `BUGFLOW_DEMO_LOGIN=1` gives anyone on `/login` full Admin without a password (enabled for marketing, 2026-10-28). Turn off when done; see [AUTH_AND_PERMISSIONS.md](AUTH_AND_PERMISSIONS.md).
 - `README.md` says migrations `001…010`; actual range is `001…020`.
 - `roadmap.md` lists S3 media uploads as deferred, but media upload is implemented (R2 bucket connected 2026-10-23).
 - Bucket CORS must include every app origin (prod uploads fail otherwise).

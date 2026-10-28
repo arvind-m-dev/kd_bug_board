@@ -138,7 +138,7 @@ async function serverFor(access: BugAccess) {
   const server = new McpServer(
     { name: "bugflow", version: "1.0.0" },
     {
-      instructions: `You are connected to the Futurist Global Bug Board as ${actor.name} (${actor.role} panel). You may only see and change bugs this panel is allowed to. Report bugs with clear steps; one bug per report. Use get_bug before changing a bug so you have its current id and version.`,
+      instructions: `You are connected to the Bug Board as ${actor.name} (${actor.role} panel). You may only see and change bugs this panel is allowed to. Report bugs with clear steps; one bug per report. Use get_bug before changing a bug so you have its current id and version.`,
     },
   );
 

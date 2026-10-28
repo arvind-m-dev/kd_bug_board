@@ -151,7 +151,7 @@ export function PersonalPortal({
     return (
       <div className="min-h-screen bg-background">
         <header className="bf-topbar">
-          <strong>Futurist Global Bug Board</strong>
+          <strong>Bug Board</strong>
         </header>
         <main className="bf-main">
           <div className="bf-access">
@@ -194,7 +194,7 @@ export function PersonalPortal({
             <BrandMark />
           </span>
           <span className="bf-brand-name">
-            Futurist Global Bug Board<span className="text-primary">.</span>
+            Bug Board<span className="text-primary">.</span>
           </span>
         </div>
         <div className="bf-workspace">
@@ -368,7 +368,7 @@ export function PersonalPortal({
             </div>
           )}
           <footer className="bf-footer">
-            <span>Futurist Global Bug Board · {p.name}</span>
+            <span>Bug Board · {p.name}</span>
             <span>Private access · Shared records</span>
           </footer>
         </main>

@@ -50,7 +50,7 @@ export function checkOrigin() {
   }
   const origin = request.headers.get("origin");
   if (origin && origin !== new URL(request.url).origin)
-    throw new Error("This request must come from your Futurist Global Bug Board workspace.");
+    throw new Error("This request must come from your Bug Board workspace.");
 }
 // Verified Admin sessions are remembered briefly per server instance so each request skips a database round trip.
 // Sign-out clears the entry; other revocations take effect within ADMIN_CACHE_MS.
@@ -81,13 +81,24 @@ export async function requireAdmin() {
   adminCache.set(key, { admin: result, until: Date.now() + ADMIN_CACHE_MS });
   return result;
 }
+/** Temporary one-click Admin entry (BUGFLOW_DEMO_LOGIN=1): anyone who opens /login becomes Admin. Turn off when done. */
+export const demoLoginEnabled = () => process.env["BUGFLOW_DEMO_LOGIN"] === "1";
 export async function adminStatus() {
+  const demo = demoLoginEnabled();
   try {
-    return { unlocked: true, name: (await requireAdmin()).name };
+    return { unlocked: true, name: (await requireAdmin()).name, demo };
   } catch (error) {
     if (error && typeof error === "object" && "kind" in error) throw error;
-    return { unlocked: false, name: "" };
+    return { unlocked: false, name: "", demo };
   }
+}
+/** Signs in with the configured Admin credentials on the server, so they never reach the browser. */
+export async function demoUnlockAdmin() {
+  if (!demoLoginEnabled()) throw new Error("One-click sign-in is turned off.");
+  return unlockAdmin({
+    email: process.env["BUGFLOW_ADMIN_EMAIL"] ?? "",
+    password: process.env["BUGFLOW_ADMIN_PASSWORD"] ?? "",
+  });
 }
 export async function unlockAdmin(data: z.infer<typeof unlockSchema>) {
   checkOrigin();

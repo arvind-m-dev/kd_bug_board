@@ -291,6 +291,11 @@ html, body { overflow-x: clip; }
 .bf-main code:not(pre code) { white-space: nowrap; }
 /* Seasonal 3D props may wander over rows, never over controls: actions, toolbars, paging, badges and the footer sit above the scene. */
 body:has(.bf-seasonal-3d) :is(.bf-page-actions, .bf-toolbar, .bf-table-footer, .bf-pager, .bf-panel-heading, .bf-footer, .bf-setting-row > .bf-tag, form button) { position: relative; z-index: 37; }
+/* Those lifted controls (37) must still scroll under sticky bars and the nav bar, and stay under the open mobile menu. */
+body:has(.bf-seasonal-3d) :is(.bf-settings-tabs, .bf-bulk-bar) { z-index: 38; }
+body:has(.bf-seasonal-3d) .bf-topbar { z-index: 39; }
+body:has(.bf-seasonal-3d) .bf-sidebar-scrim { z-index: 42; }
+body:has(.bf-seasonal-3d) .bf-sidebar { z-index: 43; }
 /* Room at the end of every page for the floating bin and the scene's ground band. */
 .bf-shell .bf-main { padding-bottom: 88px; }
 /* Touch devices: no hover lifts, shorter entrance animations. */
@@ -434,7 +439,7 @@ body { font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; 
 
 /* Top bar stays visible and lets content glow through */
 /* Opaque enough that nothing scrolling underneath shows through; the blur only softens the last few percent. */
-.bf-topbar { position: sticky; top: 0; z-index: 20; background: color-mix(in oklab, var(--card) 97%, transparent); backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px); }
+.bf-topbar { position: sticky; top: 0; z-index: 20; /* page content stays below 20 so it scrolls under the bar */ background: color-mix(in oklab, var(--card) 97%, transparent); backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px); }
 
 /* Page heading */
 .bf-page-heading h1 { font-size: 28px; letter-spacing: -.02em; }
@@ -1062,7 +1067,7 @@ html body[data-scroll-locked] { margin-right: 0 !important; padding-right: 0 !im
 .bf-replace-icon[data-armed] { color: var(--destructive); background: color-mix(in oklab, var(--destructive) 15%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--destructive) 45%, transparent); animation: bf-pulse-red 1.2s ease-in-out infinite; }
 .bf-replace-btn { width: 112px; justify-content: center; }
 .bf-replace-btn[data-armed] { color: var(--destructive); border-color: color-mix(in oklab, var(--destructive) 50%, var(--border)); background: color-mix(in oklab, var(--destructive) 10%, transparent); }
-.bf-armed-hint { position: absolute; bottom: calc(100% + 6px); left: 50%; z-index: 20; transform: translateX(-50%); padding: 4px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; white-space: nowrap; pointer-events: none; color: var(--card); background: var(--foreground); box-shadow: var(--shadow-lift); animation: bf-rise .15s ease both; }
+.bf-armed-hint { position: absolute; bottom: calc(100% + 6px); left: 50%; z-index: 10; transform: translateX(-50%); padding: 4px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; white-space: nowrap; pointer-events: none; color: var(--card); background: var(--foreground); box-shadow: var(--shadow-lift); animation: bf-rise .15s ease both; }
 @keyframes bf-pulse-red { 0%, 100% { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--destructive) 45%, transparent); } 50% { box-shadow: inset 0 0 0 1px var(--destructive), 0 0 0 3px color-mix(in oklab, var(--destructive) 20%, transparent); } }
 
 /* Overview: period toolbar and combined priority & severity */
@@ -1813,7 +1818,7 @@ html[data-density=compact] .bf-settings-tabs { top: 52px; }
 .bf-media-pick input, .bf-trash-pick { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
 .bf-media-tile[data-picked] { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 10px; }
 .bf-trash-row[data-picked] { background: color-mix(in oklab, var(--primary) 7%, transparent); }
-.bf-bulk-bar { position: sticky; bottom: 16px; z-index: 30; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: 0 12px 30px -12px rgb(0 0 0 / .45); font-size: 13px; }
+.bf-bulk-bar { position: sticky; bottom: 16px; z-index: 19; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: 0 12px 30px -12px rgb(0 0 0 / .45); font-size: 13px; }
 /* Video mark-up dialogs fit the screen: the picture shrinks while marking, the dialog scrolls,
    and the Cancel / Preview / Save bar stays pinned at the bottom so it is always reachable. */
 .bf-markup-dialog { max-height: 94vh; max-height: 94dvh; overflow-y: auto; overscroll-behavior: contain; }

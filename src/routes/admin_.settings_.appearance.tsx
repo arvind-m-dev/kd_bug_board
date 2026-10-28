@@ -7,7 +7,7 @@ export const Route = createFileRoute("/admin_/settings_/appearance")({
   head: () =>
     pageHead(
       "Appearance & themes",
-      "Theme Studio for Futurist Global Bug Board: palette, style, fonts, motion and seasonal scenes.",
+      "Theme Studio for Bug Board: palette, style, fonts, motion and seasonal scenes.",
     ),
   component: () => <Workspace view="appearance" />,
 });

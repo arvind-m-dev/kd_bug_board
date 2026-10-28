@@ -32,7 +32,7 @@ export function SignOutButton({ className }: { className?: string }) {
       <ConfirmAction
         open={open}
         onOpenChange={setOpen}
-        title="Sign out of Futurist Global Bug Board?"
+        title="Sign out of Bug Board?"
         description="You’ll return to the sign-in page. Any unsaved changes or unshared portal links will be lost. Saved members and projects will stay unchanged."
         confirmLabel="Sign out"
         onConfirm={signOut}
