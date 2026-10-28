@@ -65,13 +65,14 @@ export function BrandMark() {
 export function Decorations() {
   const { effective, ready } = useTheme();
   const style = styleById(effective.style);
-  if (!ready || effective.motion === "off" || !style.decorated) return null;
-  if (["halloween", "winter", "christmas", "autumn"].includes(style.id)) {
+  if (!ready || effective.motion === "off") return null;
+  if (["geometry", "halloween", "winter", "christmas", "autumn"].includes(effective.world)) {
     return (
       <Seasonal3D
-        season={style.id}
+        season={effective.world}
         lively={effective.motion === "lively"}
         scene={effective.scene}
+        quality={effective.quality}
       />
     );
   }

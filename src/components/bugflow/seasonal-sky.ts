@@ -51,6 +51,54 @@ export function createSeasonalSky(scene: T.Scene, season: string) {
   const moonHalo = halo(0xffe9ba, 0.2);
   const moonBloom = halo(0xfff6e0, 0);
   const surface = moonSurface(MOON);
+  // Distant northern lights for the snowy worlds: soft canvas ribbons remain behind every panel.
+  const snowySky = season === "winter" || season === "christmas";
+  const auroraCanvas = document.createElement("canvas");
+  auroraCanvas.width = 768;
+  auroraCanvas.height = 192;
+  const auroraContext = auroraCanvas.getContext("2d")!;
+  if (snowySky) {
+    auroraContext.filter = "blur(9px)";
+    auroraContext.globalCompositeOperation = "lighter";
+    const colors = ["rgba(24,214,137,.64)", "rgba(31,145,238,.5)", "rgba(112,55,220,.42)"];
+    for (let ribbon = 0; ribbon < 3; ribbon++) {
+      const gradient = auroraContext.createLinearGradient(0, 34, 0, 176);
+      gradient.addColorStop(0, "rgba(255,255,255,0)");
+      gradient.addColorStop(0.34, colors[ribbon]!);
+      gradient.addColorStop(1, "rgba(80,190,255,0)");
+      auroraContext.strokeStyle = gradient;
+      auroraContext.lineWidth = 30 - ribbon * 5;
+      auroraContext.beginPath();
+      for (let x = -30; x <= auroraCanvas.width + 30; x += 8) {
+        const y =
+          72 +
+          ribbon * 22 +
+          Math.sin(x * 0.012 + ribbon * 1.8) * (22 + ribbon * 5) +
+          Math.sin(x * 0.031 - ribbon) * 8;
+        if (x === -30) auroraContext.moveTo(x, y);
+        else auroraContext.lineTo(x, y);
+      }
+      auroraContext.stroke();
+    }
+  }
+  const auroraTexture = new T.CanvasTexture(auroraCanvas);
+  auroraTexture.colorSpace = T.SRGBColorSpace;
+  const auroras = snowySky
+    ? Array.from({ length: 3 }, (_, i) => {
+        const material = new T.SpriteMaterial({
+          map: auroraTexture,
+          transparent: true,
+          opacity: 0.24 - i * 0.03,
+          depthWrite: false,
+          blending: T.AdditiveBlending,
+        });
+        materials.push(material);
+        const sprite = new T.Sprite(material);
+        sprite.renderOrder = -2;
+        root.add(sprite);
+        return sprite;
+      })
+    : [];
   let checkedHour = -1;
   function updateMoon() {
     const hour = Math.floor(Date.now() / 3600000);
@@ -143,6 +191,19 @@ export function createSeasonalSky(scene: T.Scene, season: string) {
       moon.position.set(width - 50, height - header - 56, 14);
       moonHalo.position.copy(moon.position).z = 13;
       moonBloom.position.copy(moon.position).z = 12;
+      auroras.forEach((aurora, i) => {
+        const drift = moving ? Math.sin(time * (0.055 + i * 0.012) + i * 2.1) : 0;
+        const breathe = moving ? 1 + Math.sin(time * 0.12 + i) * 0.06 : 1;
+        aurora.visible = width > 760;
+        aurora.position.set(
+          left + (width - left) * (0.5 + (i - 1) * 0.015) + drift * 52,
+          height - header - 145 - i * 24,
+          5 + i * 0.2,
+        );
+        aurora.scale.set((width - left) * (1.08 + i * 0.06), 220 * breathe, 1);
+        aurora.material.opacity =
+          (0.23 - i * 0.028) * (moving ? 0.9 + Math.sin(time * 0.16 + i * 1.7) * 0.1 : 1);
+      });
       stars.forEach((star, i) => {
         star.position.set(
           i % 2 ? width - 9 : Math.max(9, left + 9),
@@ -191,6 +252,7 @@ export function createSeasonalSky(scene: T.Scene, season: string) {
       scene.remove(root);
       glowTexture.dispose();
       moonTexture.dispose();
+      auroraTexture.dispose();
       materials.forEach((m) => m.dispose());
       geometries.forEach((g) => g.dispose());
     },
