@@ -116,7 +116,9 @@ export function AdminAccess({
         </label>
         <label className="bf-field">
           Password
-          <span className="relative block">
+          {/* The toggle sits beside the field, not inside it: browser password managers draw their own icons
+              inside the input, and the two were landing on top of each other. */}
+          <span className="bf-passrow">
             <Input
               required
               type={showPassword ? "text" : "password"}
@@ -124,7 +126,6 @@ export function AdminAccess({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
-              className="pr-11"
             />
             <button
               type="button"
