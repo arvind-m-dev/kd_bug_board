@@ -14,7 +14,6 @@ Names only; never record values.
 | `MEDIA_S3_ENDPOINT`, `MEDIA_S3_BUCKET`, `MEDIA_S3_ACCESS_KEY_ID`, `MEDIA_S3_SECRET_ACCESS_KEY` | no | Fallback media bucket (workspace setting wins) |
 | `MEDIA_S3_REGION`, `MEDIA_S3_FORCE_PATH_STYLE` | no | Defaults `auto`, `1` (R2) |
 | `DATABASE_DOH` | local only | DNS-over-HTTPS workaround |
-| `BUGFLOW_DEMO_LOGIN` | no, **temporary** | `1` = one-click Admin sign-in with no password. Anyone with the URL becomes Admin. Remove after marketing |
 
 Template: `.env.example`. Local values in `.env.local` (not committed).
 

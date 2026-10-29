@@ -6,7 +6,6 @@ Status key: **Implemented** = code present with unit tests or verified per `road
 | Feature | Status | Routes / files |
 | --- | --- | --- |
 | Email/password sign-in, 8h session, throttling (10 fails / 15 min per address) | Implemented | `/login`, `portal-access.server.ts`, `sign-in-throttle.server.ts` |
-| Temporary one-click sign-in ("Login without credentials" link, `BUGFLOW_DEMO_LOGIN=1`) | Implemented (temporary) | `/login`, `admin-access.tsx`, `demoUnlockAdmin` |
 | Projects (add, archive, summary) | Implemented | `/admin/projects`, `portal-access.functions.ts` |
 | Team & access: create/manage member portals, copy links, revoke, expiry | Implemented | `/admin/users` (`/portals` redirects here), `member-portals.tsx` |
 | Member lifecycle (soft delete, restore via Trash) | Implemented | `member-management.*`, `trash.*` |
