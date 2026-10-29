@@ -2,6 +2,9 @@
 
 Newest first. Earlier history: `git log` and `roadmap.md`.
 
+## 2026-10-29 — Phase 2 demo data
+- `database/demo/phase2_seed.sql` (idempotent; `phase2_remove.sql` undoes it): on **Demo · Customer Portal** — due dates spread over 14 open bugs (4 overdue, 2 today, rest ahead), a backlog of 2 epics / 5 stories / 3 tasks with estimates, ranks, Ready flags and parents, and sprints 14 (closed, 4 committed / 2 done) → 15 (active, incl. 2 carried-over bugs and 2 stories, 1 added after start) → 16 (planned), plus matching sprint/backlog activity for the bell and log. Fixed `de300000-…-9000-…` ids; applying twice changes nothing. Verified in e2e screenshots (sprints page shows carry-over chips, bell shows due reminders).
+
 ## 2026-10-29 — Phase 2.4: agile backlog (Phase 2 complete)
 - **Backlog** (`/admin/backlog`, Bugs nav group): epics, stories, tasks and open bugs of a project in one ranked list. Drag to rank (fractional `backlog_rank` string — one row per reorder, `rankBetween`), inline estimate and Ready toggle, epic parent select (kind rules + same project + loop check, `wouldCycle` client + recursive-CTE server), epic progress bars (`epicProgress`: counts, or points when every child has one), one-click hand-off into the project's open sprint. Create dialog for story/task/epic (request-ID idempotent; audited `backlog.created`; rank-only changes are `backlog.ranked`, quiet in the bell).
 - **Deviation from plan**: non-bug kinds reuse the existing 13-status workflow instead of a separate short one — the bugs table's status CHECK and every feature (board, sprints, exports, MCP) are built on it; one workflow, no ripple.
