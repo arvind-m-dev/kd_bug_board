@@ -19,13 +19,19 @@ import { ErrorNotice, actionError } from "./action-feedback";
 import { SkeletonRows } from "./loading";
 import { toast } from "sonner";
 
-const access: BugAccess = { kind: "admin" };
-
 /**
  * The scrum board: one column per workflow stage. A drop either performs the one allowed status change directly, or
  * opens the bug (assigning and retest verdicts need their own dialogs) — it can never bypass the workflow rules.
+ * Works for the Admin panel (default) and, read/act within their own permissions, for member portals via `access`.
  */
-export function BoardView() {
+export function BoardView({
+  access = { kind: "admin" },
+  onOpen,
+}: {
+  access?: BugAccess;
+  /** Where "open the bug" goes. Default: the Admin bugs page. Portals switch to their bugs tab instead. */
+  onOpen?: (bug: LiveBug) => void;
+}) {
   const client = useQueryClient();
   const fetch = useServerFn(getBugWorkspace);
   const update = useServerFn(updateBug);
@@ -54,7 +60,7 @@ export function BoardView() {
   const bugs = d.bugs.filter((b) => project === "all" || b.projectId === project);
   const draggingBug = dragging ? bugs.find((b) => b.id === dragging) : undefined;
   const openBug = (b: LiveBug) =>
-    void navigate({ to: "/admin/bugs", search: { bug: Number(b.id) } });
+    onOpen ? onOpen(b) : void navigate({ to: "/admin/bugs", search: { bug: Number(b.id) } });
 
   async function moveTo(b: LiveBug, column: BoardColumnKey) {
     const action = dropAction(d.actor, b, column);

@@ -2,6 +2,14 @@
 
 Newest first. Earlier history: `git log` and `roadmap.md`.
 
+## 2026-10-29 — Phase 2 wrap (guide, bell reminders, portal tabs) + Playwright smoke suite
+- **2.5 user guide**: public `/guide` (static, no data, no session) — step-by-step per role incl. due dates, sprints, board, media, AI access; linked from the Help dialogs. Route + `guide-page.tsx`.
+- **2.1b bell reminders**: the Admin bell now tops with synthetic "Due soon"/"Overdue" items — open bugs due by tomorrow in the workspace tz, computed on read (`dueReminders`), no stored rows or jobs; unread once per day; clearing the bell never hides a bug still due.
+- **Portal tabs**: member portals get a read-only **Sprint** tab (`portalSprints`, scoped to the portal's projects) and a **Board** tab (same `BoardView`, portal access — moves limited to that member's own permissions; opening a bug jumps to the bugs tab).
+- **Playwright smoke suite** (`npm run test:e2e`, separate from vitest): signed-out surface (login form, `/admin*` redirects, `/guide`), a bad portal link leaks no bug data, and — while demo sign-in is enabled — a signed-in sweep of Overview/Sprints/Board/Calendar with screenshots (`e2e/shots/`). Chromium installed as a devDependency flow; config boots the built server on :4788 against the real DB (read-only pages; the demo sign-in session is the only write).
+- **Found by the suite and fixed**: the board's Done column clipped off-screen at 1280px — the board now scrolls sideways when the content area is narrower than five columns. Verified in the screenshot after the fix.
+- **Gates**: 224/224 vitest + 5/5 e2e, tsc clean, lint 0 errors / 18 warnings, build OK. First features verified in a real (headless) browser.
+
 ## 2026-10-29 — Full system re-verification + session housekeeping
 - **Gates**: tsc clean, 224/224 tests, lint 0 errors / 18 warnings (baseline), build OK.
 - **Live smoke** (built server on :4799, signed out): every `/admin*` route (incl. new sprints/board) 307 → `/login?redirect=…`; `/portals` → `/admin/users`; bad member/QA tokens render the shell with **no data and no sensitive strings in the HTML**; `/media/:id` safe; MCP without token → 401; OAuth discovery 200; `/guide` 404 (2.5 not built yet).

@@ -18,8 +18,10 @@ import {
   closeSprintFn,
   addToSprintFn,
   removeFromSprintFn,
+  getPortalSprints,
 } from "@/lib/sprints.functions";
 import type { SprintsData } from "@/lib/sprints.server";
+import type { BugAccess } from "@/lib/bug-workflow";
 import { ThemedSelect } from "./themed-select";
 import { ErrorNotice, actionError } from "./action-feedback";
 import { SkeletonRows } from "./loading";
@@ -370,5 +372,75 @@ function CreateSprintDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Read-only sprint view for member portals: the open sprints of the projects this portal can see. */
+export function PortalSprints({ access }: { access: BugAccess }) {
+  const fetch = useServerFn(getPortalSprints);
+  const q = useQuery({
+    queryKey: ["portal-sprints", access],
+    queryFn: () => fetch({ data: { access } }),
+    retry: false,
+    staleTime: 15000,
+    refetchInterval: 30000,
+  });
+  if (q.isLoading) return <SkeletonRows />;
+  if (q.isError || !q.data)
+    return (
+      <ErrorNotice
+        message="Sprints could not be loaded."
+        onRetry={() => void q.refetch()}
+        retrying={q.isFetching}
+      />
+    );
+  if (!q.data.length)
+    return (
+      <p className="bf-panel p-5 text-sm text-muted-foreground">
+        No open sprint for your projects right now.
+      </p>
+    );
+  return (
+    <div className="grid gap-3">
+      {q.data.map((s) => (
+        <div key={s.id} className="bf-panel">
+          <div className="bf-panel-heading">
+            <div className="min-w-0">
+              <h2 className="truncate">
+                {s.name}
+                <span className="bf-sprint-state" data-state={s.state}>
+                  {STATE_LABEL[s.state]}
+                </span>
+              </h2>
+              <span className="text-xs text-muted-foreground">
+                {s.project}
+                {s.startsOn || s.endsOn ? ` · ${s.startsOn ?? "…"} → ${s.endsOn ?? "…"}` : ""}
+              </span>
+            </div>
+          </div>
+          {s.goal && <p className="px-4 pb-1 text-sm">{s.goal}</p>}
+          <div className="bf-sprint-stats">
+            <Stat label="Committed" value={s.summary.committed} />
+            <Stat label="Added" value={s.summary.added} />
+            <Stat label="Open" value={s.summary.open} />
+            <Stat label="Done" value={s.summary.done} />
+          </div>
+          <div className="bf-sprint-items">
+            <table className="bf-table">
+              <tbody>
+                {s.items.map((it) => (
+                  <tr key={it.bugId}>
+                    <td className="bf-cell-nowrap font-mono text-xs">{it.code}</td>
+                    <td>{it.title}</td>
+                    <td className="bf-cell-nowrap text-xs">{pretty(it.status)}</td>
+                    <td className="bf-cell-nowrap text-xs text-muted-foreground">{it.assignee}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

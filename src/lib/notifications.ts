@@ -39,6 +39,8 @@ const words: Record<string, string> = {
   "bug.restored": "Bug restored",
   "bug.purged": "Bug deleted forever",
   "trash.emptied": "Trash emptied",
+  "bug.overdue": "Overdue",
+  "bug.due_soon": "Due soon",
   "sprint.created": "Sprint created",
   "sprint.updated": "Sprint updated",
   "sprint.started": "Sprint started",
@@ -101,6 +103,7 @@ export function notificationTone(action: string, status = "") {
     action === "member.delete" ||
     action === "bug.deleted" ||
     action === "portal.revoked" ||
+    action === "bug.overdue" ||
     status === "REOPENED"
   )
     return "danger";

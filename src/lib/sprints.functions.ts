@@ -1,10 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { accessSchema } from "./bug-workflow";
 import {
   createSprintSchema,
   updateSprintSchema,
   sprintActionSchema,
   sprintItemSchema,
 } from "./sprints";
+
+export const getPortalSprints = createServerFn({ method: "POST" })
+  .validator((v: unknown) => z.object({ access: accessSchema }).strict().parse(v))
+  .handler(async ({ data }) => {
+    const s = await import("./sprints.server");
+    const a = await import("./portal-access.server");
+    return a.databaseCall(() => s.portalSprints(data.access));
+  });
 
 export const getSprints = createServerFn({ method: "POST" }).handler(async () => {
   const s = await import("./sprints.server");

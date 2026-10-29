@@ -11,10 +11,13 @@ Verify nothing regressed. Run the automated gates first; they are the source of 
 
 ```bash
 npx tsc --noEmit          # types: must be clean
-npm test                  # vitest: all files pass (currently 210 tests / 41 files)
+npm test                  # vitest: all files pass
 npm run lint              # eslint: 0 errors; ~18 react-refresh warnings are the known baseline
 npm run build             # vite build: must exit 0
+npm run test:e2e          # Playwright smoke (needs the build above): 5 specs, real headless Chromium
 ```
+
+The e2e suite boots the built server on :4788 against the real database (read-only pages; a demo sign-in session is its only write) and saves screenshots to `e2e/shots/` — READ those images to visually confirm the pages. The signed-in sweep self-skips when `BUGFLOW_DEMO_LOGIN` is off.
 
 Report each result plainly (pass / fail with the first error). A warning count above the baseline (18) is a regression — name the new ones. Do **not** claim a browser was checked; these gates do not open one.
 
@@ -36,7 +39,7 @@ node --env-file=.env.local -e "import('@neondatabase/serverless').then(async ({n
 
 ## 3. Manual browser checklist (needs a human or an enabled browser tool)
 
-The agent cannot open a GUI here (terminal only; no Playwright installed; dev server usually down). Start it with `npm run dev` (serves :8080) and either walk these yourself or drive an enabled browser tool. Check on Admin plus one developer and one QA portal where scope matters.
+Beyond the e2e smoke, interactive flows still need a human (or extend `e2e/smoke.spec.ts`). Start it with `npm run dev` (serves :8080) and either walk these yourself or drive an enabled browser tool. Check on Admin plus one developer and one QA portal where scope matters.
 
 **Due dates (Phase 2.1a)**
 - [ ] Report/edit a bug as Admin or a `plan` holder: the Due date field shows; a non-planner (plain reporter) never sees it.

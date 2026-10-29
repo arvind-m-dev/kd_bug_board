@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as GuideRouteImport } from './routes/guide'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PortalsRouteImport } from './routes/portals'
 import { Route as AdminActivityRouteImport } from './routes/admin_.activity'
@@ -43,6 +44,11 @@ const IndexRoute = IndexRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuideRoute = GuideRouteImport.update({
+  id: '/guide',
+  path: '/guide',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -164,6 +170,7 @@ const AdminSettingsStorageRoute = AdminSettingsStorageRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/guide': typeof GuideRoute
   '/login': typeof LoginRoute
   '/portals': typeof PortalsRoute
   '/admin/activity': typeof AdminActivityRoute
@@ -191,6 +198,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/guide': typeof GuideRoute
   '/login': typeof LoginRoute
   '/portals': typeof PortalsRoute
   '/admin/activity': typeof AdminActivityRoute
@@ -219,6 +227,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/guide': typeof GuideRoute
   '/login': typeof LoginRoute
   '/portals': typeof PortalsRoute
   '/admin_/activity': typeof AdminActivityRoute
@@ -248,6 +257,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/guide'
     | '/login'
     | '/portals'
     | '/admin/activity'
@@ -275,6 +285,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/guide'
     | '/login'
     | '/portals'
     | '/admin/activity'
@@ -302,6 +313,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/guide'
     | '/login'
     | '/portals'
     | '/admin_/activity'
@@ -330,6 +342,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  GuideRoute: typeof GuideRoute
   LoginRoute: typeof LoginRoute
   PortalsRoute: typeof PortalsRoute
   AdminActivityRoute: typeof AdminActivityRoute
@@ -369,6 +382,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guide': {
+      id: '/guide'
+      path: '/guide'
+      fullPath: '/guide'
+      preLoaderRoute: typeof GuideRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -538,6 +558,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  GuideRoute: GuideRoute,
   LoginRoute: LoginRoute,
   PortalsRoute: PortalsRoute,
   AdminActivityRoute: AdminActivityRoute,

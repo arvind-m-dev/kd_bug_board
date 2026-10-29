@@ -920,9 +920,23 @@ html:root .bf-report-grid-raised, html:root .bf-report-grid-wide { grid-template
 .bf-status-note[data-status=RECHECK] { --n: var(--success); }
 .bf-tz-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
 .bf-tz-card .bf-input { padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--foreground); font: inherit; font-size: 13px; min-width: 200px; }
+/* ── User guide (/guide) ── */
+.bf-guide { max-width: 760px; margin: 0 auto; padding: 32px 16px 60px; display: grid; gap: 18px; }
+.bf-guide-hero h1 { display: flex; align-items: center; gap: 10px; font-size: 24px; font-weight: 800; margin: 0 0 8px; }
+.bf-guide-hero p { margin: 0; color: var(--muted-foreground); max-width: 56ch; }
+.bf-guide-back { display: inline-flex; align-items: center; gap: 5px; margin-top: 12px; font-size: 13px; font-weight: 600; color: var(--primary); }
+.bf-guide-section { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.bf-guide-section h2 { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; margin: 0 0 10px; }
+.bf-guide-section ol { margin: 0; padding-left: 20px; display: grid; gap: 7px; font-size: 14px; }
+.bf-guide-section li { line-height: 1.45; }
+.bf-guide-foot { font-size: 13px; color: var(--muted-foreground); text-align: center; }
+.bf-guide-foot a { color: var(--primary); font-weight: 600; }
+
 /* ── Scrum board ── */
-.bf-board { display: grid; grid-template-columns: repeat(5, minmax(210px, 1fr)); gap: 12px; align-items: start; }
-@media (max-width: 1100px) { .bf-board { display: flex; overflow-x: auto; padding-bottom: 8px; } .bf-board .bf-board-col { min-width: 230px; } }
+/* Five columns side by side; when the content area is narrower than they need, the board scrolls sideways
+   instead of clipping the last column (seen at 1280px with the sidebar open). */
+.bf-board { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 12px; align-items: start; overflow-x: auto; padding-bottom: 8px; }
+@media (max-width: 1100px) { .bf-board { display: flex; } .bf-board .bf-board-col { min-width: 230px; flex: none; } }
 .bf-board[data-busy] { opacity: .7; pointer-events: none; }
 .bf-board-col { background: var(--muted); border: 1px solid var(--border); border-radius: 10px; min-height: 120px; transition: opacity .15s; }
 .bf-board-col[data-dim] { opacity: .35; }

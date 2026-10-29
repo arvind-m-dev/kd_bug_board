@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "demo:seed": "python3 database/demo/generate_seed.py > database/demo/seed.sql && node --env-file-if-exists=.env.local node_modules/jiti/lib/jiti-cli.mjs database/demo/apply.ts seed",
     "demo:remove": "node --env-file-if-exists=.env.local node_modules/jiti/lib/jiti-cli.mjs database/demo/apply.ts remove",
-    "db:migrate": "node --env-file-if-exists=.env.local node_modules/jiti/lib/jiti-cli.mjs database/migrate.ts"
+    "db:migrate": "node --env-file-if-exists=.env.local node_modules/jiti/lib/jiti-cli.mjs database/migrate.ts",
+    "test:e2e": "playwright test"
   },
   "overrides": {
     "rolldown": "1.2.1"
@@ -83,6 +84,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
+    "@playwright/test": "^1.64.1",
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",
     "@types/node": "^22.16.5",

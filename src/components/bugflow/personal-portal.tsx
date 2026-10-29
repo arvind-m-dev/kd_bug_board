@@ -12,6 +12,8 @@ import {
   X,
   CircleHelp,
   FolderKanban,
+  CalendarRange,
+  Kanban,
   CalendarDays,
   Hash,
   CircleCheck,
@@ -43,6 +45,8 @@ import { permissionLabels, rolePermissions, type Permission } from "@/lib/onboar
 import { Button } from "@/components/ui/button";
 import { ErrorNotice } from "./action-feedback";
 import { BugWorkspace } from "./bug-workspace";
+import { PortalSprints } from "./sprints";
+import { BoardView } from "./board";
 import { HelpContent, roleGuide } from "./help-content";
 import { getBugWorkspace } from "@/lib/bug-workflow.functions";
 import { focusCounts, portalFocus, type BugAccess } from "@/lib/bug-workflow";
@@ -51,17 +55,19 @@ import { useMemberFavicon } from "@/hooks/use-member-favicon";
 import { usePresence } from "@/hooks/use-presence";
 import { useUrlParam } from "@/hooks/use-url-param";
 
-type Tab = "bugs" | "media" | "access" | "ai" | "theme" | "help";
+type Tab = "bugs" | "sprint" | "board" | "media" | "access" | "ai" | "theme" | "help";
 type Focus = { filter: string; label: string };
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "bugs", label: "My bugs", icon: Bug },
+  { id: "sprint", label: "Sprint", icon: CalendarRange },
+  { id: "board", label: "Board", icon: Kanban },
   { id: "media", label: "My media", icon: Images },
   { id: "ai", label: "AI access", icon: Bot },
   { id: "theme", label: "My theme", icon: Palette },
   { id: "help", label: "How it works", icon: CircleHelp },
 ];
 
-const TAB_IDS: Tab[] = ["bugs", "media", "access", "ai", "theme", "help"];
+const TAB_IDS: Tab[] = ["bugs", "sprint", "board", "media", "access", "ai", "theme", "help"];
 const ACCESS_VIEW: { id: Tab; label: string; icon: LucideIcon } = {
   id: "access",
   label: "My projects & access",
@@ -85,6 +91,8 @@ export function PersonalPortal({
   const read = useServerFn(getMemberPortal);
   // The open tab lives in the URL (?tab=…), so a refresh or "Try again" reopens it.
   const [tabParam, setTabParam] = useUrlParam("tab");
+  // Set by the board when a move needs the bug dialog: the bugs tab reads ?bug= and opens it.
+  const [, setBugParam] = useUrlParam("bug");
   const tab: Tab = TAB_IDS.includes(tabParam as Tab) ? (tabParam as Tab) : "bugs";
   const setTab = (t: Tab) => setTabParam(t === "bugs" ? null : t);
   const [sheet, setSheet] = useState(false);
@@ -347,6 +355,16 @@ export function PersonalPortal({
                 initialFilterLabel={focus.label}
               />
             </>
+          )}
+          {tab === "sprint" && <PortalSprints access={access} />}
+          {tab === "board" && (
+            <BoardView
+              access={access}
+              onOpen={(b) => {
+                setBugParam(String(b.id));
+                setTab("bugs");
+              }}
+            />
           )}
           {tab === "media" && <MediaLibrary access={access} />}
           {tab === "access" && (

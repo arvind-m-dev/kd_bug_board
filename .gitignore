@@ -33,3 +33,4 @@ dist-ssr
 
 .env
 .vercel
+e2e/shots/

@@ -78,11 +78,12 @@ Status key: **Implemented** = code present with unit tests or verified per `road
 | Timestamped text comments on recordings | Planned — undecided | Timed drawn marks exist (migration 018); text comments at a time do not |
 | Media end-to-end test against the real R2 bucket incl. production origin CORS | Partial — bucket verified 2026-10-28 | CORS preflight PUT/GET OK for `localhost:8080` and `kd-bug-board.vercel.app`; signed PUT/GET/delete round-trip with stored credentials OK. Full in-app upload (thumbnails, compression, mark-up) not yet clicked through in a browser |
 | Published deep-link checks | Deferred | Needs publishing approval (`roadmap.md`) |
-| Phase 2.1 Due dates, overdue, filter, time zone, calendar | Partial — 2.1a + calendar view shipped; bell due-reminders pending | `due_on` (021), `isOverdue`/`dueBadge`, `maySetDue`, `plan`; `DueCalendar` on All Bugs |
-| Phase 2.2 Sprints (plan/start/close, carry-over) | Implemented (Admin) | `/admin/sprints`, migration 022; `get_sprint` MCP tool done; member read-only tab pending |
-| Phase 2.3 Scrum board (rule-bound drag) | Implemented (Admin) | `/admin/board`, `board.ts` rules + tests; native drag + per-card Move menu (not @dnd-kit — D5 deviation); portal board tab pending |
+| Phase 2.1 Due dates, overdue, filter, time zone, calendar, bell reminders | Implemented | `due_on` (021), `DueCalendar`; synthetic due reminders in the Admin bell (`dueReminders`, computed on read) |
+| Phase 2.2 Sprints (plan/start/close, carry-over) | Implemented | `/admin/sprints` (Admin manages); read-only Sprint tab on member portals; `get_sprint` MCP tool |
+| Phase 2.3 Scrum board (rule-bound drag) | Implemented | `/admin/board` + Board tab on member portals (role-scoped moves); native drag + Move menu (D5 deviation) |
 | Phase 2.4 Agile backlog (epics/stories/tasks via `bugs.kind`) | Planned | same plan |
-| Phase 2.5 In-app user guide | Planned | same plan |
+| Phase 2.5 In-app user guide | Implemented | public `/guide` (static, no data); linked from Help dialogs |
+| Browser smoke suite (Playwright) | Implemented | `npm run test:e2e` (`e2e/smoke.spec.ts`): signed-out surface, no-leak check, guide, demo-sign-in sweep with screenshots |
 | Phase 3 (burndown, SLA, alerts, releases, GitHub/GitLab, AI triage, phone capture, feedback widget, SSO/MFA) | Planned | same plan, Phase 3 section |
 | Jira sync / import | Not planned | Decision D1, 2026-10-28 |
 

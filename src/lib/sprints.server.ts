@@ -229,3 +229,34 @@ export async function activeSprint(projectId: string) {
   const items = itemRows.map(parseItem);
   return { ...sprint, items, summary: summarizeSprint(items, sprint.startedAt) };
 }
+
+/**
+ * Read-only sprints for a portal: open sprints (and the project names) of exactly the projects this access can see.
+ * No mutations here — planning stays with Admin; members watch their sprint.
+ */
+export async function portalSprints(access: import("./bug-workflow").BugAccess) {
+  const { actorFor } = await import("./bug-workflow.server");
+  const actor = await actorFor(access);
+  if (!actor.permissions.includes("view"))
+    throw new Error("This portal does not have permission to view bugs.");
+  const { rows } = await neonQuery(
+    `select s.*,pr.name as project_name,to_json(s.started_at) as started_iso,to_json(s.closed_at) as closed_iso,to_json(s.created_at) as created_iso
+     from bugflow.sprints s join bugflow.projects pr on pr.id=s.project_id
+     where s.state<>'closed' and ($2::boolean or exists(select 1 from bugflow.portal_projects pp where pp.portal_id=$1::uuid and pp.project_id=s.project_id))
+     order by (s.state='active') desc,s.created_at desc limit 20`,
+    [actor.portalId, actor.role === "admin"],
+  );
+  const sprints = rows.map(parseSprint);
+  if (!sprints.length) return [];
+  const ids = sprints.map((s) => s.id);
+  const { rows: itemRows } = await neonQuery(
+    `select si.sprint_id,si.bug_id,si.carried_from_sprint_id,to_json(si.added_at) as added_iso,to_json(si.removed_at) as removed_iso,b.title,b.status,b.priority,b.due_on,coalesce(a.name,'Unassigned') as assignee_name
+     from bugflow.sprint_items si join bugflow.bugs b on b.id=si.bug_id left join bugflow.users a on a.id=b.assignee_id
+     where si.sprint_id=any($1::uuid[]) and si.removed_at is null and b.deleted_at is null order by si.added_at limit 1000`,
+    [ids],
+  );
+  return sprints.map((s) => {
+    const items = itemRows.filter((r) => String(r["sprint_id"]) === s.id).map(parseItem);
+    return { ...s, items, summary: summarizeSprint(items, s.startedAt) };
+  });
+}
