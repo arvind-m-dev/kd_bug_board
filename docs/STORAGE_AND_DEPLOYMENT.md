@@ -6,6 +6,7 @@ Names only; never record values.
 | Name | Required | Purpose |
 | --- | --- | --- |
 | `DATABASE_URL` | yes | Neon connection |
+| `BUGFLOW_DEMO_LOGIN` | no, **temporary** | `1` = one-click Admin sign-in with no password. Anyone with the URL becomes Admin. Remove after marketing |
 | `BUGFLOW_ADMIN_EMAIL`, `BUGFLOW_ADMIN_PASSWORD` | yes | Admin sign-in |
 | `BUGFLOW_PORTAL_ENCRYPTION_KEY` | yes | Encrypts portal link copies and workspace bucket secret |
 | `VITE_SITE_URL` | recommended | Public origin for copied links and OG image |

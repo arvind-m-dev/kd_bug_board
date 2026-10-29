@@ -2,6 +2,9 @@
 
 Newest first. Earlier history: `git log` and `roadmap.md`.
 
+## 2026-10-29 — Demo login kept (owner's decision)
+- The one-click Admin sign-in removed earlier today is **restored unchanged** (code, flag in `.env.local`/`.env.example`, test, docs): marketing capture still needs open access. The rest of the security pass stays — vite 8.3.5, credential-based e2e sign-in, session purge, audit notes. Retire later per [AUTH_AND_PERMISSIONS.md](AUTH_AND_PERMISSIONS.md).
+
 ## 2026-10-29 — Security hardening: demo login removed
 - **Removed the temporary one-click Admin sign-in entirely** (code, env flag, test): `demoUnlockAdmin`, the `/login` "Login without credentials" link and the `demo` status flag are gone; `BUGFLOW_DEMO_LOGIN` deleted from `.env.local` and `.env.example`. **Vercel still needs the env var unset + a redeploy** — until then old deployments keep the behaviour.
 - **E2e sign-in reworked**: the signed-in sweep now fills the real credential form (email/password from `.env.local`, loaded by `playwright.config.ts`, never written into the spec); self-skips when unconfigured. This also exercises the true sign-in path (throttle, session readback) in a browser on every run.

@@ -5,7 +5,7 @@ import { useRouter } from "@tanstack/react-router";
 import { Eye, EyeOff, LockKeyhole, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getAdminStatus, unlockAdminAccess } from "@/lib/portal-access.functions";
+import { demoAdminAccess, getAdminStatus, unlockAdminAccess } from "@/lib/portal-access.functions";
 import { SignOutButton } from "./sign-out";
 import { actionError, ErrorNotice } from "./action-feedback";
 
@@ -30,6 +30,7 @@ export function AdminAccess({
     staleTime: 60000,
   });
   const unlock = useServerFn(unlockAdminAccess);
+  const demoUnlock = useServerFn(demoAdminAccess);
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
@@ -123,15 +124,17 @@ export function AdminAccess({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
-              className="pr-10"
+              className="pr-11"
             />
             <button
               type="button"
+              className="bf-eye"
               aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
+              title={showPassword ? "Hide password" : "Show password"}
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
-              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
             </button>
           </span>
         </label>
@@ -140,6 +143,16 @@ export function AdminAccess({
           <ShieldCheck />
           {busy ? "Signing in…" : "Sign in"}
         </Button>
+        {status.data?.demo && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void signIn(() => demoUnlock())}
+            className="mx-auto text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground disabled:opacity-50"
+          >
+            Login without credentials
+          </button>
+        )}
       </form>
     </section>
   );
