@@ -2,6 +2,12 @@
 
 Newest first. Earlier history: `git log` and `roadmap.md`.
 
+## 2026-10-29 — Phase 2.4: agile backlog (Phase 2 complete)
+- **Backlog** (`/admin/backlog`, Bugs nav group): epics, stories, tasks and open bugs of a project in one ranked list. Drag to rank (fractional `backlog_rank` string — one row per reorder, `rankBetween`), inline estimate and Ready toggle, epic parent select (kind rules + same project + loop check, `wouldCycle` client + recursive-CTE server), epic progress bars (`epicProgress`: counts, or points when every child has one), one-click hand-off into the project's open sprint. Create dialog for story/task/epic (request-ID idempotent; audited `backlog.created`; rank-only changes are `backlog.ranked`, quiet in the bell).
+- **Deviation from plan**: non-bug kinds reuse the existing 13-status workflow instead of a separate short one — the bugs table's status CHECK and every feature (board, sprints, exports, MCP) are built on it; one workflow, no ripple.
+- **Containment**: the workspace bug lists, counts, exports and MCP `list_bugs` are now explicitly `kind='bug'`, so Phase-1 numbers keep their meaning; epics cannot join sprints (guard in `addToSprint`); migration 023 defaults every existing row to `bug`.
+- **Tests**: `backlog.test.ts` (8 — ranking stability, cycles, parent rules, epic progress); 232/232 vitest, 6-step e2e sweep incl. a backlog screenshot, tsc clean, lint 0 errors / 18 warnings, build OK. Migration applied to Neon and verified.
+
 ## 2026-10-29 — Phase 2 wrap (guide, bell reminders, portal tabs) + Playwright smoke suite
 - **2.5 user guide**: public `/guide` (static, no data, no session) — step-by-step per role incl. due dates, sprints, board, media, AI access; linked from the Help dialogs. Route + `guide-page.tsx`.
 - **2.1b bell reminders**: the Admin bell now tops with synthetic "Due soon"/"Overdue" items — open bugs due by tomorrow in the workspace tz, computed on read (`dueReminders`), no stored rows or jobs; unread once per day; clearing the bell never hides a bug still due.

@@ -155,7 +155,7 @@ export async function workspaceData(access: BugAccess, cursor?: string): Promise
   ];
   const timeZone = await workspaceTimeZone();
   const today = new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
-  const where = scope(actor);
+  const where = `${scope(actor)} and b.kind='bug'`; // the workspace lists bugs; other kinds live on the backlog
   const { results } = await neonQuery<{ results: { rows: Record<string, unknown>[] }[] }>(
     [
       {
@@ -586,7 +586,7 @@ export async function exportBugs(
   const comment = (types: string) =>
     `(select c.content from bugflow.comments c where c.bug_id=b.id and exists(select 1 from bugflow.portals px where px.user_id=c.actor_id and px.type in (${types})) order by c.created_at desc limit 1)`;
   const { rows } = await neonQuery(
-    `select ${columns},${comment("'developer'")} as dev_comment,${comment("'qa','admin'")} as qa_comment,coalesce((select jsonb_agg(m.id order by m.created_at) from bugflow.bug_media m where m.bug_id=b.id and m.status='ready' and m.deleted_at is null),'[]'::jsonb) as media_ids ${joins} where ${scope(actor)} and ($4::uuid is null or b.project_id=$4::uuid)${closed} order by b.created_at,b.id limit 2000`,
+    `select ${columns},${comment("'developer'")} as dev_comment,${comment("'qa','admin'")} as qa_comment,coalesce((select jsonb_agg(m.id order by m.created_at) from bugflow.bug_media m where m.bug_id=b.id and m.status='ready' and m.deleted_at is null),'[]'::jsonb) as media_ids ${joins} where ${scope(actor)} and b.kind='bug' and ($4::uuid is null or b.project_id=$4::uuid)${closed} order by b.created_at,b.id limit 2000`,
     params,
   );
   return rows.map((r) => ({

@@ -16,6 +16,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as PortalsRouteImport } from './routes/portals'
 import { Route as AdminActivityRouteImport } from './routes/admin_.activity'
 import { Route as AdminAssignmentsRouteImport } from './routes/admin_.assignments'
+import { Route as AdminBacklogRouteImport } from './routes/admin_.backlog'
 import { Route as AdminBoardRouteImport } from './routes/admin_.board'
 import { Route as AdminBugsRouteImport } from './routes/admin_.bugs'
 import { Route as AdminNotificationsRouteImport } from './routes/admin_.notifications'
@@ -69,6 +70,11 @@ const AdminActivityRoute = AdminActivityRouteImport.update({
 const AdminAssignmentsRoute = AdminAssignmentsRouteImport.update({
   id: '/admin_/assignments',
   path: '/admin/assignments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminBacklogRoute = AdminBacklogRouteImport.update({
+  id: '/admin_/backlog',
+  path: '/admin/backlog',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminBoardRoute = AdminBoardRouteImport.update({
@@ -175,6 +181,7 @@ export interface FileRoutesByFullPath {
   '/portals': typeof PortalsRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/assignments': typeof AdminAssignmentsRoute
+  '/admin/backlog': typeof AdminBacklogRoute
   '/admin/board': typeof AdminBoardRoute
   '/admin/bugs': typeof AdminBugsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -203,6 +210,7 @@ export interface FileRoutesByTo {
   '/portals': typeof PortalsRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/assignments': typeof AdminAssignmentsRoute
+  '/admin/backlog': typeof AdminBacklogRoute
   '/admin/board': typeof AdminBoardRoute
   '/admin/bugs': typeof AdminBugsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -232,6 +240,7 @@ export interface FileRoutesById {
   '/portals': typeof PortalsRoute
   '/admin_/activity': typeof AdminActivityRoute
   '/admin_/assignments': typeof AdminAssignmentsRoute
+  '/admin_/backlog': typeof AdminBacklogRoute
   '/admin_/board': typeof AdminBoardRoute
   '/admin_/bugs': typeof AdminBugsRoute
   '/admin_/notifications': typeof AdminNotificationsRoute
@@ -262,6 +271,7 @@ export interface FileRouteTypes {
     | '/portals'
     | '/admin/activity'
     | '/admin/assignments'
+    | '/admin/backlog'
     | '/admin/board'
     | '/admin/bugs'
     | '/admin/notifications'
@@ -290,6 +300,7 @@ export interface FileRouteTypes {
     | '/portals'
     | '/admin/activity'
     | '/admin/assignments'
+    | '/admin/backlog'
     | '/admin/board'
     | '/admin/bugs'
     | '/admin/notifications'
@@ -318,6 +329,7 @@ export interface FileRouteTypes {
     | '/portals'
     | '/admin_/activity'
     | '/admin_/assignments'
+    | '/admin_/backlog'
     | '/admin_/board'
     | '/admin_/bugs'
     | '/admin_/notifications'
@@ -347,6 +359,7 @@ export interface RootRouteChildren {
   PortalsRoute: typeof PortalsRoute
   AdminActivityRoute: typeof AdminActivityRoute
   AdminAssignmentsRoute: typeof AdminAssignmentsRoute
+  AdminBacklogRoute: typeof AdminBacklogRoute
   AdminBoardRoute: typeof AdminBoardRoute
   AdminBugsRoute: typeof AdminBugsRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
@@ -417,6 +430,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/assignments'
       fullPath: '/admin/assignments'
       preLoaderRoute: typeof AdminAssignmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin_/backlog': {
+      id: '/admin_/backlog'
+      path: '/admin/backlog'
+      fullPath: '/admin/backlog'
+      preLoaderRoute: typeof AdminBacklogRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin_/board': {
@@ -563,6 +583,7 @@ const rootRouteChildren: RootRouteChildren = {
   PortalsRoute: PortalsRoute,
   AdminActivityRoute: AdminActivityRoute,
   AdminAssignmentsRoute: AdminAssignmentsRoute,
+  AdminBacklogRoute: AdminBacklogRoute,
   AdminBoardRoute: AdminBoardRoute,
   AdminBugsRoute: AdminBugsRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,

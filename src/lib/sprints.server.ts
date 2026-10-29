@@ -177,7 +177,7 @@ export async function addToSprint(data: z.infer<typeof sprintItemSchema>) {
     `insert into bugflow.sprint_items(sprint_id,bug_id,added_by)
       select $1,$2::bigint,$3 from bugflow.sprints s
       where s.id=$1 and s.state in ('planned','active')
-        and exists(select 1 from bugflow.bugs b where b.id=$2::bigint and b.deleted_at is null and b.project_id=s.project_id)
+        and exists(select 1 from bugflow.bugs b where b.id=$2::bigint and b.deleted_at is null and b.kind<>'epic' and b.project_id=s.project_id)
         and not exists(
           select 1 from bugflow.sprint_items o join bugflow.sprints os on os.id=o.sprint_id
           where o.bug_id=$2::bigint and o.removed_at is null and os.state in ('planned','active') and os.id<>$1)

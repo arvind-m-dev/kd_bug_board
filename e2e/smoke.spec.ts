@@ -74,6 +74,10 @@ test("admin overview, sprints and board render (demo sign-in)", async ({ page })
     });
   await page.screenshot({ path: "e2e/shots/board.png", fullPage: true });
 
+  await page.goto("/admin/backlog");
+  await expect(page.getByRole("button", { name: /new item/i })).toBeVisible({ timeout: 15_000 });
+  await page.screenshot({ path: "e2e/shots/backlog.png", fullPage: true });
+
   await page.goto("/admin/bugs?cal=1");
   await expect(page.getByRole("button", { name: /calendar/i }).first()).toBeVisible({
     timeout: 15_000,

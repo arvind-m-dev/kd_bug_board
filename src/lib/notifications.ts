@@ -3,7 +3,7 @@ export const NOTIFICATION_DAYS = 10;
  * File events (attached, removed, restored, renamed, marked up, cleared) are too frequent to notify about: they stay in
  * the activity log and on each bug, but never reach the bell. Bug events (reported, assigned, status, deleted…) do.
  */
-export const QUIET_ACTION_PREFIXES = ["bug.media_", "sprint.item_"] as const;
+export const QUIET_ACTION_PREFIXES = ["bug.media_", "sprint.item_", "backlog.ranked"] as const;
 export const isQuietAction = (action: string) =>
   QUIET_ACTION_PREFIXES.some((p) => action.startsWith(p));
 export type NotificationItem = {
@@ -41,6 +41,8 @@ const words: Record<string, string> = {
   "trash.emptied": "Trash emptied",
   "bug.overdue": "Overdue",
   "bug.due_soon": "Due soon",
+  "backlog.created": "Backlog item created",
+  "backlog.updated": "Backlog item updated",
   "sprint.created": "Sprint created",
   "sprint.updated": "Sprint updated",
   "sprint.started": "Sprint started",
@@ -85,6 +87,7 @@ export function notificationHref(n: NotificationItem): string {
   if (a.startsWith("settings.media")) return "/admin/settings/storage";
   if (a.startsWith("settings.")) return "/admin/settings";
   if (a.startsWith("sprint.")) return "/admin/sprints";
+  if (a.startsWith("backlog.")) return "/admin/backlog";
   return a.startsWith("bug.") ? "/admin/bugs" : "/admin/users";
 }
 export function notificationLabel(action: string) {

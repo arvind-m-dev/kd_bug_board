@@ -81,7 +81,7 @@ Status key: **Implemented** = code present with unit tests or verified per `road
 | Phase 2.1 Due dates, overdue, filter, time zone, calendar, bell reminders | Implemented | `due_on` (021), `DueCalendar`; synthetic due reminders in the Admin bell (`dueReminders`, computed on read) |
 | Phase 2.2 Sprints (plan/start/close, carry-over) | Implemented | `/admin/sprints` (Admin manages); read-only Sprint tab on member portals; `get_sprint` MCP tool |
 | Phase 2.3 Scrum board (rule-bound drag) | Implemented | `/admin/board` + Board tab on member portals (role-scoped moves); native drag + Move menu (D5 deviation) |
-| Phase 2.4 Agile backlog (epics/stories/tasks via `bugs.kind`) | Planned | same plan |
+| Phase 2.4 Agile backlog (epics/stories/tasks via `bugs.kind`) | Implemented | `/admin/backlog`, migration 023; fractional ranking, epic progress, ready/estimate, sprint hand-off; non-bug kinds reuse the 13-status workflow (plan deviation); bug lists/counts/exports stay bug-only |
 | Phase 2.5 In-app user guide | Implemented | public `/guide` (static, no data); linked from Help dialogs |
 | Browser smoke suite (Playwright) | Implemented | `npm run test:e2e` (`e2e/smoke.spec.ts`): signed-out surface, no-leak check, guide, demo-sign-in sweep with screenshots |
 | Phase 3 (burndown, SLA, alerts, releases, GitHub/GitLab, AI triage, phone capture, feedback widget, SSO/MFA) | Planned | same plan, Phase 3 section |

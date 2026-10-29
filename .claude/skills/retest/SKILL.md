@@ -57,6 +57,12 @@ Beyond the e2e smoke, interactive flows still need a human (or extend `e2e/smoke
 - [ ] Close the sprint with a carry-to target — still-open bugs appear in the target marked "carried"; a closed sprint is read-only.
 - [ ] Sprint create/start/close show in the bell; add/remove do not (they stay on the bug's activity log).
 
+**Backlog (Phase 2.4)**
+- [ ] `/admin/backlog`: open items of the picked project in rank order; dragging a row re-ranks it and the order survives a refresh.
+- [ ] New item (story/task/epic) appears at the end; bugs raised normally also show here, and stories never appear in All bugs or its counts.
+- [ ] An epic can hold stories/tasks/bugs; a story can hold tasks; loops are refused; the epic's progress bar moves as children close.
+- [ ] Estimate and Ready save inline; "Sprint" sends an item to the project's open sprint (epics never offer it).
+
 **Scrum board (Phase 2.3)**
 - [ ] `/admin/board`: every bug appears in exactly one column; counts per column match the list.
 - [ ] Dragging Assigned → In progress (as a developer on their own bug, or Admin) applies directly with a toast; while dragging, unreachable columns dim.

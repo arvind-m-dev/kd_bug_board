@@ -920,6 +920,27 @@ html:root .bf-report-grid-raised, html:root .bf-report-grid-wide { grid-template
 .bf-status-note[data-status=RECHECK] { --n: var(--success); }
 .bf-tz-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
 .bf-tz-card .bf-input { padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--foreground); font: inherit; font-size: 13px; min-width: 200px; }
+/* ── Backlog ── */
+.bf-backlog { display: grid; gap: 6px; }
+.bf-backlog[data-busy] { opacity: .7; pointer-events: none; }
+.bf-backlog-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; cursor: grab; }
+.bf-backlog-row[data-dragging] { opacity: .5; }
+.bf-backlog-grip { flex: none; color: var(--muted-foreground); }
+.bf-backlog-kind { flex: none; width: 48px; text-align: center; padding: 1px 0; border-radius: 999px; border: 1px solid var(--border); font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--muted-foreground); }
+.bf-backlog-kind[data-kind=epic] { color: var(--primary); border-color: color-mix(in oklab, var(--primary) 40%, transparent); }
+.bf-backlog-kind[data-kind=story] { color: var(--success); border-color: color-mix(in oklab, var(--success) 40%, transparent); }
+.bf-backlog-kind[data-kind=bug] { color: var(--destructive); border-color: color-mix(in oklab, var(--destructive) 35%, transparent); }
+.bf-backlog-title { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+.bf-backlog-parent { font-size: 11px; font-weight: 500; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.bf-backlog-progress { flex: none; width: 110px; height: 6px; border-radius: 999px; background: var(--muted); overflow: hidden; }
+.bf-backlog-progress > span { display: block; height: 100%; background: var(--primary); }
+.bf-backlog-estimate { width: 64px; flex: none; }
+.bf-backlog-ready { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted-foreground); white-space: nowrap; }
+.bf-backlog-row .bf-board-move { width: auto; max-width: 150px; flex: none; }
+.bf-backlog-insprint { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--primary); white-space: nowrap; }
+.bf-backlog-tail { padding: 10px; border: 1px dashed var(--border); border-radius: 8px; text-align: center; font-size: 12px; color: var(--muted-foreground); }
+@media (max-width: 760px) { .bf-backlog-row { flex-wrap: wrap; } }
+
 /* ── User guide (/guide) ── */
 .bf-guide { max-width: 760px; margin: 0 auto; padding: 32px 16px 60px; display: grid; gap: 18px; }
 .bf-guide-hero h1 { display: flex; align-items: center; gap: 10px; font-size: 24px; font-weight: 800; margin: 0 0 8px; }
