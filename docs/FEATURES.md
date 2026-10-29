@@ -79,8 +79,8 @@ Status key: **Implemented** = code present with unit tests or verified per `road
 | Media end-to-end test against the real R2 bucket incl. production origin CORS | Partial — bucket verified 2026-10-28 | CORS preflight PUT/GET OK for `localhost:8080` and `kd-bug-board.vercel.app`; signed PUT/GET/delete round-trip with stored credentials OK. Full in-app upload (thumbnails, compression, mark-up) not yet clicked through in a browser |
 | Published deep-link checks | Deferred | Needs publishing approval (`roadmap.md`) |
 | Phase 2.1 Due dates, overdue, filter, time zone, calendar | Partial — 2.1a + calendar view shipped; bell due-reminders pending | `due_on` (021), `isOverdue`/`dueBadge`, `maySetDue`, `plan`; `DueCalendar` on All Bugs |
-| Phase 2.2 Sprints (plan/start/close, carry-over) | Implemented (Admin) | `/admin/sprints`, `sprints.ts`/`.server.ts`, migration 022; member read-only tab + MCP pending |
-| Phase 2.3 Scrum board (rule-bound drag) | Planned | same plan |
+| Phase 2.2 Sprints (plan/start/close, carry-over) | Implemented (Admin) | `/admin/sprints`, migration 022; `get_sprint` MCP tool done; member read-only tab pending |
+| Phase 2.3 Scrum board (rule-bound drag) | Implemented (Admin) | `/admin/board`, `board.ts` rules + tests; native drag + per-card Move menu (not @dnd-kit — D5 deviation); portal board tab pending |
 | Phase 2.4 Agile backlog (epics/stories/tasks via `bugs.kind`) | Planned | same plan |
 | Phase 2.5 In-app user guide | Planned | same plan |
 | Phase 3 (burndown, SLA, alerts, releases, GitHub/GitLab, AI triage, phone capture, feedback widget, SSO/MFA) | Planned | same plan, Phase 3 section |

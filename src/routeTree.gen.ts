@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as PortalsRouteImport } from './routes/portals'
 import { Route as AdminActivityRouteImport } from './routes/admin_.activity'
 import { Route as AdminAssignmentsRouteImport } from './routes/admin_.assignments'
+import { Route as AdminBoardRouteImport } from './routes/admin_.board'
 import { Route as AdminBugsRouteImport } from './routes/admin_.bugs'
 import { Route as AdminNotificationsRouteImport } from './routes/admin_.notifications'
 import { Route as AdminProjectsRouteImport } from './routes/admin_.projects'
@@ -62,6 +63,11 @@ const AdminActivityRoute = AdminActivityRouteImport.update({
 const AdminAssignmentsRoute = AdminAssignmentsRouteImport.update({
   id: '/admin_/assignments',
   path: '/admin/assignments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminBoardRoute = AdminBoardRouteImport.update({
+  id: '/admin_/board',
+  path: '/admin/board',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminBugsRoute = AdminBugsRouteImport.update({
@@ -162,6 +168,7 @@ export interface FileRoutesByFullPath {
   '/portals': typeof PortalsRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/assignments': typeof AdminAssignmentsRoute
+  '/admin/board': typeof AdminBoardRoute
   '/admin/bugs': typeof AdminBugsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/projects': typeof AdminProjectsRoute
@@ -188,6 +195,7 @@ export interface FileRoutesByTo {
   '/portals': typeof PortalsRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/assignments': typeof AdminAssignmentsRoute
+  '/admin/board': typeof AdminBoardRoute
   '/admin/bugs': typeof AdminBugsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/projects': typeof AdminProjectsRoute
@@ -215,6 +223,7 @@ export interface FileRoutesById {
   '/portals': typeof PortalsRoute
   '/admin_/activity': typeof AdminActivityRoute
   '/admin_/assignments': typeof AdminAssignmentsRoute
+  '/admin_/board': typeof AdminBoardRoute
   '/admin_/bugs': typeof AdminBugsRoute
   '/admin_/notifications': typeof AdminNotificationsRoute
   '/admin_/projects': typeof AdminProjectsRoute
@@ -243,6 +252,7 @@ export interface FileRouteTypes {
     | '/portals'
     | '/admin/activity'
     | '/admin/assignments'
+    | '/admin/board'
     | '/admin/bugs'
     | '/admin/notifications'
     | '/admin/projects'
@@ -269,6 +279,7 @@ export interface FileRouteTypes {
     | '/portals'
     | '/admin/activity'
     | '/admin/assignments'
+    | '/admin/board'
     | '/admin/bugs'
     | '/admin/notifications'
     | '/admin/projects'
@@ -295,6 +306,7 @@ export interface FileRouteTypes {
     | '/portals'
     | '/admin_/activity'
     | '/admin_/assignments'
+    | '/admin_/board'
     | '/admin_/bugs'
     | '/admin_/notifications'
     | '/admin_/projects'
@@ -322,6 +334,7 @@ export interface RootRouteChildren {
   PortalsRoute: typeof PortalsRoute
   AdminActivityRoute: typeof AdminActivityRoute
   AdminAssignmentsRoute: typeof AdminAssignmentsRoute
+  AdminBoardRoute: typeof AdminBoardRoute
   AdminBugsRoute: typeof AdminBugsRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminProjectsRoute: typeof AdminProjectsRoute
@@ -384,6 +397,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/assignments'
       fullPath: '/admin/assignments'
       preLoaderRoute: typeof AdminAssignmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin_/board': {
+      id: '/admin_/board'
+      path: '/admin/board'
+      fullPath: '/admin/board'
+      preLoaderRoute: typeof AdminBoardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin_/bugs': {
@@ -522,6 +542,7 @@ const rootRouteChildren: RootRouteChildren = {
   PortalsRoute: PortalsRoute,
   AdminActivityRoute: AdminActivityRoute,
   AdminAssignmentsRoute: AdminAssignmentsRoute,
+  AdminBoardRoute: AdminBoardRoute,
   AdminBugsRoute: AdminBugsRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminProjectsRoute: AdminProjectsRoute,

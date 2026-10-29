@@ -54,6 +54,14 @@ The agent cannot open a GUI here (terminal only; no Playwright installed; dev se
 - [ ] Close the sprint with a carry-to target — still-open bugs appear in the target marked "carried"; a closed sprint is read-only.
 - [ ] Sprint create/start/close show in the bell; add/remove do not (they stay on the bug's activity log).
 
+**Scrum board (Phase 2.3)**
+- [ ] `/admin/board`: every bug appears in exactly one column; counts per column match the list.
+- [ ] Dragging Assigned → In progress (as a developer on their own bug, or Admin) applies directly with a toast; while dragging, unreachable columns dim.
+- [ ] Dropping onto Assigned or dropping a Retest card onto Done opens the bug (assign / verify dialog) — the drag alone never resolves a bug.
+- [ ] The per-card "Move to…" menu offers the same moves (keyboard path).
+- [ ] A stale card (changed elsewhere) errors politely and the board refreshes.
+- [ ] AI access: `get_sprint` returns the project's open sprint in compact text, and is refused for a project outside the token's scope.
+
 **View state across refresh**
 - [ ] Page through the bug table, the member table, and the Overview urgent list, then refresh — the same page stays (URL has `?page=` / `?urgent=`).
 - [ ] Switch a Trash tab, refresh — the same tab stays (`?tab=`).

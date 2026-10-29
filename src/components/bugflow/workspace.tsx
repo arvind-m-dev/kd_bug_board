@@ -44,6 +44,7 @@ import {
   ChevronRight,
   ChevronDown,
   CalendarRange,
+  Kanban,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -70,6 +71,7 @@ const DropdownOptionsEditor = lazy(() =>
 );
 const TeamReports = lazy(() => import("./team-reports").then((m) => ({ default: m.TeamReports })));
 const SprintsView = lazy(() => import("./sprints").then((m) => ({ default: m.SprintsView })));
+const BoardView = lazy(() => import("./board").then((m) => ({ default: m.BoardView })));
 const AppearanceSettings = lazy(() =>
   import("./appearance-settings").then((m) => ({ default: m.AppearanceSettings })),
 );
@@ -134,6 +136,7 @@ type View =
   | "users"
   | "assignments"
   | "sprints"
+  | "board"
   | "projects"
   | "activity"
   | "reports"
@@ -152,6 +155,7 @@ const navigation: {
     | "/admin/users"
     | "/admin/assignments"
     | "/admin/sprints"
+    | "/admin/board"
     | "/admin/projects"
     | "/admin/activity"
     | "/admin/reports"
@@ -164,6 +168,7 @@ const navigation: {
   { to: "/admin/bugs", label: "All bugs", icon: Bug, count: true },
   { to: "/admin/assignments", label: "Assignments", icon: ListChecks, count: true },
   { to: "/admin/sprints", label: "Sprints", icon: CalendarRange },
+  { to: "/admin/board", label: "Board", icon: Kanban },
   { to: "/admin/projects", label: "Projects & modules", icon: FolderKanban },
   { to: "/admin/users", label: "Team & access", icon: UsersRound, count: true },
   { to: "/admin/activity", label: "Activity & reports", icon: Activity },
@@ -173,9 +178,9 @@ const navigation: {
 // Sidebar is grouped; each group's title carries a chevron to fold its links away.
 const navGroups: { id: string; label: string; icon: LucideIcon; items: typeof navigation }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, items: navigation.slice(0, 1) },
-  { id: "bugs", label: "Bugs", icon: Bug, items: navigation.slice(1, 4) },
-  { id: "management", label: "Management", icon: FolderKanban, items: navigation.slice(4, 6) },
-  { id: "reports", label: "Reports", icon: ChartPie, items: navigation.slice(6, 8) },
+  { id: "bugs", label: "Bugs", icon: Bug, items: navigation.slice(1, 5) },
+  { id: "management", label: "Management", icon: FolderKanban, items: navigation.slice(5, 7) },
+  { id: "reports", label: "Reports", icon: ChartPie, items: navigation.slice(7, 9) },
 ];
 const titles: Record<View, string> = {
   overview: "Overview",
@@ -183,6 +188,7 @@ const titles: Record<View, string> = {
   users: "Team & access",
   assignments: "Assignments",
   sprints: "Sprints",
+  board: "Board",
   projects: "Projects & modules",
   activity: "Activity & reports",
   reports: "Team reports",
@@ -212,6 +218,7 @@ const subtitles: Record<View, string> = {
     "Your team, their roles and their private portal links — open, copy or replace a link here.",
   assignments: "Keep the right bugs with the right people.",
   sprints: "Plan bugs into sprints and track scope and carry-over.",
+  board: "Drag bugs between stages — never past the workflow rules.",
   projects: "Organize testing across your applications and modules.",
   reports: "How each person is doing — what they raised, fixed, rejected and how fast.",
   activity: "Every change, with the complete story behind it.",
@@ -557,6 +564,8 @@ export function Workspace({ view = "overview" }: { view?: View }) {
                 <AdminBugs assignmentsOnly />
               ) : view === "sprints" ? (
                 <SprintsView />
+              ) : view === "board" ? (
+                <BoardView />
               ) : view === "projects" ? (
                 <ProjectsView onDialog={setDialog} />
               ) : view === "activity" ? (

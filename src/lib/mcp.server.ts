@@ -170,6 +170,36 @@ async function serverFor(access: BugAccess) {
   );
 
   server.registerTool(
+    "get_sprint",
+    {
+      title: "Current sprint",
+      description:
+        "The active (or next planned) sprint of one project: goal, dates, scope counts and the bugs in it.",
+      inputSchema: { projectId: z.string().uuid() },
+    },
+    async ({ projectId }) => {
+      if (!can("view")) return fail("This panel cannot view bugs.");
+      // Scope first: the panel must be able to see the project before any sprint data is read.
+      const ws = await bw.workspaceData(access);
+      if (!ws.projects.some((p) => p.id === projectId))
+        return fail("That project is not available to this panel.");
+      const sprint = await (await import("./sprints.server")).activeSprint(projectId);
+      if (!sprint) return text("No open sprint for this project.");
+      const s = sprint.summary;
+      const lines = [
+        `${sprint.name} (${sprint.state}) · ${sprint.project}`,
+        sprint.goal ? `goal: ${sprint.goal}` : "",
+        `${sprint.startsOn ?? "?"} → ${sprint.endsOn ?? "?"} · committed ${s.committed}, added ${s.added}, open ${s.open}, done ${s.done}, carried in ${s.carried}`,
+        "bugs (code | status | priority | assignee | title):",
+        ...sprint.items.map(
+          (i) => `${i.code} | ${i.status} | ${i.priority} | ${i.assignee} | ${i.title}`,
+        ),
+      ].filter(Boolean);
+      return text(lines.join("\n"));
+    },
+  );
+
+  server.registerTool(
     "list_bugs",
     {
       title: "List bugs",

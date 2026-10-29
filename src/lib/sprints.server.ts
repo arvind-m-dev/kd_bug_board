@@ -205,3 +205,27 @@ export async function removeFromSprint(data: z.infer<typeof sprintItemSchema>) {
   await audit(admin.userId, data.bugId, "sprint.item_removed", { sprint: data.sprintId });
   return { removed: true };
 }
+
+/**
+ * The active (else newest planned) sprint of one project, with its live items. Carries NO access check of its own:
+ * callers (the MCP tools) must already have verified the project is visible to their panel.
+ */
+export async function activeSprint(projectId: string) {
+  const { rows } = await neonQuery(
+    `select s.*,pr.name as project_name,to_json(s.started_at) as started_iso,to_json(s.closed_at) as closed_iso,to_json(s.created_at) as created_iso
+     from bugflow.sprints s join bugflow.projects pr on pr.id=s.project_id
+     where s.project_id=$1 and s.state<>'closed' order by (s.state='active') desc,s.created_at desc limit 1`,
+    [projectId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  const sprint = parseSprint(row);
+  const { rows: itemRows } = await neonQuery(
+    `select si.sprint_id,si.bug_id,si.carried_from_sprint_id,to_json(si.added_at) as added_iso,to_json(si.removed_at) as removed_iso,b.title,b.status,b.priority,b.due_on,coalesce(a.name,'Unassigned') as assignee_name
+     from bugflow.sprint_items si join bugflow.bugs b on b.id=si.bug_id left join bugflow.users a on a.id=b.assignee_id
+     where si.sprint_id=$1 and si.removed_at is null and b.deleted_at is null order by si.added_at limit 500`,
+    [sprint.id],
+  );
+  const items = itemRows.map(parseItem);
+  return { ...sprint, items, summary: summarizeSprint(items, sprint.startedAt) };
+}

@@ -2,6 +2,12 @@
 
 Newest first. Earlier history: `git log` and `roadmap.md`.
 
+## 2026-10-29 — Phase 2.3: scrum board (Admin) + `get_sprint` MCP tool
+- **Board** (`/admin/board`, Bugs nav group): five columns over the existing statuses (To do / Assigned / In progress / Retest / Done). Dragging a card performs the one allowed plain transition directly; a drop that needs a dialog (assigning, retest verdict, choosing a closing status) opens the bug instead; a column the actor cannot reach dims. Rules in `src/lib/board.ts` (`boardColumn`, `dropAction`, `mayDragCard`) on top of `allowedStatuses`/`mayVerify` — a drag can never resolve a bug or skip QA. Every status maps to exactly one column (tested). Cards show code, title, status, priority, due badge, assignee; project filter; a per-card "Move to…" menu covers keyboard use.
+- **Deviation from plan D5**: native HTML drag + the Move menu instead of `@dnd-kit` — the codebase already uses native drag (dropdown options), and the menu gives keyboard access without a new dependency.
+- **MCP**: new read-only `get_sprint` tool — active/next sprint of a project with scope counts and its bugs, compact text; the panel's project scope is checked first (`activeSprint` in `sprints.server.ts` carries no check of its own).
+- **Tests**: `board.test.ts` (8); 224/224 pass, tsc clean, lint 0 errors / 18 warnings, build OK. Not clicked through in a browser.
+
 ## 2026-10-28 — Phase 2.2: sprints (Admin)
 - **Feature**: a Sprints page (`/admin/sprints`, in the Bugs nav group). Create a sprint for a project (name, goal, start/end), add/remove bugs, Start it (one active sprint per project, enforced by a partial unique index) and Close it — optionally carrying still-open bugs into another open sprint, recorded with `carried_from_sprint_id`. Each card shows committed / added / open / done / carried, computed from membership history (`summarizeSprint`). A bug can be in only one open sprint at a time.
 - **Data**: migration `022_sprints.sql` — `sprints`, `sprint_items`. Applied to Neon and verified.
