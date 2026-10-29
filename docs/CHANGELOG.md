@@ -2,6 +2,12 @@
 
 Newest first. Earlier history: `git log` and `roadmap.md`.
 
+## 2026-10-29 — Security hardening: demo login removed
+- **Removed the temporary one-click Admin sign-in entirely** (code, env flag, test): `demoUnlockAdmin`, the `/login` "Login without credentials" link and the `demo` status flag are gone; `BUGFLOW_DEMO_LOGIN` deleted from `.env.local` and `.env.example`. **Vercel still needs the env var unset + a redeploy** — until then old deployments keep the behaviour.
+- **E2e sign-in reworked**: the signed-in sweep now fills the real credential form (email/password from `.env.local`, loaded by `playwright.config.ts`, never written into the spec); self-skips when unconfigured. This also exercises the true sign-in path (throttle, session readback) in a browser on every run.
+- **Audit pass**: guards verified — AI onboarding spends credits only after `requireOnboardingAdmin`; portal AI-token reads validate the portal token; OAuth/MCP endpoints carry their own auth. `vite` bumped 8.1.5 → 8.3.5 (clears the high dev-only `launch-editor` advisories). Accepted for now and documented: `uuid<11.1.1` via exceljs (moderate; unused v3/v5-with-buffer path) and `zod<4.6.6` (v4 is a breaking migration; every schema here bounds collection sizes, which is the exploit precondition).
+- **Gates**: 234/234 vitest (demo-login test removed with its feature), 5/5 e2e, tsc clean, lint 0 errors / 18 warnings, build OK on the new vite.
+
 ## 2026-10-29 — Nameable bug-ID prefixes
 - **Feature**: bug codes are now `<prefix>-<number>` with Admin-named prefixes (e.g. `DEPLOY-000123`, `PROD-000124`). Settings → Options gains a **Bug ID prefixes** list (1-10 capitals/digits, letter first); the first entry is the default for new bugs. With more than one prefix, the report form shows a picker, so a reporter can file something as a deploy or post-production bug by ID alone. On an existing bug only Admin may change the prefix (audited in `bug.edited`); the underlying number never changes, so references stay stable and old codes keep the prefix they were born with.
 - **Data**: migration 024 — `bugs.code_prefix` (default `BF`, check-constrained). Applied and verified.

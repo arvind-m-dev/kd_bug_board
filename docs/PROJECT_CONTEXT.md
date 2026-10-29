@@ -40,7 +40,6 @@ TanStack Start (React 19, file routes in `src/routes`), Tailwind + shadcn/ui, Ne
 - Never record secrets in docs or code. User runs dev server on :8080 while agents work; do not save workspace settings from scripts.
 
 ## Known issues / drift
-- **Temporary security exception:** `BUGFLOW_DEMO_LOGIN=1` gives anyone on `/login` full Admin without a password (enabled for marketing, 2026-10-28). Turn off when done; see [AUTH_AND_PERMISSIONS.md](AUTH_AND_PERMISSIONS.md).
 - Bucket CORS must include every app origin (prod uploads fail otherwise). Verified 2026-10-28: localhost:8080 and kd-bug-board.vercel.app allowed for PUT/GET.
 - Lint: 18 react-refresh warnings (pre-existing).
 
