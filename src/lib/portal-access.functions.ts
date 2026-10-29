@@ -12,6 +12,10 @@ export const unlockAdminAccess = createServerFn({ method: "POST" })
     const s = await import("./portal-access.server");
     return s.databaseCall(() => s.unlockAdmin(data));
   });
+export const demoAdminAccess = createServerFn({ method: "POST" }).handler(async () => {
+  const s = await import("./portal-access.server");
+  return s.databaseCall(s.demoUnlockAdmin);
+});
 export const lockAdminAccess = createServerFn({ method: "POST" }).handler(async () => {
   const s = await import("./portal-access.server");
   return s.databaseCall(s.lockAdmin);

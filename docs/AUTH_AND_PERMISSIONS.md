@@ -9,8 +9,10 @@ No secret values belong in this file.
 - Mutations validate same origin (`checkOrigin`; no-op outside Start runtime, i.e. MCP).
 - Session ending mid-use (`isAdminSessionError`) clears caches and returns to `/login?redirect=…` (same-site paths only).
 
-### One-click sign-in — removed 2026-10-29
-The temporary `BUGFLOW_DEMO_LOGIN` entry (anyone on `/login` became Admin) was deleted: code, flag, link and test. Unset the variable in Vercel and redeploy to retire old builds.
+### Temporary one-click sign-in (`BUGFLOW_DEMO_LOGIN=1`)
+- Removed 2026-10-29 during a security pass, then **restored the same day at the owner's request** (marketing capture still running). Anyone opening `/login` becomes Admin while the flag is `1`.
+- `/login` shows a "Login without credentials" link. It calls `demoAdminAccess` → `demoUnlockAdmin`, which runs the normal `unlockAdmin` with the server-side `BUGFLOW_ADMIN_EMAIL`/`PASSWORD` (origin check, throttle, hashed 8h session unchanged). Credentials never reach the browser.
+- **To retire it:** unset `BUGFLOW_DEMO_LOGIN` (Vercel + `.env.local`) and redeploy; optionally delete the code (`demoUnlockAdmin`, the link in `admin-access.tsx`, `demo-login.test.ts`).
 
 ## Member portal links
 - Created by Admin; default expiry 90 days. Stored as hash plus server-encrypted copy so Admin can re-copy.

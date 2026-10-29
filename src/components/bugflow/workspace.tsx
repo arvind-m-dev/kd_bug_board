@@ -297,9 +297,10 @@ export function Workspace({ view = "overview" }: { view?: View }) {
       }
       return n;
     });
+  // Accordion: opening a group folds the others away, so the sidebar never stacks several open sections.
   const toggleGroup = (id: string) =>
     setOpenGroups((o) => {
-      const n = { ...o, [id]: o[id] !== true };
+      const n: Record<string, boolean> = o[id] === true ? { ...o, [id]: false } : { [id]: true };
       try {
         localStorage.setItem("bf-nav-groups", JSON.stringify(n));
       } catch {
