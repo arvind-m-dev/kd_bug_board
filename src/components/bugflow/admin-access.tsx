@@ -28,6 +28,9 @@ export function AdminAccess({
     queryFn: () => getAdminStatus(),
     retry: false,
     staleTime: 60000,
+    // Never pause on a misdetected offline state (VPN/Wi-Fi flaps): attempt the call regardless, so the page
+    // settles into the form or the visible retry screen instead of "Checking private access…" forever.
+    networkMode: "always",
   });
   const unlock = useServerFn(unlockAdminAccess);
   const demoUnlock = useServerFn(demoAdminAccess);
