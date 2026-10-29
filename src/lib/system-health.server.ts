@@ -25,6 +25,11 @@ const MIGRATIONS: [string, string, string | null][] = [
   ["018", "bug_media", "marks"],
   ["019", "bug_media", "restorable_until"],
   ["020", "bug_media", "has_thumb"],
+  ["021", "bugs", "due_on"],
+  ["022", "sprints", null],
+  ["023", "bugs", "kind"],
+  ["024", "bugs", "code_prefix"],
+  ["025", "admin_sessions", "created_at"],
 ];
 export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1]![0];
 

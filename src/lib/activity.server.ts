@@ -28,6 +28,7 @@ const CATEGORY: Record<string, string[]> = {
     "project.restored",
     "settings.dropdowns",
     "settings.appearance",
+    "settings.sessions",
   ],
 };
 

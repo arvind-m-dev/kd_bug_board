@@ -20,6 +20,14 @@ export const lockAdminAccess = createServerFn({ method: "POST" }).handler(async 
   const s = await import("./portal-access.server");
   return s.databaseCall(s.lockAdmin);
 });
+export const getAdminSessions = createServerFn({ method: "GET" }).handler(async () => {
+  const s = await import("./portal-access.server");
+  return s.databaseCall(s.listAdminSessions);
+});
+export const lockOtherDevices = createServerFn({ method: "POST" }).handler(async () => {
+  const s = await import("./portal-access.server");
+  return s.databaseCall(s.signOutOtherDevices);
+});
 export const getMembers = createServerFn({ method: "GET" }).handler(async () => {
   const s = await import("./portal-access.server");
   return s.databaseCall(s.listMembers);

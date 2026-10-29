@@ -174,6 +174,35 @@ export async function lockAdmin() {
   });
   return { locked: true };
 }
+/** Every live Admin session — one per signed-in device; the caller's own is flagged. */
+export async function listAdminSessions() {
+  await requireAdmin();
+  const key = await hashToken(getCookie("bugflow_admin") ?? "");
+  const { rows } = await neonQuery(
+    "select token_hash=$1 as current, to_json(created_at) as created_at, to_json(expires_at) as expires_at from bugflow.admin_sessions where expires_at>now() order by created_at desc limit 50",
+    [key],
+  );
+  return rows.map((r) => ({
+    current: r["current"] === true,
+    createdAt: String(r["created_at"]),
+    expiresAt: String(r["expires_at"]),
+  }));
+}
+/** Signs the Admin out of every device except this one; the audit row records how many. */
+export async function signOutOtherDevices() {
+  checkOrigin();
+  const admin = await requireAdmin();
+  const key = await hashToken(getCookie("bugflow_admin") ?? "");
+  adminCache.clear();
+  const { rows } = await neonQuery(
+    `with gone as (delete from bugflow.admin_sessions where token_hash<>$1 returning 1),
+      audit as (insert into bugflow.activity(id,actor_id,action,detail)
+        select $2,$3,'settings.sessions',jsonb_build_object('signedOut',count(*)) from gone having count(*)>0)
+      select count(*)::int as signed_out from gone`,
+    [key, crypto.randomUUID(), admin.userId],
+  );
+  return { signedOut: Number(rows[0]?.["signed_out"] ?? 0) };
+}
 export async function listMembers() {
   await requireAdmin();
   const { rows } = await neonQuery(

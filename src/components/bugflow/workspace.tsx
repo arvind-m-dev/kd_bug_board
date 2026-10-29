@@ -84,6 +84,9 @@ const TrashView = lazy(() => import("./trash-view").then((m) => ({ default: m.Tr
 const SystemHealth = lazy(() =>
   import("./system-health").then((m) => ({ default: m.SystemHealth })),
 );
+const SignedInDevices = lazy(() =>
+  import("./signed-in-devices").then((m) => ({ default: m.SignedInDevices })),
+);
 const StorageAlarmBanner = lazy(() =>
   import("./system-health").then((m) => ({ default: m.StorageAlarmBanner })),
 );
@@ -599,6 +602,7 @@ export function Workspace({ view = "overview" }: { view?: View }) {
               ) : view === "settings-health" ? (
                 <SettingsPage tab="settings-health">
                   <SystemHealth />
+                  <SignedInDevices />
                 </SettingsPage>
               ) : view === "settings-ai" ? (
                 <SettingsPage tab="settings-ai">

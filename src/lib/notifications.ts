@@ -52,6 +52,7 @@ const words: Record<string, string> = {
   "settings.media_storage": "Media storage changed",
   "settings.media_quota": "Storage limit changed",
   "settings.mcp": "AI access settings changed",
+  "settings.sessions": "Other devices signed out",
   "portal.created": "Portal link created",
   "portal.regenerated": "Portal link replaced",
   "portal.revoked": "Portal link revoked",
