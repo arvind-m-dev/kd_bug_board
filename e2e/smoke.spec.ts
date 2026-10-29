@@ -39,24 +39,23 @@ test("a bad portal link shows no bug data", async ({ page }) => {
 });
 
 /**
- * Signed-in sweep — only when the temporary demo sign-in is enabled (BUGFLOW_DEMO_LOGIN=1). It uses the one-click
- * link, so no credentials live in this file. Skipped silently when the link is absent.
+ * Signed-in sweep: signs in with the real Admin credentials from .env.local (loaded by the config; never written
+ * into this file). Self-skips when they are not configured.
  */
-async function demoSignIn(page: Page): Promise<boolean> {
+async function adminSignIn(page: Page): Promise<boolean> {
+  const email = process.env["BUGFLOW_ADMIN_EMAIL"];
+  const password = process.env["BUGFLOW_ADMIN_PASSWORD"];
+  if (!email || !password) return false;
   await page.goto("/login");
-  const link = page.getByText(/login without credentials/i);
-  try {
-    await link.waitFor({ state: "visible", timeout: 5000 });
-  } catch {
-    return false;
-  }
-  await link.click();
+  await page.locator("input[type=email]").fill(email);
+  await page.locator("input[type=password]").fill(password);
+  await page.getByRole("button", { name: /sign in/i }).click();
   await page.waitForURL(/\/admin/, { timeout: 15_000 });
   return true;
 }
 
-test("admin overview, sprints and board render (demo sign-in)", async ({ page }) => {
-  test.skip(!(await demoSignIn(page)), "demo sign-in disabled");
+test("admin overview, sprints and board render (signed in)", async ({ page }) => {
+  test.skip(!(await adminSignIn(page)), "admin credentials not configured");
   await expect(page.getByRole("heading", { name: /needs your attention/i })).toBeVisible({
     timeout: 15_000,
   });
