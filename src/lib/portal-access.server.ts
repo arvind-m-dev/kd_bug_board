@@ -139,6 +139,12 @@ export async function unlockAdmin(data: z.infer<typeof unlockSchema>) {
         "insert into bugflow.admin_sessions (token_hash,portal_id,expires_at) select $1,p.id,now()+interval '8 hours' from bugflow.portals p join bugflow.users u on u.id=p.user_id where p.type='admin' and p.active and p.revoked_at is null and u.active and u.email=$2 and (p.expires_at is null or p.expires_at>now()) returning portal_id",
       params: [await hashToken(session), data.email.toLowerCase()],
     },
+    // Housekeeping on each sign-in: long-expired sessions are dead weight (they can never validate again).
+    // Appended last so the result indices above stay unchanged.
+    {
+      query: "delete from bugflow.admin_sessions where expires_at < now() - interval '7 days'",
+      params: [],
+    },
   ]);
   if (!result.results[4]?.rows.length) throw new Error("Admin account is unavailable or inactive.");
   setCookie("bugflow_admin", session, {

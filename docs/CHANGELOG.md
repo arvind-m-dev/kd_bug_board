@@ -2,6 +2,13 @@
 
 Newest first. Earlier history: `git log` and `roadmap.md`.
 
+## 2026-10-29 — Full system re-verification + session housekeeping
+- **Gates**: tsc clean, 224/224 tests, lint 0 errors / 18 warnings (baseline), build OK.
+- **Live smoke** (built server on :4799, signed out): every `/admin*` route (incl. new sprints/board) 307 → `/login?redirect=…`; `/portals` → `/admin/users`; bad member/QA tokens render the shell with **no data and no sensitive strings in the HTML**; `/media/:id` safe; MCP without token → 401; OAuth discovery 200; `/guide` 404 (2.5 not built yet).
+- **DB integrity**: 28 tables; no orphan sprint items, no bug in two open sprints, no double-active sprint; old 'pending' media rows are purged history (by design). **Found + fixed**: expired `admin_sessions` were never deleted (258 rows) — sign-in now also deletes sessions expired >7 days (appended to the batch, result indices unchanged), and a one-time purge removed 178.
+- **Storage**: R2 CORS preflight PUT/GET 204 for localhost:8080 and kd-bug-board.vercel.app.
+- **Still enabled**: `BUGFLOW_DEMO_LOGIN=1` (anyone on /login becomes Admin) — awaiting the user's go-ahead to remove.
+
 ## 2026-10-29 — Phase 2.3: scrum board (Admin) + `get_sprint` MCP tool
 - **Board** (`/admin/board`, Bugs nav group): five columns over the existing statuses (To do / Assigned / In progress / Retest / Done). Dragging a card performs the one allowed plain transition directly; a drop that needs a dialog (assigning, retest verdict, choosing a closing status) opens the bug instead; a column the actor cannot reach dims. Rules in `src/lib/board.ts` (`boardColumn`, `dropAction`, `mayDragCard`) on top of `allowedStatuses`/`mayVerify` — a drag can never resolve a bug or skip QA. Every status maps to exactly one column (tested). Cards show code, title, status, priority, due badge, assignee; project filter; a per-card "Move to…" menu covers keyboard use.
 - **Deviation from plan D5**: native HTML drag + the Move menu instead of `@dnd-kit` — the codebase already uses native drag (dropdown options), and the menu gives keyboard access without a new dependency.
