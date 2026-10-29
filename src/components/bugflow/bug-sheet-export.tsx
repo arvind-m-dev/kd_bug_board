@@ -28,6 +28,7 @@ export function BugSheetExport({
   const fetch = useServerFn(getBugExport);
   const [projectId, setProjectId] = useState("all");
   const [includeClosed, setIncludeClosed] = useState(true);
+  const [format, setFormat] = useState<"sheet" | "jira">("sheet");
   const [busy, setBusy] = useState(false);
   async function run() {
     setBusy(true);
@@ -39,24 +40,36 @@ export function BugSheetExport({
         toast.info("Nothing to export with these choices.");
         return;
       }
-      const { buildBugSheet, downloadBlob } = await import("@/lib/bug-sheet-client");
-      const people = [...new Set(workspace.developers.map((d) => d.name))];
-      const blob = await buildBugSheet(
-        bugs,
-        { categories: workspace.options.modules, builds: workspace.options.environments, people },
-        shareOrigin(),
-      );
       const project =
         projectId === "all"
           ? null
           : (workspace.projects.find((p) => p.id === projectId)?.name ?? null);
-      downloadBlob(blob, sheetFileName(project));
-      toast.success(`${bugs.length} ${bugs.length === 1 ? "bug" : "bugs"} exported`, {
-        description: "Opens in Excel, Google Sheets or Numbers with colours, dropdowns and links.",
-      });
+      const { downloadBlob } = await import("@/lib/bug-sheet-client");
+      if (format === "jira") {
+        const { buildJiraCsv, jiraFileName, JIRA_DATE_FORMAT } = await import("@/lib/jira-csv");
+        const csv = buildJiraCsv(bugs, shareOrigin());
+        downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), jiraFileName(project));
+        toast.success(`${bugs.length} ${bugs.length === 1 ? "bug" : "bugs"} exported for Jira`, {
+          description: `In Jira: Settings → System → External System Import → CSV. Date format: ${JIRA_DATE_FORMAT}.`,
+          duration: 10000,
+        });
+      } else {
+        const { buildBugSheet } = await import("@/lib/bug-sheet-client");
+        const people = [...new Set(workspace.developers.map((d) => d.name))];
+        const blob = await buildBugSheet(
+          bugs,
+          { categories: workspace.options.modules, builds: workspace.options.environments, people },
+          shareOrigin(),
+        );
+        downloadBlob(blob, sheetFileName(project));
+        toast.success(`${bugs.length} ${bugs.length === 1 ? "bug" : "bugs"} exported`, {
+          description:
+            "Opens in Excel, Google Sheets or Numbers with colours, dropdowns and links.",
+        });
+      }
       close();
     } catch (e) {
-      toast.error(actionError(e, "The sheet could not be built."));
+      toast.error(actionError(e, "The export could not be built."));
     } finally {
       setBusy(false);
     }
@@ -75,23 +88,45 @@ export function BugSheetExport({
           ]}
         />
       </div>
+      <div className="grid gap-1 text-sm">
+        <span className="text-xs font-semibold">Format</span>
+        <ThemedSelect
+          label="Format"
+          value={format}
+          onChange={(v) => setFormat(v === "jira" ? "jira" : "sheet")}
+          options={[
+            { value: "sheet", label: "Team sheet (.xlsx)" },
+            { value: "jira", label: "Jira import (.csv)" },
+          ]}
+        />
+      </div>
       <label className="flex items-center gap-2 text-sm">
         <Checkbox checked={includeClosed} onCheckedChange={(v) => setIncludeClosed(v === true)} />
         Include resolved and closed bugs
       </label>
-      <p className="text-xs text-muted-foreground">
-        Columns A to M match the team's bug sheet (ticket, Web/Mobile, category, build, date,
-        status, priority, assigned to, issue, steps, media, dev and QA comments). Severity,
-        reporter, project, expected and actual results, device, fix notes, last update and a link to
-        open the bug follow after. Bugs are grouped under a green band per day, like the shared
-        sheet.
-      </p>
+      {format === "sheet" ? (
+        <p className="text-xs text-muted-foreground">
+          Columns A to M match the team's bug sheet (ticket, Web/Mobile, category, build, date,
+          status, priority, assigned to, issue, steps, media, dev and QA comments). Severity,
+          reporter, project, expected and actual results, device, fix notes, last update and a link
+          to open the bug follow after. Bugs are grouped under a green band per day, like the shared
+          sheet.
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          A CSV for Jira's "Import issues from CSV" (External System Import). Statuses map to To Do
+          / In Progress / Done, priorities to Jira's defaults; steps, expected and actual results,
+          device, severity and a link back to the bug go into the description. The bug code,
+          category and build come along as labels. One-way only — nothing in BugFlow changes.
+        </p>
+      )}
       <div className="flex justify-end gap-2">
         <Button variant="outline" size="sm" onClick={close} disabled={busy}>
           Cancel
         </Button>
         <Button size="sm" onClick={() => void run()} disabled={busy}>
-          {busy ? <LoaderCircle className="animate-spin" /> : <FileSpreadsheet />}Download .xlsx
+          {busy ? <LoaderCircle className="animate-spin" /> : <FileSpreadsheet />}
+          {format === "jira" ? "Download .csv" : "Download .xlsx"}
         </Button>
       </div>
     </div>
