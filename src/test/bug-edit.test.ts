@@ -57,6 +57,7 @@ const edit = (over: Record<string, unknown> = {}) => ({
   environment: "",
   evidenceUrls: [],
   dueOn: null,
+  codePrefix: null,
   ...over,
 });
 

@@ -98,6 +98,7 @@ export async function activityStream(
     `select a.id, a.action, to_json(a.created_at) as at, a.detail, a.bug_id, u.name as actor,
       ${VIA_SQL} as via,
       b.title as btitle,
+      b.code_prefix as bprefix,
       coalesce((select u3.name from bugflow.users u3 where u3.id::text=a.detail->>'assignee'), '') as assignee_name
      from bugflow.activity a
      join bugflow.users u on u.id=a.actor_id
@@ -120,7 +121,7 @@ export async function activityStream(
       action: String(r["action"]),
       at: String(r["at"]),
       bugId,
-      bugCode: bugId ? formatBugCode(bugId) : "",
+      bugCode: bugId ? formatBugCode(bugId, String(r["bprefix"] ?? "BF")) : "",
       bugTitle: String(r["btitle"] ?? ""),
       actor: String(r["actor"] ?? ""),
       via: String(r["via"] ?? ""),

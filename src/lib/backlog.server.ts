@@ -35,7 +35,7 @@ export type BacklogData = {
 function parseItem(r: Record<string, unknown>): BacklogItem {
   return {
     id: String(r["id"]),
-    code: formatBugCode(String(r["id"])),
+    code: formatBugCode(String(r["id"]), String(r["code_prefix"] ?? "BF")),
     kind: (r["kind"] as WorkKind) ?? "bug",
     title: String(r["title"]),
     status: r["status"] as Status,
@@ -64,7 +64,7 @@ export async function backlogData(): Promise<BacklogData> {
         params: [],
       },
       {
-        query: `select b.id,b.kind,b.title,b.status,b.priority,b.project_id,b.parent_id,b.estimate,b.ready,b.backlog_rank,coalesce(a.name,'Unassigned') as assignee_name,
+        query: `select b.id,b.kind,b.title,b.status,b.priority,b.project_id,b.parent_id,b.estimate,b.ready,b.backlog_rank,b.code_prefix,coalesce(a.name,'Unassigned') as assignee_name,
             (select si.sprint_id from bugflow.sprint_items si join bugflow.sprints s on s.id=si.sprint_id where si.bug_id=b.id and si.removed_at is null and s.state<>'closed' limit 1) as sprint_id
           from bugflow.bugs b left join bugflow.users a on a.id=b.assignee_id
           where b.deleted_at is null and b.status not in ('RESOLVED','DUPLICATE','NOT_A_BUG','WONT_FIX')

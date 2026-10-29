@@ -99,7 +99,7 @@ export async function markNotifications(kind: "read" | "clear") {
 export async function bugState(bugId: string) {
   await requireAdmin();
   const { rows } = await neonQuery(
-    `select b.title,to_json(b.deleted_at) as deleted_iso,to_json(b.purged_at) as purged_iso,
+    `select b.title,b.code_prefix,to_json(b.deleted_at) as deleted_iso,to_json(b.purged_at) as purged_iso,
       (select u.name from bugflow.activity a join bugflow.users u on u.id=a.actor_id where a.bug_id=b.id and a.action='bug.deleted' order by a.created_at desc limit 1) as deleted_by,
       coalesce(
         (select u.name from bugflow.activity a join bugflow.users u on u.id=a.actor_id where a.bug_id=b.id and a.action='bug.purged' order by a.created_at desc limit 1),
@@ -112,10 +112,12 @@ export async function bugState(bugId: string) {
   const r = rows[0];
   if (!r) return { state: "missing" as const };
   const title = String(r["title"]);
+  const codePrefix = String(r["code_prefix"] ?? "BF");
   if (r["purged_iso"])
     return {
       state: "purged" as const,
       title,
+      codePrefix,
       by: r["purged_by"] ? String(r["purged_by"]) : "the Trash clean-up (after 30 days)",
       at: String(r["purged_iso"]),
       deletedBy: r["deleted_by"] ? String(r["deleted_by"]) : null,
@@ -124,8 +126,9 @@ export async function bugState(bugId: string) {
     return {
       state: "trashed" as const,
       title,
+      codePrefix,
       by: r["deleted_by"] ? String(r["deleted_by"]) : "Admin",
       at: String(r["deleted_iso"]),
     };
-  return { state: "ok" as const, title };
+  return { state: "ok" as const, title, codePrefix };
 }

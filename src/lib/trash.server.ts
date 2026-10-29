@@ -47,7 +47,7 @@ export async function listTrash(): Promise<TrashData> {
   await maybeExpireTrash().catch(() => undefined);
   const [bugs, members, files] = await neonBatch([
     {
-      query: `select b.id,b.title,b.status,pr.name as project,to_json(b.deleted_at) as deleted_iso,
+      query: `select b.id,b.title,b.status,b.code_prefix,pr.name as project,to_json(b.deleted_at) as deleted_iso,
         coalesce((select u.name from bugflow.activity a join bugflow.users u on u.id=a.actor_id where a.bug_id=b.id and a.action='bug.deleted' order by a.created_at desc limit 1),'Admin') as deleted_by,
         (select count(*) from bugflow.bug_media m where m.bug_id=b.id and m.status='ready' and m.deleted_at is null)::int as files
       from bugflow.bugs b join bugflow.projects pr on pr.id=b.project_id
@@ -62,7 +62,7 @@ export async function listTrash(): Promise<TrashData> {
       params: [TRASH_DAYS],
     },
     {
-      query: `select m.id,m.name,m.kind,m.size,m.bug_id,b.title as bug_title,to_json(m.deleted_at) as deleted_iso,coalesce(u.name,'Clean-up') as deleted_by,(m.purged_at is null and m.restorable_until>now() and b.deleted_at is null) as restorable
+      query: `select m.id,m.name,m.kind,m.size,m.bug_id,b.title as bug_title,b.code_prefix,to_json(m.deleted_at) as deleted_iso,coalesce(u.name,'Clean-up') as deleted_by,(m.purged_at is null and m.restorable_until>now() and b.deleted_at is null) as restorable
       from bugflow.bug_media m join bugflow.bugs b on b.id=m.bug_id left join bugflow.users u on u.id=m.deleted_by
       where m.deleted_at is not null and m.status='ready' and m.deleted_at>now()-make_interval(days=>$1) order by m.deleted_at desc limit 200`,
       params: [TRASH_DAYS],
@@ -72,7 +72,7 @@ export async function listTrash(): Promise<TrashData> {
     days: TRASH_DAYS,
     bugs: bugs.rows.map((r) => ({
       id: String(r["id"]),
-      code: formatBugCode(String(r["id"])),
+      code: formatBugCode(String(r["id"]), String(r["code_prefix"] ?? "BF")),
       title: String(r["title"]),
       project: String(r["project"]),
       status: String(r["status"]),
@@ -94,7 +94,7 @@ export async function listTrash(): Promise<TrashData> {
       kind: String(r["kind"]),
       size: N(r["size"]),
       bugId: String(r["bug_id"]),
-      bugCode: formatBugCode(String(r["bug_id"])),
+      bugCode: formatBugCode(String(r["bug_id"]), String(r["code_prefix"] ?? "BF")),
       bugTitle: String(r["bug_title"]),
       deletedAt: String(r["deleted_iso"]),
       deletedBy: String(r["deleted_by"]),

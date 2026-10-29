@@ -102,6 +102,7 @@ export function BugReportForm({
       environment: read("environment"),
       evidenceUrls: links.map((v) => v.trim()).filter(Boolean),
       dueOn: canPlan ? read("dueOn") : "",
+      codePrefix: read("codePrefix"),
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Check the report details.");
@@ -193,6 +194,19 @@ export function BugReportForm({
             </label>
           </div>
           <div className="bf-form-grid">
+            {/* The ID prefix names the bug (BF, DEPLOY, PROD…). Shown when Admin configured more than one; on an
+                existing bug only Admin may change it (the server enforces the same rule). */}
+            {options.prefixes.length > 1 && (!initial || access.kind === "admin") && (
+              <label className="bf-field">
+                Bug ID prefix
+                <FormSelect
+                  name="codePrefix"
+                  label="Bug ID prefix"
+                  initial={initial ? initial.code.split("-")[0]! : options.prefixes[0]!}
+                  options={options.prefixes.map((p) => ({ value: p, label: `${p}-…` }))}
+                />
+              </label>
+            )}
             <label className="bf-field">
               Priority
               <FormSelect

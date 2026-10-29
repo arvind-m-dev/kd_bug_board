@@ -1,4 +1,7 @@
 import { z } from "zod";
+
+/** Allowed bug-ID prefix shape: 1-10 capitals/digits, letter first (BF, DEPLOY, PROD2…). */
+export const CODE_PREFIX_RE = /^[A-Z][A-Z0-9]{0,9}$/;
 import { STATUSES, canTransition, type Status, type Role } from "./bugflow";
 import type { MediaConfig } from "./bug-media";
 export const PRIORITIES = ["P0", "P1", "P2", "P3", "P4", "P5"] as const;
@@ -76,6 +79,11 @@ const reportFields = z
     browserDevice: z.string().trim().max(200).default(""),
     environment: z.string().trim().max(80).default(""),
     evidenceUrls: z.array(evidenceUrlSchema).max(10).default([]),
+    // The bug-ID prefix, from the Admin-managed list; empty means the workspace default (the list's first entry).
+    codePrefix: z
+      .union([z.literal(""), z.string().trim().toUpperCase().regex(CODE_PREFIX_RE)])
+      .default("")
+      .transform((v) => v || null),
     // Plain calendar date or empty (cleared). Permission to actually set it is checked on the server (maySetDue).
     dueOn: z
       .union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date.")])
@@ -142,6 +150,18 @@ export const optionsSchema = z
     environments: optionList,
     devices: optionList,
     severities: z.array(z.string().trim().min(1).max(40)).max(12).default(DEFAULT_SEVERITIES),
+    /** Bug-ID prefixes (e.g. BF, DEPLOY, PROD). The first is the default for new bugs. */
+    prefixes: z
+      .array(
+        z
+          .string()
+          .trim()
+          .toUpperCase()
+          .regex(CODE_PREFIX_RE, "1-10 letters/digits, starting with a letter."),
+      )
+      .min(1)
+      .max(12)
+      .default(["BF"]),
   })
   .strict();
 export type DropdownOptions = z.infer<typeof optionsSchema>;
@@ -160,17 +180,20 @@ export const DEFAULT_OPTIONS: DropdownOptions = {
   environments: ["Development", "Staging", "Production"],
   devices: DEFAULT_DEVICES,
   severities: DEFAULT_SEVERITIES,
+  prefixes: ["BF"],
 };
 export function cleanOptions(v: unknown): DropdownOptions {
   const r = optionsSchema.safeParse(v);
   if (!r.success) return DEFAULT_OPTIONS;
   const u = (a: string[]) => [...new Set(a)];
   const severities = u(r.data.severities);
+  const prefixes = u(r.data.prefixes.map((p) => p.toUpperCase()));
   return {
     modules: u(r.data.modules),
     environments: u(r.data.environments),
     devices: u(r.data.devices),
     severities: severities.length ? severities : DEFAULT_SEVERITIES,
+    prefixes: prefixes.length ? prefixes : ["BF"],
   };
 }
 export type BugActor = {
@@ -377,8 +400,9 @@ export function assignmentMessage(people: { name: string; role: string; task: As
       : `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
   return `Assigned to ${list}.`;
 }
-export function formatBugCode(id: string) {
-  return `BF-${id.padStart(6, "0")}`;
+/** The display code: stable number, workspace-named prefix (stamped on the row when the bug was reported). */
+export function formatBugCode(id: string, prefix = "BF") {
+  return `${prefix || "BF"}-${id.padStart(6, "0")}`;
 }
 export type LastChange = { by: string; via: string; action: string; at: string } | null;
 export type StatusCount = { status: string; assigned: boolean; count: number };

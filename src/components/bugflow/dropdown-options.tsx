@@ -46,6 +46,11 @@ const groups: {
     max: 12,
     min: 1,
   },
+  {
+    key: "prefixes",
+    title: "Bug ID prefixes",
+    hint: "Name bug IDs: the first is the default for new bugs (e.g. BF, DEPLOY, PROD). Capitals and digits, letter first. Existing codes keep the prefix they were born with.",
+  },
   { key: "modules", title: "Modules / pages", hint: "Shown in the “Module or page” dropdown." },
   { key: "environments", title: "Environments", hint: "Shown in the “Environment” dropdown." },
   {

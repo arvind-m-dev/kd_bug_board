@@ -361,7 +361,7 @@ async function serverFor(access: BugAccess) {
     async ({ id, version, status, notes }) => {
       try {
         await change({ id, version, action: "status", status, notes });
-        return text(`Status of ${formatBugCode(id)} updated to ${status}.`);
+        return text(`Status of bug #${id} updated to ${status}.`);
       } catch (e) {
         return fail(e instanceof Error ? e.message : "The status could not be changed.");
       }
@@ -383,7 +383,7 @@ async function serverFor(access: BugAccess) {
       if (!can("comment")) return fail("This panel cannot comment on bugs.");
       try {
         await change({ id, version, action: "comment", notes: comment });
-        return text(`Comment added to ${formatBugCode(id)}.`);
+        return text(`Comment added to bug #${id}.`);
       } catch (e) {
         return fail(e instanceof Error ? e.message : "The comment could not be added.");
       }
@@ -406,7 +406,7 @@ async function serverFor(access: BugAccess) {
       async ({ id, version, assigneeIds }) => {
         try {
           await change({ id, version, action: "assign", assigneeIds });
-          return text(`${formatBugCode(id)} assigned.`);
+          return text(`Bug #${id} assigned.`);
         } catch (e) {
           return fail(e instanceof Error ? e.message : "The bug could not be assigned.");
         }
