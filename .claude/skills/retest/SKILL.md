@@ -49,6 +49,10 @@ Beyond the e2e smoke, interactive flows still need a human (or extend `e2e/smoke
 - [ ] A non-planner editing a bug cannot change its due date (field absent; server ignores any value).
 - [ ] All Bugs → Calendar toggle shows a month grid; days with open due bugs are dotted, overdue days red; picking a day filters the list to that day and the choice survives a refresh (`?cal=1&due=`); Clear day resets.
 
+**Bug ID prefixes**
+- [ ] Settings → Options → Bug ID prefixes: add e.g. DEPLOY and PROD; the report form now shows a prefix picker; a new bug filed as DEPLOY shows `DEPLOY-…` everywhere (list, board, sprints, trash, exports).
+- [ ] Old bugs keep `BF-…`; a non-Admin editing a bug cannot change its prefix; Admin can, and the change is audited.
+
 **Sprints (Phase 2.2)**
 - [ ] `/admin/sprints`: create a sprint for a project; it starts as Planned.
 - [ ] Add a bug by number — only bugs in the sprint's project are accepted, and a bug already in an open sprint is refused.

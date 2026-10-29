@@ -558,14 +558,14 @@ export async function listLibrary(access: BugAccess): Promise<LibraryItem[]> {
   if (!actor.permissions.includes("view")) throw new Error("Bug access is not permitted.");
   const mine = actor.role !== "admin";
   const { rows } = await neonQuery(
-    `select ${ITEM},b.title as bug_title,b.status as bug_status from bugflow.bug_media m join bugflow.users u on u.id=m.uploaded_by join bugflow.bugs b on b.id=m.bug_id
+    `select ${ITEM},b.title as bug_title,b.status as bug_status,b.code_prefix as bug_prefix from bugflow.bug_media m join bugflow.users u on u.id=m.uploaded_by join bugflow.bugs b on b.id=m.bug_id
     where m.status='ready' and m.deleted_at is null and b.deleted_at is null ${mine ? "and m.uploaded_by=$1" : ""} order by m.created_at desc,m.id limit 500`,
     mine ? [actor.userId] : [],
   );
   const items = await toItems(rows, actor.permissions.includes("evidence"));
   return items.map((it, i) => ({
     ...it,
-    bugCode: formatBugCode(it.bugId),
+    bugCode: formatBugCode(it.bugId, String(rows[i]!["bug_prefix"] ?? "BF")),
     bugTitle: String(rows[i]!["bug_title"]),
     bugStatus: String(rows[i]!["bug_status"]),
   }));
@@ -650,7 +650,7 @@ export async function listMediaTrash(access: BugAccess): Promise<TrashedMedia[]>
   if (!actor.permissions.includes("view")) throw new Error("Bug access is not permitted.");
   const mine = actor.role !== "admin";
   const { rows } = await neonQuery(
-    `select m.id,m.bug_id,m.name,m.kind,m.size,b.title as bug_title,u.name as uploader,to_json(m.deleted_at) as deleted_iso,to_json(m.restorable_until) as until_iso,(b.deleted_at is not null) as bug_trashed
+    `select m.id,m.bug_id,m.name,m.kind,m.size,b.title as bug_title,b.code_prefix,u.name as uploader,to_json(m.deleted_at) as deleted_iso,to_json(m.restorable_until) as until_iso,(b.deleted_at is not null) as bug_trashed
     from bugflow.bug_media m join bugflow.bugs b on b.id=m.bug_id join bugflow.users u on u.id=m.uploaded_by
     where m.status='ready' and m.deleted_at is not null and m.purged_at is null and m.restorable_until>now() and b.purged_at is null ${mine ? "and m.uploaded_by=$1" : ""}
     order by m.deleted_at desc limit 200`,
@@ -659,7 +659,7 @@ export async function listMediaTrash(access: BugAccess): Promise<TrashedMedia[]>
   return rows.map((r) => ({
     id: String(r["id"]),
     bugId: String(r["bug_id"]),
-    bugCode: formatBugCode(String(r["bug_id"])),
+    bugCode: formatBugCode(String(r["bug_id"]), String(r["code_prefix"] ?? "BF")),
     bugTitle: String(r["bug_title"]),
     name: String(r["name"]),
     kind: String(r["kind"]),

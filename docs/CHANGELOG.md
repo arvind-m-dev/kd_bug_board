@@ -2,6 +2,12 @@
 
 Newest first. Earlier history: `git log` and `roadmap.md`.
 
+## 2026-10-29 — Nameable bug-ID prefixes
+- **Feature**: bug codes are now `<prefix>-<number>` with Admin-named prefixes (e.g. `DEPLOY-000123`, `PROD-000124`). Settings → Options gains a **Bug ID prefixes** list (1-10 capitals/digits, letter first); the first entry is the default for new bugs. With more than one prefix, the report form shows a picker, so a reporter can file something as a deploy or post-production bug by ID alone. On an existing bug only Admin may change the prefix (audited in `bug.edited`); the underlying number never changes, so references stay stable and old codes keep the prefix they were born with.
+- **Data**: migration 024 — `bugs.code_prefix` (default `BF`, check-constrained). Applied and verified.
+- **Reach**: `formatBugCode(id, prefix)` threaded through every surface that prints a code — workspace/detail/exports, sprints, backlog, board, overview, trash, activity, person reports, media library/trash/tray, bell lookups; MCP mutation confirmations switched to plain `bug #N` (ids are the stable handle for AI clients).
+- **Tests**: `code-prefix.test.ts` (4); 236/236 vitest, 5/5 e2e, tsc clean, lint 0 errors / 18 warnings, build OK.
+
 ## 2026-10-29 — Phase 2 demo data
 - `database/demo/phase2_seed.sql` (idempotent; `phase2_remove.sql` undoes it): on **Demo · Customer Portal** — due dates spread over 14 open bugs (4 overdue, 2 today, rest ahead), a backlog of 2 epics / 5 stories / 3 tasks with estimates, ranks, Ready flags and parents, and sprints 14 (closed, 4 committed / 2 done) → 15 (active, incl. 2 carried-over bugs and 2 stories, 1 added after start) → 16 (planned), plus matching sprint/backlog activity for the bell and log. Fixed `de300000-…-9000-…` ids; applying twice changes nothing. Verified in e2e screenshots (sprints page shows carry-over chips, bell shows due reminders).
 

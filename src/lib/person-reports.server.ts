@@ -134,7 +134,7 @@ export async function personDetail(
         params: [person],
       },
       {
-        query: `select b.id, b.title, b.status, b.priority, b.severity, to_json(b.updated_at) as updated_at,
+        query: `select b.id, b.title, b.status, b.priority, b.severity, b.code_prefix, to_json(b.updated_at) as updated_at,
       (b.reporter_id=$1::uuid) as raised,
       (b.assignee_id=$1::uuid or exists(select 1 from bugflow.bug_assignees x where x.bug_id=b.id and x.user_id=$1::uuid)) as assigned
     from bugflow.bugs b where b.deleted_at is null and (b.reporter_id=$1::uuid or b.assignee_id=$1::uuid or exists(select 1 from bugflow.bug_assignees x where x.bug_id=b.id and x.user_id=$1::uuid))
@@ -153,7 +153,7 @@ export async function personDetail(
     })),
     recent: recent.rows.map((r) => ({
       id: String(r["id"]),
-      code: formatBugCode(String(r["id"])),
+      code: formatBugCode(String(r["id"]), String(r["code_prefix"] ?? "BF")),
       title: String(r["title"]),
       status: String(r["status"]),
       priority: String(r["priority"]),
@@ -186,7 +186,7 @@ export async function teamDetail(): Promise<{
       from weeks w order by w.wk`,
     },
     {
-      query: `select b.id, b.title, b.status, b.priority, b.severity, to_json(b.updated_at) as updated_at from bugflow.bugs b where b.deleted_at is null order by b.updated_at desc limit 15`,
+      query: `select b.id, b.title, b.status, b.priority, b.severity, b.code_prefix, to_json(b.updated_at) as updated_at from bugflow.bugs b where b.deleted_at is null order by b.updated_at desc limit 15`,
     },
   ]);
   return {
@@ -197,7 +197,7 @@ export async function teamDetail(): Promise<{
     })),
     recent: recent.rows.map((r) => ({
       id: String(r["id"]),
-      code: formatBugCode(String(r["id"])),
+      code: formatBugCode(String(r["id"]), String(r["code_prefix"] ?? "BF")),
       title: String(r["title"]),
       status: String(r["status"]),
       priority: String(r["priority"]),

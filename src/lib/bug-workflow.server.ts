@@ -90,7 +90,7 @@ const joins = `from bugflow.bugs b join bugflow.projects pr on pr.id=b.project_i
 function parseBug(r: Record<string, unknown>, evidence = false): LiveBug {
   return {
     id: String(r["id"]),
-    code: formatBugCode(String(r["id"])),
+    code: formatBugCode(String(r["id"]), String(r["code_prefix"] ?? "BF")),
     title: String(r["title"]),
     projectId: String(r["project_id"]),
     project: String(r["project_name"]),
@@ -228,12 +228,18 @@ export async function reportBug(access: BugAccess, data: z.infer<typeof reportSc
   const actor = await actorFor(access);
   if (!actor.permissions.includes("report"))
     throw new Error("Your Admin has not granted bug reporting permission.");
-  if (!(await dropdownOptions()).severities.includes(data.severity))
+  const options = await dropdownOptions();
+  if (!options.severities.includes(data.severity))
     throw new Error("Choose a severity from the list.");
   // A reporter without planning permission cannot set a due date on creation; the value is dropped, not rejected.
   const dueOn = maySetDue(actor) ? data.dueOn : null;
+  // The bug's code prefix: the reporter's pick when it is on the Admin-managed list, else the workspace default.
+  const codePrefix =
+    data.codePrefix && options.prefixes.includes(data.codePrefix)
+      ? data.codePrefix
+      : (options.prefixes[0] ?? "BF");
   const { rows } = await neonExecute(
-    `with permitted as (select p.id from bugflow.projects p where p.id=$3 and not p.archived and ($2::boolean or exists(select 1 from bugflow.portal_projects pp join bugflow.portals ap on ap.id=pp.portal_id where pp.portal_id=$1 and pp.project_id=p.id and ap.active and ap.revoked_at is null and (ap.expires_at is null or ap.expires_at>now())))), existing as (select b.id from bugflow.bug_details d join bugflow.bugs b on b.id=d.bug_id where d.request_id=$4 and b.reporter_id=$5), created as (insert into bugflow.bugs(title,project_id,reporter_id,priority,severity,description,expected,actual,browser_device,environment,due_on) select $6,id,$5,$7,$8,$9,$10,$11,$12,$13,$19::date from permitted where not exists(select 1 from existing) returning id), details as (insert into bugflow.bug_details(bug_id,request_id,module_name,evidence_urls) select id,$4,$14,$15::jsonb from created), steps as (insert into bugflow.steps(bug_id,position,content) select c.id,s.ordinality::int,s.value from created c cross join jsonb_array_elements_text($16::jsonb) with ordinality s(value,ordinality)), history as (insert into bugflow.status_history(id,bug_id,actor_id,new_status) select $17,id,$5,'NEW' from created), activity as (insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $18,id,$5,'bug.created',jsonb_build_object('priority',$7::text) from created) select id from created union all select id from existing`,
+    `with permitted as (select p.id from bugflow.projects p where p.id=$3 and not p.archived and ($2::boolean or exists(select 1 from bugflow.portal_projects pp join bugflow.portals ap on ap.id=pp.portal_id where pp.portal_id=$1 and pp.project_id=p.id and ap.active and ap.revoked_at is null and (ap.expires_at is null or ap.expires_at>now())))), existing as (select b.id from bugflow.bug_details d join bugflow.bugs b on b.id=d.bug_id where d.request_id=$4 and b.reporter_id=$5), created as (insert into bugflow.bugs(title,project_id,reporter_id,priority,severity,description,expected,actual,browser_device,environment,due_on,code_prefix) select $6,id,$5,$7,$8,$9,$10,$11,$12,$13,$19::date,$20 from permitted where not exists(select 1 from existing) returning id), details as (insert into bugflow.bug_details(bug_id,request_id,module_name,evidence_urls) select id,$4,$14,$15::jsonb from created), steps as (insert into bugflow.steps(bug_id,position,content) select c.id,s.ordinality::int,s.value from created c cross join jsonb_array_elements_text($16::jsonb) with ordinality s(value,ordinality)), history as (insert into bugflow.status_history(id,bug_id,actor_id,new_status) select $17,id,$5,'NEW' from created), activity as (insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $18,id,$5,'bug.created',jsonb_build_object('priority',$7::text) from created) select id from created union all select id from existing`,
     [
       actor.portalId,
       actor.role === "admin",
@@ -254,11 +260,12 @@ export async function reportBug(access: BugAccess, data: z.infer<typeof reportSc
       crypto.randomUUID(),
       crypto.randomUUID(),
       dueOn,
+      codePrefix,
     ],
   );
   const row = rows[0];
   if (!row) throw new Error("Choose a project available to this portal.");
-  return { id: String(row["id"]), code: formatBugCode(String(row["id"])) };
+  return { id: String(row["id"]), code: formatBugCode(String(row["id"]), codePrefix) };
 }
 export async function bugDetail(access: BugAccess, id: string) {
   const actor = await actorFor(access);
@@ -436,13 +443,18 @@ export async function editBugReport(access: BugAccess, data: BugEdit) {
   const evidence = actor.permissions.includes("evidence") || actor.role === "admin";
   // Only planners may change the due date; for anyone else the stored value is preserved ($13 = false).
   const applyDue = maySetDue(actor);
+  // Renaming a bug's ID prefix is an Admin decision (codes are how people refer to bugs), and only to a listed value.
+  const applyPrefix =
+    actor.role === "admin" &&
+    !!data.codePrefix &&
+    (await dropdownOptions()).prefixes.includes(data.codePrefix);
   // The audit row is written by the same statement as the version-checked update, so it exists only when this
   // edit won; the detail and step writes below depend on it and never apply a stale edit's leftovers.
   const editId = crypto.randomUUID();
   const applied = (n: number) => `exists(select 1 from bugflow.activity where id=$${n}::uuid)`;
   const { results } = await neonExecute<{ results: { rows: Record<string, unknown>[] }[] }>([
     {
-      query: `with old as (select priority,severity,due_on from bugflow.bugs where id=$1), u as (update bugflow.bugs set title=$3,priority=$4,severity=$5,description=$6,expected=$7,actual=$8,browser_device=$9,environment=$10,due_on=case when $13::boolean then $14::date else due_on end,updated_at=clock_timestamp() where id=$1 and updated_at=$2::timestamptz and deleted_at is null returning id) insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $11,u.id,$12,'bug.edited',jsonb_strip_nulls(jsonb_build_object('title',$3::text,'previousPriority',case when old.priority<>$4 then old.priority end,'priority',case when old.priority<>$4 then $4::text end,'previousSeverity',case when old.severity<>$5 then old.severity end,'severity',case when old.severity<>$5 then $5::text end,'previousDue',case when $13::boolean and old.due_on is distinct from $14::date then coalesce(to_char(old.due_on,'YYYY-MM-DD'),'none') end,'due',case when $13::boolean and old.due_on is distinct from $14::date then coalesce($14::text,'none') end)) from u cross join old returning bug_id`,
+      query: `with old as (select priority,severity,due_on,code_prefix from bugflow.bugs where id=$1), u as (update bugflow.bugs set title=$3,priority=$4,severity=$5,description=$6,expected=$7,actual=$8,browser_device=$9,environment=$10,due_on=case when $13::boolean then $14::date else due_on end,code_prefix=case when $15::boolean then $16 else code_prefix end,updated_at=clock_timestamp() where id=$1 and updated_at=$2::timestamptz and deleted_at is null returning id) insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $11,u.id,$12,'bug.edited',jsonb_strip_nulls(jsonb_build_object('title',$3::text,'previousPriority',case when old.priority<>$4 then old.priority end,'priority',case when old.priority<>$4 then $4::text end,'previousSeverity',case when old.severity<>$5 then old.severity end,'severity',case when old.severity<>$5 then $5::text end,'previousDue',case when $13::boolean and old.due_on is distinct from $14::date then coalesce(to_char(old.due_on,'YYYY-MM-DD'),'none') end,'due',case when $13::boolean and old.due_on is distinct from $14::date then coalesce($14::text,'none') end,'previousPrefix',case when $15::boolean and old.code_prefix<>$16 then old.code_prefix end,'prefix',case when $15::boolean and old.code_prefix<>$16 then $16::text end)) from u cross join old returning bug_id`,
       params: [
         data.id,
         data.version,
@@ -458,6 +470,8 @@ export async function editBugReport(access: BugAccess, data: BugEdit) {
         actor.userId,
         applyDue,
         data.dueOn,
+        applyPrefix,
+        data.codePrefix,
       ],
     },
     {

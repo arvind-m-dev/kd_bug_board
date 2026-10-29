@@ -29,7 +29,7 @@ function parseSprint(r: Record<string, unknown>): Sprint {
 function parseItem(r: Record<string, unknown>): SprintItem {
   return {
     bugId: String(r["bug_id"]),
-    code: formatBugCode(String(r["bug_id"])),
+    code: formatBugCode(String(r["bug_id"]), String(r["code_prefix"] ?? "BF")),
     title: String(r["title"]),
     status: r["status"] as SprintItem["status"],
     priority: String(r["priority"]),
@@ -59,7 +59,7 @@ export async function sprintsData(): Promise<SprintsData> {
         params: [],
       },
       {
-        query: `select si.sprint_id,si.bug_id,si.carried_from_sprint_id,to_json(si.added_at) as added_iso,to_json(si.removed_at) as removed_iso,b.title,b.status,b.priority,b.due_on,coalesce(a.name,'Unassigned') as assignee_name from bugflow.sprint_items si join bugflow.bugs b on b.id=si.bug_id left join bugflow.users a on a.id=b.assignee_id where si.removed_at is null and b.deleted_at is null order by si.added_at desc limit 2000`,
+        query: `select si.sprint_id,si.bug_id,si.carried_from_sprint_id,to_json(si.added_at) as added_iso,to_json(si.removed_at) as removed_iso,b.title,b.status,b.priority,b.due_on,b.code_prefix,coalesce(a.name,'Unassigned') as assignee_name from bugflow.sprint_items si join bugflow.bugs b on b.id=si.bug_id left join bugflow.users a on a.id=b.assignee_id where si.removed_at is null and b.deleted_at is null order by si.added_at desc limit 2000`,
         params: [],
       },
     ],
@@ -221,7 +221,7 @@ export async function activeSprint(projectId: string) {
   if (!row) return null;
   const sprint = parseSprint(row);
   const { rows: itemRows } = await neonQuery(
-    `select si.sprint_id,si.bug_id,si.carried_from_sprint_id,to_json(si.added_at) as added_iso,to_json(si.removed_at) as removed_iso,b.title,b.status,b.priority,b.due_on,coalesce(a.name,'Unassigned') as assignee_name
+    `select si.sprint_id,si.bug_id,si.carried_from_sprint_id,to_json(si.added_at) as added_iso,to_json(si.removed_at) as removed_iso,b.title,b.status,b.priority,b.due_on,b.code_prefix,coalesce(a.name,'Unassigned') as assignee_name
      from bugflow.sprint_items si join bugflow.bugs b on b.id=si.bug_id left join bugflow.users a on a.id=b.assignee_id
      where si.sprint_id=$1 and si.removed_at is null and b.deleted_at is null order by si.added_at limit 500`,
     [sprint.id],
@@ -250,7 +250,7 @@ export async function portalSprints(access: import("./bug-workflow").BugAccess) 
   if (!sprints.length) return [];
   const ids = sprints.map((s) => s.id);
   const { rows: itemRows } = await neonQuery(
-    `select si.sprint_id,si.bug_id,si.carried_from_sprint_id,to_json(si.added_at) as added_iso,to_json(si.removed_at) as removed_iso,b.title,b.status,b.priority,b.due_on,coalesce(a.name,'Unassigned') as assignee_name
+    `select si.sprint_id,si.bug_id,si.carried_from_sprint_id,to_json(si.added_at) as added_iso,to_json(si.removed_at) as removed_iso,b.title,b.status,b.priority,b.due_on,b.code_prefix,coalesce(a.name,'Unassigned') as assignee_name
      from bugflow.sprint_items si join bugflow.bugs b on b.id=si.bug_id left join bugflow.users a on a.id=b.assignee_id
      where si.sprint_id=any($1::uuid[]) and si.removed_at is null and b.deleted_at is null order by si.added_at limit 1000`,
     [ids],

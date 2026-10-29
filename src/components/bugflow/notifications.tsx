@@ -82,9 +82,9 @@ function Item({ n, onClick }: { n: NotificationItem; onClick?: () => void }) {
     if (!bugId || e.metaKey || e.ctrlKey || e.shiftKey) return;
     e.preventDefault();
     onClick?.();
-    const code = formatBugCode(bugId);
     try {
       const s = await lookup({ data: { bugId } });
+      const code = formatBugCode(bugId, "codePrefix" in s ? s.codePrefix : "BF");
       if (s.state === "ok") {
         void navigate({ href: `/admin/bugs?bug=${bugId}` });
         return;

@@ -25,7 +25,7 @@ export async function overviewStats(period: Period & { tz?: string }) {
       params,
     },
     {
-      query: `select b.id, b.title, b.status, b.priority, to_json(b.created_at) as created_at,
+      query: `select b.id, b.title, b.status, b.priority, b.code_prefix, to_json(b.created_at) as created_at,
         coalesce((select string_agg(u.name, ', ' order by u.name) from ${owners} o join bugflow.users u on u.id=o.user_id where o.bug_id=b.id), '') as owners
       from ${base} and ${attention}
       order by array_position(array['P0','P1','P2','P3','P4','P5'], b.priority), b.created_at limit 500`,
@@ -46,7 +46,7 @@ export async function overviewStats(period: Period & { tz?: string }) {
     unowned: Number(unowned.rows[0]?.["n"] ?? 0),
     attention: urgent.rows.map((r) => ({
       id: String(r["id"]),
-      code: formatBugCode(String(r["id"])),
+      code: formatBugCode(String(r["id"]), String(r["code_prefix"] ?? "BF")),
       title: String(r["title"]),
       status: String(r["status"]),
       priority: String(r["priority"]),
