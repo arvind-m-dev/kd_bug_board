@@ -165,6 +165,18 @@ export function HelpContent({
           from your profile in Team & access.
         </p>
       )}
+      <p className="text-xs text-muted-foreground">
+        Step-by-step instructions for every role:{" "}
+        <Link
+          to="/guide"
+          target="_blank"
+          className="font-semibold text-primary"
+          onClick={onNavigate}
+        >
+          open the full user guide
+        </Link>
+        .
+      </p>
     </div>
   );
 }

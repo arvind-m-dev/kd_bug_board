@@ -36,3 +36,18 @@ export function useUrlParam(key: string): [string | null, (value: string | null)
   );
   return [value, set];
 }
+
+/**
+ * A page index (or any non-negative integer) kept in the address bar, so a refresh reopens the same page of a table
+ * instead of jumping back to the first. The fallback value writes nothing, keeping clean URLs for the default.
+ */
+export function useUrlNumber(key: string, fallback = 0): [number, (n: number) => void] {
+  const [raw, setRaw] = useUrlParam(key);
+  const parsed = raw === null ? fallback : Number.parseInt(raw, 10);
+  const value = Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+  const set = useCallback(
+    (n: number) => setRaw(n === fallback ? null : String(n)),
+    [setRaw, fallback],
+  );
+  return [value, set];
+}

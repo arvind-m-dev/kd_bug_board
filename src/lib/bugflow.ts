@@ -16,6 +16,40 @@ export const STATUSES = [
 export type Status = (typeof STATUSES)[number];
 export type Role = "admin" | "reporter" | "qa" | "developer" | "member";
 export const OPEN_STATUSES: readonly Status[] = ["NEW", "VALIDATED", "ASSIGNED", "IN_PROGRESS"];
+/** Statuses that end a bug's life: it needs no more work, so a past due date no longer counts as overdue. */
+export const CLOSED_STATUSES: readonly Status[] = [
+  "RESOLVED",
+  "DUPLICATE",
+  "NOT_A_BUG",
+  "WONT_FIX",
+];
+/** Dates are plain YYYY-MM-DD; "today" is that date in the workspace time zone, computed once (see workspaceToday). */
+export function isOverdue(status: string, dueOn: string | null, today: string): boolean {
+  return !!dueOn && !CLOSED_STATUSES.includes(status as Status) && dueOn < today;
+}
+/** Due today or tomorrow and still open: a gentle "coming up", distinct from overdue. */
+export function dueSoon(status: string, dueOn: string | null, today: string): boolean {
+  if (!dueOn || CLOSED_STATUSES.includes(status as Status) || dueOn < today) return false;
+  const t = new Date(`${today}T00:00:00Z`);
+  const tomorrow = new Date(t.getTime() + 86400000).toISOString().slice(0, 10);
+  return dueOn === today || dueOn === tomorrow;
+}
+/** A short badge label for a due date, or null when nothing should show. */
+export function dueBadge(
+  status: string,
+  dueOn: string | null,
+  today: string,
+): { tone: "danger" | "warning"; text: string } | null {
+  if (!dueOn || CLOSED_STATUSES.includes(status as Status)) return null;
+  const days = Math.round(
+    (new Date(`${dueOn}T00:00:00Z`).getTime() - new Date(`${today}T00:00:00Z`).getTime()) /
+      86400000,
+  );
+  if (days < 0) return { tone: "danger", text: `Overdue ${-days}d` };
+  if (days === 0) return { tone: "warning", text: "Due today" };
+  if (days === 1) return { tone: "warning", text: "Due tomorrow" };
+  return null;
+}
 export type Bug = {
   id: string;
   title: string;

@@ -12,6 +12,7 @@ export const permissionLabels = {
   progress: "Update assigned bugs",
   recheck: "Request QA retest",
   disposition: "Close as not a bug, duplicate or won’t fix",
+  plan: "Plan work: set due dates and sprints",
 } as const;
 export type Permission = keyof typeof permissionLabels;
 export const rolePermissions: Record<string, Permission[]> = {
@@ -26,7 +27,7 @@ export const rolePermissions: Record<string, Permission[]> = {
     "recheck",
     "disposition",
   ],
-  qa: ["view", "view_all", "report", "comment", "evidence", "validate", "assign", "verify"],
+  qa: ["view", "view_all", "report", "comment", "evidence", "validate", "assign", "verify", "plan"],
   other: ["view", "view_all", "report", "comment", "evidence"],
 };
 export const collaboratorSchema = z
@@ -50,9 +51,10 @@ export const collaboratorSchema = z
           "progress",
           "recheck",
           "disposition",
+          "plan",
         ]),
       )
-      .max(10),
+      .max(11),
   })
   .strict()
   .superRefine((value, ctx) => {

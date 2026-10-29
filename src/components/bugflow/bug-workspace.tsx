@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { RoleTag } from "./role-tag";
-import { useUrlParam } from "@/hooks/use-url-param";
+import { useUrlParam, useUrlNumber } from "@/hooks/use-url-param";
 import { SkeletonRows } from "./loading";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -59,8 +59,11 @@ import {
   priorityTone,
   priorityNames,
   mayEditBug,
+  maySetDue,
   severityLevel,
 } from "@/lib/bug-workflow";
+import { isOverdue, dueBadge, CLOSED_STATUSES } from "@/lib/bugflow";
+import { Calendar } from "@/components/ui/calendar";
 import { useNavigate } from "@tanstack/react-router";
 import { getMembers } from "@/lib/portal-access.functions";
 import { MemberProfile } from "./member-profile";
@@ -109,7 +112,8 @@ export function BugWorkspace({
   const navigate = useNavigate();
   const [cursor, setCursor] = useState<string>();
   const [pages, setPages] = useState<(string | undefined)[]>([]);
-  const [page, setPage] = useState(0);
+  // The page index lives in the URL (?page=) so a refresh or shared link reopens the same page of the table.
+  const [page, setPage] = useUrlNumber("page");
   const data = useQuery({
     queryKey: ["bug-workspace", access, cursor],
     queryFn: () => fetch({ data: { access, cursor } }),
@@ -132,6 +136,10 @@ export function BugWorkspace({
   const [priority, setPriority] = useState(/^P[0-5]$/.test(initialFilter) ? initialFilter : "all");
   const [severity, setSeverity] = useState("all");
   const [report, setReport] = useState(false);
+  // Calendar view (?cal=1) and the day it has selected (?due=YYYY-MM-DD): both survive a refresh.
+  const [calParam, setCalParam] = useUrlParam("cal");
+  const calOpen = calParam === "1";
+  const [dueDay, setDueDay] = useUrlParam("due");
   // The open bug lives in the URL (?bug=…), so a refresh or "Try again" reopens it.
   const [rawId, setId] = useUrlParam("bug");
   // Only a real bug number from the address is used; anything else is ignored rather than sent to the server.
@@ -262,7 +270,10 @@ export function BugWorkspace({
   const rows = d.bugs.filter(
     (b) =>
       (!assignmentsOnly || b.assigneeId !== null) &&
-      matchesFilter(filter, b, d.actor.userId) &&
+      (filter === "overdue"
+        ? isOverdue(b.status, b.dueOn, d.today)
+        : matchesFilter(filter, b, d.actor.userId)) &&
+      (!dueDay || b.dueOn === dueDay) &&
       (severity === "all" || b.severity === severity) &&
       (priority === "all" || b.priority === priority) &&
       `${b.code} ${b.title} ${b.project} ${b.reporter} ${b.assignee}`
@@ -313,6 +324,9 @@ export function BugWorkspace({
       tone: "info",
     },
     ...counts.groups.map((g) => ({ key: g.key, label: g.label, count: g.count, tone: g.tone })),
+    ...(!assignmentsOnly && d.overdue > 0
+      ? [{ key: "overdue", label: "Overdue", count: d.overdue, tone: "danger" }]
+      : []),
   ];
   async function quickChange(b: LiveBug, change: Partial<BugChange>, done: string) {
     try {
@@ -343,6 +357,7 @@ export function BugWorkspace({
     { value: "owned", label: "Assigned to me" },
     { value: "open", label: "Open bugs" },
     { value: "unassigned", label: "Unassigned" },
+    { value: "overdue", label: "Overdue" },
     ...STATUS_GROUPS.map((g) => ({ value: g.key, label: `${g.label} (group)` })),
     ...ALL_STATUSES.map((v) => ({ value: v, label: statusLabel(v) })),
   ];
@@ -454,6 +469,16 @@ export function BugWorkspace({
             Select
           </Button>
         )}
+        <Button
+          variant={calOpen ? "default" : "outline"}
+          size="sm"
+          onClick={() => setCalParam(calOpen ? null : "1")}
+          title="Show bugs on a calendar by due date"
+          aria-pressed={calOpen}
+        >
+          <CalendarClock />
+          Calendar
+        </Button>
         {d.actor.permissions.includes("report") && (
           <Button onClick={() => setReport(true)}>
             <Plus />
@@ -461,6 +486,17 @@ export function BugWorkspace({
           </Button>
         )}
       </div>
+      {calOpen && (
+        <DueCalendar
+          bugs={d.bugs}
+          today={d.today}
+          selected={dueDay}
+          onSelect={(day) => {
+            setDueDay(day);
+            setPage(0);
+          }}
+        />
+      )}
       <div className="bf-table-wrap bf-sticky-table rounded-md border">
         <table className="bf-table bf-bug-table">
           <thead>
@@ -582,6 +618,7 @@ export function BugWorkspace({
                       >
                         {b.title}
                       </Button>
+                      <DueBadge bug={b} today={d.today} />
                       {b.statusNote && NOTE_STATUSES.includes(b.status) && (
                         <StatusNoteLine status={b.status} note={b.statusNote} />
                       )}
@@ -835,6 +872,7 @@ export function BugWorkspace({
             projects={d.projects}
             options={d.options}
             media={d.media}
+            canPlan={maySetDue(d.actor)}
             onSaved={(saved) => {
               setReport(false);
               setId(saved);
@@ -984,6 +1022,7 @@ export function BugDetails({
           options={workspace.options}
           media={workspace.media}
           initial={b}
+          canPlan={maySetDue(actor)}
           onSaved={() => setEditing(false)}
         />
       </div>
@@ -1326,6 +1365,75 @@ const NOTE_SHORT: Record<string, string> = {
   WONT_FIX: "Won’t fix",
   RECHECK: "Fix note",
 };
+/** A local YYYY-MM-DD for a calendar day (the day the user clicked, in their own calendar), matching stored due dates. */
+function dayKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+/**
+ * A month calendar over the loaded bugs: days that hold an open bug with a due date are marked, overdue days in red.
+ * Picking a day filters the table to bugs due then; picking it again clears the filter.
+ */
+function DueCalendar({
+  bugs,
+  today,
+  selected,
+  onSelect,
+}: {
+  bugs: LiveBug[];
+  today: string;
+  selected: string | null;
+  onSelect: (day: string | null) => void;
+}) {
+  const open = bugs.filter((b) => b.dueOn && !CLOSED_STATUSES.includes(b.status));
+  const dueDays = new Set(open.map((b) => b.dueOn as string));
+  const overdueDays = new Set(
+    open.filter((b) => (b.dueOn as string) < today).map((b) => b.dueOn as string),
+  );
+  const selDate = selected ? new Date(`${selected}T00:00:00`) : undefined;
+  const selCount = open.filter((b) => b.dueOn === selected).length;
+  return (
+    <div className="bf-due-cal">
+      <Calendar
+        mode="single"
+        selected={selDate}
+        onSelect={(d) => onSelect(d ? dayKey(d) : null)}
+        modifiers={{
+          due: (d) => dueDays.has(dayKey(d)),
+          overdueDue: (d) => overdueDays.has(dayKey(d)),
+        }}
+        modifiersClassNames={{ due: "bf-cal-due", overdueDue: "bf-cal-overdue" }}
+      />
+      <div className="bf-due-cal-side">
+        {selected ? (
+          <>
+            <p className="text-sm">
+              <strong>{selCount}</strong> {selCount === 1 ? "bug" : "bugs"} due {selected}
+            </p>
+            <Button variant="ghost" size="sm" onClick={() => onSelect(null)}>
+              <X />
+              Clear day
+            </Button>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Pick a day to see the bugs due then. Marked days have open bugs; red days are overdue.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+/** A small overdue / due-soon badge shown under a bug title. Nothing renders when the date is clear or far off. */
+function DueBadge({ bug, today }: { bug: LiveBug; today: string }) {
+  const badge = dueBadge(bug.status, bug.dueOn, today);
+  if (!badge) return null;
+  return (
+    <span className="bf-due-badge" data-tone={badge.tone} title={`Due ${bug.dueOn}`}>
+      <CalendarClock size={12} aria-hidden="true" />
+      {badge.text}
+    </span>
+  );
+}
 function StatusNoteLine({
   status,
   note,

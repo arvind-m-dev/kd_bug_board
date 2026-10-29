@@ -43,6 +43,9 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  CalendarRange,
+  Kanban,
+  Layers,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -68,6 +71,9 @@ const DropdownOptionsEditor = lazy(() =>
   import("./dropdown-options").then((m) => ({ default: m.DropdownOptionsEditor })),
 );
 const TeamReports = lazy(() => import("./team-reports").then((m) => ({ default: m.TeamReports })));
+const SprintsView = lazy(() => import("./sprints").then((m) => ({ default: m.SprintsView })));
+const BoardView = lazy(() => import("./board").then((m) => ({ default: m.BoardView })));
+const BacklogView = lazy(() => import("./backlog").then((m) => ({ default: m.BacklogView })));
 const AppearanceSettings = lazy(() =>
   import("./appearance-settings").then((m) => ({ default: m.AppearanceSettings })),
 );
@@ -131,6 +137,9 @@ type View =
   | "bugs"
   | "users"
   | "assignments"
+  | "sprints"
+  | "board"
+  | "backlog"
   | "projects"
   | "activity"
   | "reports"
@@ -148,6 +157,9 @@ const navigation: {
     | "/admin/bugs"
     | "/admin/users"
     | "/admin/assignments"
+    | "/admin/sprints"
+    | "/admin/board"
+    | "/admin/backlog"
     | "/admin/projects"
     | "/admin/activity"
     | "/admin/reports"
@@ -159,6 +171,9 @@ const navigation: {
   { to: "/admin", label: "Overview", icon: LayoutDashboard },
   { to: "/admin/bugs", label: "All bugs", icon: Bug, count: true },
   { to: "/admin/assignments", label: "Assignments", icon: ListChecks, count: true },
+  { to: "/admin/sprints", label: "Sprints", icon: CalendarRange },
+  { to: "/admin/board", label: "Board", icon: Kanban },
+  { to: "/admin/backlog", label: "Backlog", icon: Layers },
   { to: "/admin/projects", label: "Projects & modules", icon: FolderKanban },
   { to: "/admin/users", label: "Team & access", icon: UsersRound, count: true },
   { to: "/admin/activity", label: "Activity & reports", icon: Activity },
@@ -168,15 +183,18 @@ const navigation: {
 // Sidebar is grouped; each group's title carries a chevron to fold its links away.
 const navGroups: { id: string; label: string; icon: LucideIcon; items: typeof navigation }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, items: navigation.slice(0, 1) },
-  { id: "bugs", label: "Bugs", icon: Bug, items: navigation.slice(1, 3) },
-  { id: "management", label: "Management", icon: FolderKanban, items: navigation.slice(3, 5) },
-  { id: "reports", label: "Reports", icon: ChartPie, items: navigation.slice(5, 7) },
+  { id: "bugs", label: "Bugs", icon: Bug, items: navigation.slice(1, 6) },
+  { id: "management", label: "Management", icon: FolderKanban, items: navigation.slice(6, 8) },
+  { id: "reports", label: "Reports", icon: ChartPie, items: navigation.slice(8, 10) },
 ];
 const titles: Record<View, string> = {
   overview: "Overview",
   bugs: "All bugs",
   users: "Team & access",
   assignments: "Assignments",
+  sprints: "Sprints",
+  board: "Board",
+  backlog: "Backlog",
   projects: "Projects & modules",
   activity: "Activity & reports",
   reports: "Team reports",
@@ -205,6 +223,9 @@ const subtitles: Record<View, string> = {
   users:
     "Your team, their roles and their private portal links — open, copy or replace a link here.",
   assignments: "Keep the right bugs with the right people.",
+  sprints: "Plan bugs into sprints and track scope and carry-over.",
+  board: "Drag bugs between stages — never past the workflow rules.",
+  backlog: "Epics, stories, tasks and bugs in one ranked list per project.",
   projects: "Organize testing across your applications and modules.",
   reports: "How each person is doing — what they raised, fixed, rejected and how fast.",
   activity: "Every change, with the complete story behind it.",
@@ -548,6 +569,12 @@ export function Workspace({ view = "overview" }: { view?: View }) {
                 <UsersView />
               ) : view === "assignments" ? (
                 <AdminBugs assignmentsOnly />
+              ) : view === "sprints" ? (
+                <SprintsView />
+              ) : view === "board" ? (
+                <BoardView />
+              ) : view === "backlog" ? (
+                <BacklogView />
               ) : view === "projects" ? (
                 <ProjectsView onDialog={setDialog} />
               ) : view === "activity" ? (

@@ -31,7 +31,7 @@ npm run dev                  # http://localhost:8080
 
 ## Database
 
-Schema changes live in versioned SQL files under [`database/`](database/), applied in order (`001` … `010`).
+Schema changes live in versioned SQL files under [`database/`](database/), applied in order (`001` … `020`).
 
 ## Scripts
 

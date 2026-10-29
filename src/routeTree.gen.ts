@@ -11,15 +11,19 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as GuideRouteImport } from './routes/guide'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PortalsRouteImport } from './routes/portals'
 import { Route as AdminActivityRouteImport } from './routes/admin_.activity'
 import { Route as AdminAssignmentsRouteImport } from './routes/admin_.assignments'
+import { Route as AdminBacklogRouteImport } from './routes/admin_.backlog'
+import { Route as AdminBoardRouteImport } from './routes/admin_.board'
 import { Route as AdminBugsRouteImport } from './routes/admin_.bugs'
 import { Route as AdminNotificationsRouteImport } from './routes/admin_.notifications'
 import { Route as AdminProjectsRouteImport } from './routes/admin_.projects'
 import { Route as AdminReportsRouteImport } from './routes/admin_.reports'
 import { Route as AdminSettingsRouteImport } from './routes/admin_.settings'
+import { Route as AdminSprintsRouteImport } from './routes/admin_.sprints'
 import { Route as AdminTrashRouteImport } from './routes/admin_.trash'
 import { Route as AdminUsersRouteImport } from './routes/admin_.users'
 import { Route as DeveloperPortalTokenRouteImport } from './routes/developer.$portalToken'
@@ -43,6 +47,11 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GuideRoute = GuideRouteImport.update({
+  id: '/guide',
+  path: '/guide',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -61,6 +70,16 @@ const AdminActivityRoute = AdminActivityRouteImport.update({
 const AdminAssignmentsRoute = AdminAssignmentsRouteImport.update({
   id: '/admin_/assignments',
   path: '/admin/assignments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminBacklogRoute = AdminBacklogRouteImport.update({
+  id: '/admin_/backlog',
+  path: '/admin/backlog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminBoardRoute = AdminBoardRouteImport.update({
+  id: '/admin_/board',
+  path: '/admin/board',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminBugsRoute = AdminBugsRouteImport.update({
@@ -86,6 +105,11 @@ const AdminReportsRoute = AdminReportsRouteImport.update({
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
   id: '/admin_/settings',
   path: '/admin/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSprintsRoute = AdminSprintsRouteImport.update({
+  id: '/admin_/sprints',
+  path: '/admin/sprints',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminTrashRoute = AdminTrashRouteImport.update({
@@ -152,15 +176,19 @@ const AdminSettingsStorageRoute = AdminSettingsStorageRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/guide': typeof GuideRoute
   '/login': typeof LoginRoute
   '/portals': typeof PortalsRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/assignments': typeof AdminAssignmentsRoute
+  '/admin/backlog': typeof AdminBacklogRoute
+  '/admin/board': typeof AdminBoardRoute
   '/admin/bugs': typeof AdminBugsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/projects': typeof AdminProjectsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/sprints': typeof AdminSprintsRoute
   '/admin/trash': typeof AdminTrashRoute
   '/admin/users': typeof AdminUsersRoute
   '/developer/$portalToken': typeof DeveloperPortalTokenRoute
@@ -177,15 +205,19 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/guide': typeof GuideRoute
   '/login': typeof LoginRoute
   '/portals': typeof PortalsRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/assignments': typeof AdminAssignmentsRoute
+  '/admin/backlog': typeof AdminBacklogRoute
+  '/admin/board': typeof AdminBoardRoute
   '/admin/bugs': typeof AdminBugsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/projects': typeof AdminProjectsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/sprints': typeof AdminSprintsRoute
   '/admin/trash': typeof AdminTrashRoute
   '/admin/users': typeof AdminUsersRoute
   '/developer/$portalToken': typeof DeveloperPortalTokenRoute
@@ -203,15 +235,19 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/guide': typeof GuideRoute
   '/login': typeof LoginRoute
   '/portals': typeof PortalsRoute
   '/admin_/activity': typeof AdminActivityRoute
   '/admin_/assignments': typeof AdminAssignmentsRoute
+  '/admin_/backlog': typeof AdminBacklogRoute
+  '/admin_/board': typeof AdminBoardRoute
   '/admin_/bugs': typeof AdminBugsRoute
   '/admin_/notifications': typeof AdminNotificationsRoute
   '/admin_/projects': typeof AdminProjectsRoute
   '/admin_/reports': typeof AdminReportsRoute
   '/admin_/settings': typeof AdminSettingsRoute
+  '/admin_/sprints': typeof AdminSprintsRoute
   '/admin_/trash': typeof AdminTrashRoute
   '/admin_/users': typeof AdminUsersRoute
   '/developer/$portalToken': typeof DeveloperPortalTokenRoute
@@ -230,15 +266,19 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/guide'
     | '/login'
     | '/portals'
     | '/admin/activity'
     | '/admin/assignments'
+    | '/admin/backlog'
+    | '/admin/board'
     | '/admin/bugs'
     | '/admin/notifications'
     | '/admin/projects'
     | '/admin/reports'
     | '/admin/settings'
+    | '/admin/sprints'
     | '/admin/trash'
     | '/admin/users'
     | '/developer/$portalToken'
@@ -255,15 +295,19 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/guide'
     | '/login'
     | '/portals'
     | '/admin/activity'
     | '/admin/assignments'
+    | '/admin/backlog'
+    | '/admin/board'
     | '/admin/bugs'
     | '/admin/notifications'
     | '/admin/projects'
     | '/admin/reports'
     | '/admin/settings'
+    | '/admin/sprints'
     | '/admin/trash'
     | '/admin/users'
     | '/developer/$portalToken'
@@ -280,15 +324,19 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/guide'
     | '/login'
     | '/portals'
     | '/admin_/activity'
     | '/admin_/assignments'
+    | '/admin_/backlog'
+    | '/admin_/board'
     | '/admin_/bugs'
     | '/admin_/notifications'
     | '/admin_/projects'
     | '/admin_/reports'
     | '/admin_/settings'
+    | '/admin_/sprints'
     | '/admin_/trash'
     | '/admin_/users'
     | '/developer/$portalToken'
@@ -306,15 +354,19 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  GuideRoute: typeof GuideRoute
   LoginRoute: typeof LoginRoute
   PortalsRoute: typeof PortalsRoute
   AdminActivityRoute: typeof AdminActivityRoute
   AdminAssignmentsRoute: typeof AdminAssignmentsRoute
+  AdminBacklogRoute: typeof AdminBacklogRoute
+  AdminBoardRoute: typeof AdminBoardRoute
   AdminBugsRoute: typeof AdminBugsRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminProjectsRoute: typeof AdminProjectsRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminSprintsRoute: typeof AdminSprintsRoute
   AdminTrashRoute: typeof AdminTrashRoute
   AdminUsersRoute: typeof AdminUsersRoute
   DeveloperPortalTokenRoute: typeof DeveloperPortalTokenRoute
@@ -345,6 +397,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/guide': {
+      id: '/guide'
+      path: '/guide'
+      fullPath: '/guide'
+      preLoaderRoute: typeof GuideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -371,6 +430,20 @@ declare module '@tanstack/react-router' {
       path: '/admin/assignments'
       fullPath: '/admin/assignments'
       preLoaderRoute: typeof AdminAssignmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin_/backlog': {
+      id: '/admin_/backlog'
+      path: '/admin/backlog'
+      fullPath: '/admin/backlog'
+      preLoaderRoute: typeof AdminBacklogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin_/board': {
+      id: '/admin_/board'
+      path: '/admin/board'
+      fullPath: '/admin/board'
+      preLoaderRoute: typeof AdminBoardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin_/bugs': {
@@ -406,6 +479,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/settings'
       fullPath: '/admin/settings'
       preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin_/sprints': {
+      id: '/admin_/sprints'
+      path: '/admin/sprints'
+      fullPath: '/admin/sprints'
+      preLoaderRoute: typeof AdminSprintsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin_/trash': {
@@ -498,15 +578,19 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  GuideRoute: GuideRoute,
   LoginRoute: LoginRoute,
   PortalsRoute: PortalsRoute,
   AdminActivityRoute: AdminActivityRoute,
   AdminAssignmentsRoute: AdminAssignmentsRoute,
+  AdminBacklogRoute: AdminBacklogRoute,
+  AdminBoardRoute: AdminBoardRoute,
   AdminBugsRoute: AdminBugsRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminProjectsRoute: AdminProjectsRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
+  AdminSprintsRoute: AdminSprintsRoute,
   AdminTrashRoute: AdminTrashRoute,
   AdminUsersRoute: AdminUsersRoute,
   DeveloperPortalTokenRoute: DeveloperPortalTokenRoute,

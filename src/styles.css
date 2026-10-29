@@ -69,7 +69,7 @@
 .bf-workspace { margin: 7px 16px 22px; border: 1px solid var(--border); border-radius: 6px; display: flex; align-items: center; gap: 10px; padding: 11px; background: var(--background); }
 .bf-nav-label { font-size: 11.5px; font-weight: 700; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0; margin: 12px 26px 10px; }
 .bf-nav { display: grid; gap: 4px; padding: 0 14px; }
-.bf-nav-link { min-height: 42px; display: flex; align-items: center; gap: 11px; padding: 0 12px; border-radius: 6px; color: var(--muted-foreground); font-weight: 500; font-size: 13px; transition: background .15s; }
+.bf-nav-link { min-height: 42px; display: flex; align-items: center; gap: 11px; padding: 0 12px; border-radius: 6px; color: color-mix(in oklab, var(--foreground) 78%, transparent); font-weight: 500; font-size: 13px; transition: background .15s; }
 .bf-nav-link:hover { background: var(--muted); color: var(--foreground); }
 .bf-nav-link[data-status=active] { color: var(--primary); background: var(--accent); font-weight: 700; }
 .bf-nav-link svg { width: 18px; height: 18px; stroke-width: 1.7; }
@@ -77,7 +77,7 @@
 /* ── Collapsible nav groups: the section title is a button with a chevron ── */
 .bf-nav-group { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 .bf-nav-group:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
-.bf-nav-group-head { width: calc(100% - 20px); margin: 2px 10px; padding: 7px 12px; display: flex; align-items: center; gap: 9px; background: none; border: 0; cursor: pointer; border-radius: 7px; font-size: 11.5px; font-weight: 700; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: .3px; transition: background .15s, color .15s; }
+.bf-nav-group-head { width: calc(100% - 20px); margin: 2px 10px; padding: 7px 12px; display: flex; align-items: center; gap: 9px; background: none; border: 0; cursor: pointer; border-radius: 7px; font-size: 11px; font-weight: 700; color: color-mix(in oklab, var(--muted-foreground) 82%, transparent); text-transform: uppercase; letter-spacing: .6px; transition: background .15s, color .15s; }
 .bf-nav-group-head > span { flex: 1; text-align: left; }
 .bf-nav-group-head:hover { background: var(--muted); color: var(--foreground); }
 .bf-nav-group-head[data-active] { color: var(--primary); background: var(--accent); }
@@ -86,7 +86,8 @@
 .bf-nav-group[data-open=true] .bf-nav-group-chevron { transform: rotate(180deg); }
 .bf-nav-group-items { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s cubic-bezier(.22,.61,.36,1); }
 .bf-nav-group[data-open=true] .bf-nav-group-items { grid-template-rows: 1fr; }
-.bf-nav-group-items > .bf-nav { overflow: hidden; min-height: 0; }
+/* Sub-tabs sit inset under their section title, with a faint guide line, so the title reads as a parent. */
+.bf-nav-group-items > .bf-nav { overflow: hidden; min-height: 0; margin-left: 23px; padding: 0 14px 0 0; border-left: 1px solid var(--border); }
 .bf-nav-solo { padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
 .bf-sidebar-bottom { margin-top: auto; padding: 16px; }
 .bf-connection { padding: 13px 12px; background: var(--background); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 16px; }
@@ -107,6 +108,8 @@
 .bf-shell[data-collapsed=true] .bf-nav-group-head { display: none; }
 .bf-shell[data-collapsed=true] .bf-nav-group-items { grid-template-rows: 1fr; }
 .bf-shell[data-collapsed=true] .bf-nav { padding: 0 10px; }
+/* No section titles when collapsed, so drop the nesting indent/guide and keep the icons centered. */
+.bf-shell[data-collapsed=true] .bf-nav-group-items > .bf-nav { margin-left: 0; padding: 0 10px; border-left: 0; }
 .bf-shell[data-collapsed=true] .bf-nav-link { justify-content: center; gap: 0; padding: 0; font-size: 0; }
 .bf-shell[data-collapsed=true] .bf-nav-link svg { width: 20px; height: 20px; }
 .bf-shell[data-collapsed=true] .bf-nav-link[data-status=active]::before { left: -10px; }
@@ -915,6 +918,87 @@ html:root .bf-report-grid-raised, html:root .bf-report-grid-wide { grid-template
 .bf-status-note { --n: var(--warning); display: flex; align-items: center; gap: 5px; max-width: 220px; margin-top: 4px; font-size: 12px; color: var(--muted-foreground); }
 .bf-status-note[data-status=REOPENED] { --n: var(--destructive); }
 .bf-status-note[data-status=RECHECK] { --n: var(--success); }
+.bf-tz-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+.bf-tz-card .bf-input { padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--foreground); font: inherit; font-size: 13px; min-width: 200px; }
+/* ── Backlog ── */
+.bf-backlog { display: grid; gap: 6px; }
+.bf-backlog[data-busy] { opacity: .7; pointer-events: none; }
+.bf-backlog-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; cursor: grab; }
+.bf-backlog-row[data-dragging] { opacity: .5; }
+.bf-backlog-grip { flex: none; color: var(--muted-foreground); }
+.bf-backlog-kind { flex: none; width: 48px; text-align: center; padding: 1px 0; border-radius: 999px; border: 1px solid var(--border); font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--muted-foreground); }
+.bf-backlog-kind[data-kind=epic] { color: var(--primary); border-color: color-mix(in oklab, var(--primary) 40%, transparent); }
+.bf-backlog-kind[data-kind=story] { color: var(--success); border-color: color-mix(in oklab, var(--success) 40%, transparent); }
+.bf-backlog-kind[data-kind=bug] { color: var(--destructive); border-color: color-mix(in oklab, var(--destructive) 35%, transparent); }
+.bf-backlog-title { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+.bf-backlog-parent { font-size: 11px; font-weight: 500; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.bf-backlog-progress { flex: none; width: 110px; height: 6px; border-radius: 999px; background: var(--muted); overflow: hidden; }
+.bf-backlog-progress > span { display: block; height: 100%; background: var(--primary); }
+.bf-backlog-estimate { width: 64px; flex: none; }
+.bf-backlog-ready { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted-foreground); white-space: nowrap; }
+.bf-backlog-row .bf-board-move { width: auto; max-width: 150px; flex: none; }
+.bf-backlog-insprint { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--primary); white-space: nowrap; }
+.bf-backlog-tail { padding: 10px; border: 1px dashed var(--border); border-radius: 8px; text-align: center; font-size: 12px; color: var(--muted-foreground); }
+@media (max-width: 760px) { .bf-backlog-row { flex-wrap: wrap; } }
+
+/* ── User guide (/guide) ── */
+.bf-guide { max-width: 760px; margin: 0 auto; padding: 32px 16px 60px; display: grid; gap: 18px; }
+.bf-guide-hero h1 { display: flex; align-items: center; gap: 10px; font-size: 24px; font-weight: 800; margin: 0 0 8px; }
+.bf-guide-hero p { margin: 0; color: var(--muted-foreground); max-width: 56ch; }
+.bf-guide-back { display: inline-flex; align-items: center; gap: 5px; margin-top: 12px; font-size: 13px; font-weight: 600; color: var(--primary); }
+.bf-guide-section { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.bf-guide-section h2 { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; margin: 0 0 10px; }
+.bf-guide-section ol { margin: 0; padding-left: 20px; display: grid; gap: 7px; font-size: 14px; }
+.bf-guide-section li { line-height: 1.45; }
+.bf-guide-foot { font-size: 13px; color: var(--muted-foreground); text-align: center; }
+.bf-guide-foot a { color: var(--primary); font-weight: 600; }
+
+/* ── Scrum board ── */
+/* Five columns side by side; when the content area is narrower than they need, the board scrolls sideways
+   instead of clipping the last column (seen at 1280px with the sidebar open). */
+.bf-board { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 12px; align-items: start; overflow-x: auto; padding-bottom: 8px; }
+@media (max-width: 1100px) { .bf-board { display: flex; } .bf-board .bf-board-col { min-width: 230px; flex: none; } }
+.bf-board[data-busy] { opacity: .7; pointer-events: none; }
+.bf-board-col { background: var(--muted); border: 1px solid var(--border); border-radius: 10px; min-height: 120px; transition: opacity .15s; }
+.bf-board-col[data-dim] { opacity: .35; }
+.bf-board-col-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--muted-foreground); }
+.bf-board-count { font-variant-numeric: tabular-nums; }
+.bf-board-cards { display: grid; gap: 8px; padding: 0 8px 10px; }
+.bf-board-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; display: grid; gap: 6px; }
+.bf-board-card[draggable=true] { cursor: grab; }
+.bf-board-card[data-dragging] { opacity: .5; }
+.bf-board-title { display: grid; gap: 2px; text-align: left; font-size: 13px; font-weight: 600; background: none; border: 0; padding: 0; cursor: pointer; color: var(--foreground); }
+.bf-board-title:hover { color: var(--primary); }
+.bf-board-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.bf-board-chip { padding: 0 7px; border-radius: 999px; border: 1px solid var(--border); font-size: 10.5px; font-weight: 600; color: var(--muted-foreground); }
+.bf-board-chip[data-tone=danger] { color: var(--destructive); border-color: color-mix(in oklab, var(--destructive) 40%, transparent); }
+.bf-board-chip[data-tone=warning] { color: color-mix(in oklab, var(--warning) 75%, var(--foreground)); border-color: color-mix(in oklab, var(--warning) 40%, transparent); }
+.bf-board-chip[data-tone=success] { color: var(--success); border-color: color-mix(in oklab, var(--success) 40%, transparent); }
+.bf-board-move { width: 100%; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--muted-foreground); font: inherit; font-size: 12px; }
+.bf-board-empty { padding: 4px 6px 10px; font-size: 12px; color: var(--muted-foreground); }
+
+/* ── Sprints ── */
+.bf-sprint-state { margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; vertical-align: middle; border: 1px solid var(--border); color: var(--muted-foreground); }
+.bf-sprint-state[data-state=active] { color: var(--primary); border-color: color-mix(in oklab, var(--primary) 40%, transparent); background: var(--accent); }
+.bf-sprint-state[data-state=closed] { opacity: .7; }
+.bf-sprint-stats { display: flex; flex-wrap: wrap; gap: 18px; padding: 8px 16px 12px; }
+.bf-sprint-stat { display: flex; flex-direction: column; }
+.bf-sprint-stat strong { font-size: 18px; line-height: 1; }
+.bf-sprint-stat span { font-size: 11px; color: var(--muted-foreground); }
+.bf-sprint-items { border-top: 1px solid var(--border); }
+.bf-sprint-carry { margin-left: 8px; padding: 0 6px; border-radius: 999px; font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--primary); background: var(--accent); }
+.bf-sprint-add { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+.bf-sprint-add input { max-width: 320px; }
+.bf-due-cal { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+.bf-due-cal-side { flex: 1; min-width: 180px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding-top: 6px; }
+/* Days that carry an open bug with a due date get a dot; overdue days turn red. */
+.bf-cal-due:not(.rdp-selected) { position: relative; font-weight: 700; }
+.bf-cal-due:not(.rdp-selected)::after { content: ""; position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 999px; background: var(--primary); }
+.bf-cal-overdue:not(.rdp-selected) { color: var(--destructive); }
+.bf-cal-overdue:not(.rdp-selected)::after { background: var(--destructive); }
+.bf-due-badge { --n: var(--warning); display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 1px 7px 1px 5px; border-radius: 999px; border: 1px solid color-mix(in oklab, var(--n) 35%, transparent); background: color-mix(in oklab, var(--n) 12%, transparent); font-size: 11px; font-weight: 600; color: color-mix(in oklab, var(--n) 75%, var(--foreground)); }
+.bf-due-badge[data-tone=danger] { --n: var(--destructive); }
+.bf-due-badge svg { flex-shrink: 0; }
 .bf-status-note svg { flex-shrink: 0; color: var(--n); }
 .bf-status-note b { flex-shrink: 0; font-weight: 600; color: var(--n); }
 .bf-status-note-box { --n: var(--warning); display: flex; gap: 12px; margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; border: 1px solid color-mix(in oklab, var(--n) 35%, transparent); background: color-mix(in oklab, var(--n) 10%, transparent); }

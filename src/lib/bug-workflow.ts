@@ -76,6 +76,11 @@ const reportFields = z
     browserDevice: z.string().trim().max(200).default(""),
     environment: z.string().trim().max(80).default(""),
     evidenceUrls: z.array(evidenceUrlSchema).max(10).default([]),
+    // Plain calendar date or empty (cleared). Permission to actually set it is checked on the server (maySetDue).
+    dueOn: z
+      .union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date.")])
+      .default("")
+      .transform((v) => v || null),
   })
   .strict();
 function completeReport<T extends { title: string; description: string; actual: string }>(
@@ -125,6 +130,10 @@ export function mayEditBug(
   if (LOCKED_FOR_EDIT.includes(bug.status)) return false;
   if (actor.permissions.includes("report") && bug.reporterId === actor.userId) return true;
   return actor.role === "developer" && bug.assigneeId === actor.userId;
+}
+/** Only planners set or clear due dates (Admin always; `plan` holders, e.g. QA, otherwise). */
+export function maySetDue(actor: { role: string; permissions: string[] }) {
+  return actor.role === "admin" || actor.permissions.includes("plan");
 }
 const optionList = z.array(z.string().trim().min(1).max(80)).max(50);
 export const optionsSchema = z
@@ -196,6 +205,7 @@ export type LiveBug = {
   createdAt: string;
   updatedAt: string;
   version: string;
+  dueOn: string | null;
   steps: string[];
   evidenceUrls: string[];
   module: string;
@@ -223,6 +233,12 @@ export type BugWorkspaceData = {
   recheck: number;
   resolved: number;
   unassigned: number;
+  /** Open bugs whose due date is before `today` (authoritative total across all pages, from SQL). */
+  overdue: number;
+  /** Today's date (YYYY-MM-DD) in the workspace time zone; the client derives overdue/due-soon from it. */
+  today: string;
+  /** The configured IANA workspace time zone (e.g. "Asia/Kolkata"), or "UTC" when unset. */
+  timeZone: string;
   statusCounts: StatusCount[];
   nextCursor: string | null;
   media: MediaConfig;
@@ -404,6 +420,7 @@ export type FilterableBug = {
   assigneeId: string | null;
   reporterId: string;
   assignees?: { id: string }[];
+  dueOn?: string | null;
 };
 /** 'all' | 'mine' | 'owned' | 'open' | 'unassigned' | a status | a 'g:' group, or two of them joined by ':' (e.g. 'owned:RECHECK' = my fixes awaiting QA). */
 export function matchesFilter(filter: string, b: FilterableBug, me: string): boolean {

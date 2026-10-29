@@ -14,6 +14,7 @@ import {
   type reportSchema,
   type BugEdit,
   mayEditBug,
+  maySetDue,
   cleanOptions,
   type DropdownOptions,
   type ExportBug,
@@ -116,6 +117,7 @@ function parseBug(r: Record<string, unknown>, evidence = false): LiveBug {
     createdAt: String(r["created_iso"]),
     updatedAt: String(r["updated_iso"]),
     version: String(r["version"]),
+    dueOn: r["due_on"] ? String(r["due_on"]).slice(0, 10) : null,
     module: String(r["module_name"]),
     steps: Array.isArray(r["steps"]) ? r["steps"].map(String) : [],
     lastChange:
@@ -151,7 +153,9 @@ export async function workspaceData(access: BugAccess, cursor?: string): Promise
     actor.userId,
     actor.role === "qa" || actor.permissions.includes("view_all"),
   ];
-  const where = scope(actor);
+  const timeZone = await workspaceTimeZone();
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
+  const where = `${scope(actor)} and b.kind='bug'`; // the workspace lists bugs; other kinds live on the backlog
   const { results } = await neonQuery<{ results: { rows: Record<string, unknown>[] }[] }>(
     [
       {
@@ -162,8 +166,8 @@ export async function workspaceData(access: BugAccess, cursor?: string): Promise
         params: actor.role === "admin" ? [] : [actor.portalId],
       },
       {
-        query: `select count(*) as total,count(*) filter(where b.status not in ('RESOLVED','DUPLICATE','NOT_A_BUG','WONT_FIX')) as open,count(*) filter(where b.status='RECHECK') as recheck,count(*) filter(where b.status='RESOLVED') as resolved,count(*) filter(where b.assignee_id is null) as unassigned from bugflow.bugs b where ${where}`,
-        params: params,
+        query: `select count(*) as total,count(*) filter(where b.status not in ('RESOLVED','DUPLICATE','NOT_A_BUG','WONT_FIX')) as open,count(*) filter(where b.status='RECHECK') as recheck,count(*) filter(where b.status='RESOLVED') as resolved,count(*) filter(where b.assignee_id is null) as unassigned,count(*) filter(where b.due_on is not null and b.due_on<$4::date and b.status not in ('RESOLVED','DUPLICATE','NOT_A_BUG','WONT_FIX')) as overdue from bugflow.bugs b where ${where}`,
+        params: [...params, today],
       },
       {
         query: `select ${columns} ${joins} where ${where} and ($4::bigint is null or b.id<$4) order by b.id desc limit 51`,
@@ -208,6 +212,9 @@ export async function workspaceData(access: BugAccess, cursor?: string): Promise
     recheck: Number(stats["recheck"] ?? 0),
     resolved: Number(stats["resolved"] ?? 0),
     unassigned: Number(stats["unassigned"] ?? 0),
+    overdue: Number(stats["overdue"] ?? 0),
+    today,
+    timeZone,
     statusCounts: (results[4]?.rows ?? []).map((r) => ({
       status: String(r["status"]),
       assigned: r["assigned"] === true,
@@ -223,8 +230,10 @@ export async function reportBug(access: BugAccess, data: z.infer<typeof reportSc
     throw new Error("Your Admin has not granted bug reporting permission.");
   if (!(await dropdownOptions()).severities.includes(data.severity))
     throw new Error("Choose a severity from the list.");
+  // A reporter without planning permission cannot set a due date on creation; the value is dropped, not rejected.
+  const dueOn = maySetDue(actor) ? data.dueOn : null;
   const { rows } = await neonExecute(
-    `with permitted as (select p.id from bugflow.projects p where p.id=$3 and not p.archived and ($2::boolean or exists(select 1 from bugflow.portal_projects pp join bugflow.portals ap on ap.id=pp.portal_id where pp.portal_id=$1 and pp.project_id=p.id and ap.active and ap.revoked_at is null and (ap.expires_at is null or ap.expires_at>now())))), existing as (select b.id from bugflow.bug_details d join bugflow.bugs b on b.id=d.bug_id where d.request_id=$4 and b.reporter_id=$5), created as (insert into bugflow.bugs(title,project_id,reporter_id,priority,severity,description,expected,actual,browser_device,environment) select $6,id,$5,$7,$8,$9,$10,$11,$12,$13 from permitted where not exists(select 1 from existing) returning id), details as (insert into bugflow.bug_details(bug_id,request_id,module_name,evidence_urls) select id,$4,$14,$15::jsonb from created), steps as (insert into bugflow.steps(bug_id,position,content) select c.id,s.ordinality::int,s.value from created c cross join jsonb_array_elements_text($16::jsonb) with ordinality s(value,ordinality)), history as (insert into bugflow.status_history(id,bug_id,actor_id,new_status) select $17,id,$5,'NEW' from created), activity as (insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $18,id,$5,'bug.created',jsonb_build_object('priority',$7::text) from created) select id from created union all select id from existing`,
+    `with permitted as (select p.id from bugflow.projects p where p.id=$3 and not p.archived and ($2::boolean or exists(select 1 from bugflow.portal_projects pp join bugflow.portals ap on ap.id=pp.portal_id where pp.portal_id=$1 and pp.project_id=p.id and ap.active and ap.revoked_at is null and (ap.expires_at is null or ap.expires_at>now())))), existing as (select b.id from bugflow.bug_details d join bugflow.bugs b on b.id=d.bug_id where d.request_id=$4 and b.reporter_id=$5), created as (insert into bugflow.bugs(title,project_id,reporter_id,priority,severity,description,expected,actual,browser_device,environment,due_on) select $6,id,$5,$7,$8,$9,$10,$11,$12,$13,$19::date from permitted where not exists(select 1 from existing) returning id), details as (insert into bugflow.bug_details(bug_id,request_id,module_name,evidence_urls) select id,$4,$14,$15::jsonb from created), steps as (insert into bugflow.steps(bug_id,position,content) select c.id,s.ordinality::int,s.value from created c cross join jsonb_array_elements_text($16::jsonb) with ordinality s(value,ordinality)), history as (insert into bugflow.status_history(id,bug_id,actor_id,new_status) select $17,id,$5,'NEW' from created), activity as (insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $18,id,$5,'bug.created',jsonb_build_object('priority',$7::text) from created) select id from created union all select id from existing`,
     [
       actor.portalId,
       actor.role === "admin",
@@ -244,6 +253,7 @@ export async function reportBug(access: BugAccess, data: z.infer<typeof reportSc
       JSON.stringify(data.steps),
       crypto.randomUUID(),
       crypto.randomUUID(),
+      dueOn,
     ],
   );
   const row = rows[0];
@@ -424,13 +434,15 @@ export async function editBugReport(access: BugAccess, data: BugEdit) {
   )
     throw new Error("Choose a severity from the list.");
   const evidence = actor.permissions.includes("evidence") || actor.role === "admin";
+  // Only planners may change the due date; for anyone else the stored value is preserved ($13 = false).
+  const applyDue = maySetDue(actor);
   // The audit row is written by the same statement as the version-checked update, so it exists only when this
   // edit won; the detail and step writes below depend on it and never apply a stale edit's leftovers.
   const editId = crypto.randomUUID();
   const applied = (n: number) => `exists(select 1 from bugflow.activity where id=$${n}::uuid)`;
   const { results } = await neonExecute<{ results: { rows: Record<string, unknown>[] }[] }>([
     {
-      query: `with old as (select priority,severity from bugflow.bugs where id=$1), u as (update bugflow.bugs set title=$3,priority=$4,severity=$5,description=$6,expected=$7,actual=$8,browser_device=$9,environment=$10,updated_at=clock_timestamp() where id=$1 and updated_at=$2::timestamptz and deleted_at is null returning id) insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $11,u.id,$12,'bug.edited',jsonb_strip_nulls(jsonb_build_object('title',$3::text,'previousPriority',case when old.priority<>$4 then old.priority end,'priority',case when old.priority<>$4 then $4::text end,'previousSeverity',case when old.severity<>$5 then old.severity end,'severity',case when old.severity<>$5 then $5::text end)) from u cross join old returning bug_id`,
+      query: `with old as (select priority,severity,due_on from bugflow.bugs where id=$1), u as (update bugflow.bugs set title=$3,priority=$4,severity=$5,description=$6,expected=$7,actual=$8,browser_device=$9,environment=$10,due_on=case when $13::boolean then $14::date else due_on end,updated_at=clock_timestamp() where id=$1 and updated_at=$2::timestamptz and deleted_at is null returning id) insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $11,u.id,$12,'bug.edited',jsonb_strip_nulls(jsonb_build_object('title',$3::text,'previousPriority',case when old.priority<>$4 then old.priority end,'priority',case when old.priority<>$4 then $4::text end,'previousSeverity',case when old.severity<>$5 then old.severity end,'severity',case when old.severity<>$5 then $5::text end,'previousDue',case when $13::boolean and old.due_on is distinct from $14::date then coalesce(to_char(old.due_on,'YYYY-MM-DD'),'none') end,'due',case when $13::boolean and old.due_on is distinct from $14::date then coalesce($14::text,'none') end)) from u cross join old returning bug_id`,
       params: [
         data.id,
         data.version,
@@ -444,6 +456,8 @@ export async function editBugReport(access: BugAccess, data: BugEdit) {
         data.environment,
         editId,
         actor.userId,
+        applyDue,
+        data.dueOn,
       ],
     },
     {
@@ -471,6 +485,31 @@ async function dropdownOptions() {
   return cleanOptions(rows[0]?.["value"]);
 }
 
+let tzCache: { at: number; tz: string } | null = null;
+/** The workspace's configured time zone (settings key 'workspace'), or UTC. Cached 30s; used to decide "today". */
+export async function workspaceTimeZone(): Promise<string> {
+  if (tzCache && Date.now() - tzCache.at < 30000) return tzCache.tz;
+  let tz = "UTC";
+  try {
+    const { rows } = await neonQuery(`select value from bugflow.settings where key='workspace'`);
+    const v = rows[0]?.["value"] as { timeZone?: unknown } | undefined;
+    if (v && typeof v.timeZone === "string") {
+      // Validate against the runtime's zone database; an unknown name throws and we keep UTC.
+      new Intl.DateTimeFormat("en-CA", { timeZone: v.timeZone });
+      tz = v.timeZone;
+    }
+  } catch {
+    tz = "UTC";
+  }
+  tzCache = { at: Date.now(), tz };
+  return tz;
+}
+/** Today's date (YYYY-MM-DD) in the workspace time zone. en-CA formats as YYYY-MM-DD. */
+export async function workspaceToday(): Promise<string> {
+  const tz = await workspaceTimeZone();
+  return new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
+}
+
 export async function saveDropdownOptions(options: DropdownOptions) {
   checkOrigin();
   const admin = await requireAdmin();
@@ -486,6 +525,28 @@ export async function saveDropdownOptions(options: DropdownOptions) {
     },
   ]);
   return clean;
+}
+export async function saveWorkspaceTimeZone(timeZone: string) {
+  checkOrigin();
+  const admin = await requireAdmin();
+  // Reject anything the runtime's zone database does not know, so "today" is always computable.
+  try {
+    new Intl.DateTimeFormat("en-CA", { timeZone });
+  } catch {
+    throw new Error("Choose a valid time zone.");
+  }
+  await neonExecute([
+    {
+      query: `insert into bugflow.settings(key,value) values('workspace',jsonb_build_object('timeZone',$1::text)) on conflict (key) do update set value=bugflow.settings.value||jsonb_build_object('timeZone',$1::text)`,
+      params: [timeZone],
+    },
+    {
+      query: `insert into bugflow.activity(id,actor_id,action,detail) values($1,$2,'settings.timezone',jsonb_build_object('timeZone',$3::text))`,
+      params: [crypto.randomUUID(), admin.userId, timeZone],
+    },
+  ]);
+  tzCache = null;
+  return { timeZone };
 }
 export async function deleteBugReport(id: string, reason: string) {
   checkOrigin();
@@ -525,7 +586,7 @@ export async function exportBugs(
   const comment = (types: string) =>
     `(select c.content from bugflow.comments c where c.bug_id=b.id and exists(select 1 from bugflow.portals px where px.user_id=c.actor_id and px.type in (${types})) order by c.created_at desc limit 1)`;
   const { rows } = await neonQuery(
-    `select ${columns},${comment("'developer'")} as dev_comment,${comment("'qa','admin'")} as qa_comment,coalesce((select jsonb_agg(m.id order by m.created_at) from bugflow.bug_media m where m.bug_id=b.id and m.status='ready' and m.deleted_at is null),'[]'::jsonb) as media_ids ${joins} where ${scope(actor)} and ($4::uuid is null or b.project_id=$4::uuid)${closed} order by b.created_at,b.id limit 2000`,
+    `select ${columns},${comment("'developer'")} as dev_comment,${comment("'qa','admin'")} as qa_comment,coalesce((select jsonb_agg(m.id order by m.created_at) from bugflow.bug_media m where m.bug_id=b.id and m.status='ready' and m.deleted_at is null),'[]'::jsonb) as media_ids ${joins} where ${scope(actor)} and b.kind='bug' and ($4::uuid is null or b.project_id=$4::uuid)${closed} order by b.created_at,b.id limit 2000`,
     params,
   );
   return rows.map((r) => ({

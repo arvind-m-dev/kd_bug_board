@@ -38,11 +38,46 @@ export async function listNotifications(limit: number) {
     userId: ref(r["detail"], "userId"),
     projectId: ref(r["detail"], "projectId"),
   }));
+  const due = await dueReminders(admin.userId);
   return {
-    items,
-    total: Number(rows[0]?.["total"] ?? 0),
-    unread: Number(rows[0]?.["unread_total"] ?? 0),
+    items: [...due, ...items],
+    total: Number(rows[0]?.["total"] ?? 0) + due.length,
+    unread: Number(rows[0]?.["unread_total"] ?? 0) + due.filter((d) => d.unread).length,
   };
+}
+
+/**
+ * Synthetic reminders, computed on read (no stored rows, no background job): open bugs that are overdue or due by
+ * tomorrow in the workspace time zone. They sit on top of the bell and count as unread once per day — "mark read"
+ * quietens them until the next day; clearing the bell does not remove a bug that is still due.
+ */
+async function dueReminders(userId: string): Promise<NotificationItem[]> {
+  const { workspaceTimeZone, workspaceToday } = await import("./bug-workflow.server");
+  const [tz, today] = await Promise.all([workspaceTimeZone(), workspaceToday()]);
+  const { rows } = await neonQuery(
+    `select b.id::text as id,b.title,b.due_on::text as due_on,(b.due_on<$2::date) as overdue,
+       (coalesce((select read_at from bugflow.notification_state where user_id=$1),'epoch'::timestamptz)
+         < (date_trunc('day', now() at time zone $3) at time zone $3)) as unread
+     from bugflow.bugs b
+     where b.deleted_at is null and b.due_on is not null and b.due_on <= $2::date + 1
+       and b.status not in ('RESOLVED','DUPLICATE','NOT_A_BUG','WONT_FIX')
+     order by b.due_on,b.id limit 12`,
+    [userId, today, tz],
+  );
+  const now = new Date().toISOString();
+  return rows.map((r) => ({
+    id: `due-${String(r["id"])}-${today}`,
+    action: r["overdue"] === true ? "bug.overdue" : "bug.due_soon",
+    bugId: String(r["id"]),
+    title: String(r["title"]),
+    actor: "Due date",
+    at: now,
+    unread: Boolean(r["unread"]),
+    status: "",
+    portalId: null,
+    userId: null,
+    projectId: null,
+  }));
 }
 
 export async function markNotifications(kind: "read" | "clear") {

@@ -34,6 +34,9 @@ Neon Postgres, schema `bugflow`. Connection: `DATABASE_URL`. Apply migrations: `
 | 018 | `bug_media.marks`, `marks_version` |
 | 019 | `bug_media.restorable_until` |
 | 020 | `bug_media.has_thumb` |
+| 021 | `bugs.due_on` (Phase 2.1 due dates) + partial index |
+| 022 | `sprints`, `sprint_items` (Phase 2.2); one active sprint per project |
+| 023 | `bugs.kind/parent_id/estimate/ready/backlog_rank` (Phase 2.4 backlog) |
 
 ## Integrity notes
 - Member deletion is soft; bug references remain; all portals revoked.

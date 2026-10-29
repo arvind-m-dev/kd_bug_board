@@ -41,13 +41,11 @@ TanStack Start (React 19, file routes in `src/routes`), Tailwind + shadcn/ui, Ne
 
 ## Known issues / drift
 - **Temporary security exception:** `BUGFLOW_DEMO_LOGIN=1` gives anyone on `/login` full Admin without a password (enabled for marketing, 2026-10-28). Turn off when done; see [AUTH_AND_PERMISSIONS.md](AUTH_AND_PERMISSIONS.md).
-- `README.md` says migrations `001…010`; actual range is `001…020`.
-- `roadmap.md` lists S3 media uploads as deferred, but media upload is implemented (R2 bucket connected 2026-10-23).
-- Bucket CORS must include every app origin (prod uploads fail otherwise).
+- Bucket CORS must include every app origin (prod uploads fail otherwise). Verified 2026-10-28: localhost:8080 and kd-bug-board.vercel.app allowed for PUT/GET.
 - Lint: 18 react-refresh warnings (pre-existing).
 
 ## Next recommended step
-No new feature list was attached to the documentation task of 2026-10-28. Known open items: "Planned / deferred" in [FEATURES.md](FEATURES.md) (Drive connector, public media links, timestamped video comments, real-bucket media test). Before new work: read this file, [FEATURES.md](FEATURES.md), the doc for the area, then `git status`.
+Phase 2 plan: `.lovable/plan/phase-2-plan-2026-10-28.md` (Phase 2 + 3; decisions D1–D6 agreed 2026-10-28, no Jira sync). No new feature list was attached to the documentation task of 2026-10-28. Known open items: "Planned / deferred" in [FEATURES.md](FEATURES.md) (Drive connector, public media links, timestamped video comments, real-bucket media test). Before new work: read this file, [FEATURES.md](FEATURES.md), the doc for the area, then `git status`.
 
 ## Doc index
 [OVERVIEW](PROJECT_OVERVIEW.md) · [FEATURES](FEATURES.md) · [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [AUTH](AUTH_AND_PERMISSIONS.md) · [WORKFLOW](BUG_WORKFLOW.md) · [API](API_REFERENCE.md) · [STORAGE/DEPLOY](STORAGE_AND_DEPLOYMENT.md) · [TESTING](TESTING.md) · [CHANGELOG](CHANGELOG.md) · [DECISIONS](DECISIONS.md)

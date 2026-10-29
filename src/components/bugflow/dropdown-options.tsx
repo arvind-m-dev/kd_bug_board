@@ -16,7 +16,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getBugWorkspace, saveOptions } from "@/lib/bug-workflow.functions";
+import { getBugWorkspace, saveOptions, saveTimeZone } from "@/lib/bug-workflow.functions";
 import { DEFAULT_OPTIONS, severityLevel, type DropdownOptions } from "@/lib/bug-workflow";
 import { ConfirmAction, ErrorNotice, actionError } from "./action-feedback";
 import { changeMember } from "@/lib/member-management.functions";
@@ -505,6 +505,7 @@ export function DropdownOptionsEditor({ onAddMember }: { onAddMember: () => void
           }
         }}
       />
+      <TimeZoneCard current={q.data?.timeZone ?? "UTC"} />
       <div className="flex flex-wrap justify-between gap-3 pt-4 text-xs text-muted-foreground">
         <span>New members appear automatically for projects they can access.</span>
         <Button asChild variant="link" size="sm">
@@ -512,5 +513,61 @@ export function DropdownOptionsEditor({ onAddMember }: { onAddMember: () => void
         </Button>
       </div>
     </section>
+  );
+}
+
+const TIME_ZONES: string[] = (() => {
+  try {
+    const supported = (
+      Intl as unknown as { supportedValuesOf?: (k: string) => string[] }
+    ).supportedValuesOf?.("timeZone");
+    if (supported?.length) return ["UTC", ...supported.filter((z) => z !== "UTC")];
+  } catch {
+    /* fall back below */
+  }
+  return ["UTC", "America/New_York", "Europe/London", "Asia/Kolkata", "Asia/Singapore"];
+})();
+
+/** Sets the one workspace time zone that decides when a due date counts as overdue. Admin only. */
+function TimeZoneCard({ current }: { current: string }) {
+  const save = useServerFn(saveTimeZone);
+  const client = useQueryClient();
+  const [tz, setTz] = useState(current);
+  useEffect(() => setTz(current), [current]);
+  const m = useMutation({
+    mutationFn: (timeZone: string) => save({ data: { timeZone } }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ["bug-workspace"] });
+      toast.success("Workspace time zone saved");
+    },
+    onError: (e) => toast.error(actionError(e, "The time zone could not be saved.")),
+  });
+  const list = TIME_ZONES.includes(current) ? TIME_ZONES : [current, ...TIME_ZONES];
+  return (
+    <div className="bf-tz-card">
+      <div className="min-w-0">
+        <h3 className="text-sm font-semibold">Workspace time zone</h3>
+        <span className="text-xs text-muted-foreground">
+          Decides “today”, so a bug is overdue once its due date has passed here.
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <select
+          className="bf-input"
+          aria-label="Workspace time zone"
+          value={tz}
+          onChange={(e) => setTz(e.target.value)}
+        >
+          {list.map((z) => (
+            <option key={z} value={z}>
+              {z}
+            </option>
+          ))}
+        </select>
+        <Button size="sm" disabled={tz === current || m.isPending} onClick={() => m.mutate(tz)}>
+          Save
+        </Button>
+      </div>
+    </div>
   );
 }

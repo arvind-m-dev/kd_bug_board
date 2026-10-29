@@ -67,7 +67,7 @@ Status key: **Implemented** = code present with unit tests or verified per `road
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Theme provider, light/dark, Theme Studio | Implemented | `appearance*.ts`, `theme-toggle.tsx` |
-| Seasonal / 3D background worlds, scene-quality setting | Partial (in progress on `feat/theme-worlds`) | `seasonal-*.ts`, `scene-quality.ts` |
+| Seasonal / 3D background worlds, scene-quality setting | Partial — code wired, tests/build pass 2026-10-28; not yet viewed in a browser | `seasonal-*.ts`, `scene-quality.ts` |
 | Responsive sticky tables, scroll hints | Implemented | `scroll-hints.tsx` |
 
 ## Planned / deferred
@@ -76,7 +76,15 @@ Status key: **Implemented** = code present with unit tests or verified per `road
 | Google Drive connector (connect a Drive folder for media) | Planned | Settings → Media storage shows "Coming later"; Drive *links* on bugs already work. Needs a Google OAuth app |
 | Public (signed-out) media share links | Planned — undecided | Currently in-app only (`/media/$bugId`, needs Admin session or portal) |
 | Timestamped text comments on recordings | Planned — undecided | Timed drawn marks exist (migration 018); text comments at a time do not |
-| Media end-to-end test against the real R2 bucket incl. production origin CORS | Pending verification | Bucket connected 2026-10-23; prod origin must be in bucket CORS |
+| Media end-to-end test against the real R2 bucket incl. production origin CORS | Partial — bucket verified 2026-10-28 | CORS preflight PUT/GET OK for `localhost:8080` and `kd-bug-board.vercel.app`; signed PUT/GET/delete round-trip with stored credentials OK. Full in-app upload (thumbnails, compression, mark-up) not yet clicked through in a browser |
 | Published deep-link checks | Deferred | Needs publishing approval (`roadmap.md`) |
+| Phase 2.1 Due dates, overdue, filter, time zone, calendar, bell reminders | Implemented | `due_on` (021), `DueCalendar`; synthetic due reminders in the Admin bell (`dueReminders`, computed on read) |
+| Phase 2.2 Sprints (plan/start/close, carry-over) | Implemented | `/admin/sprints` (Admin manages); read-only Sprint tab on member portals; `get_sprint` MCP tool |
+| Phase 2.3 Scrum board (rule-bound drag) | Implemented | `/admin/board` + Board tab on member portals (role-scoped moves); native drag + Move menu (D5 deviation) |
+| Phase 2.4 Agile backlog (epics/stories/tasks via `bugs.kind`) | Implemented | `/admin/backlog`, migration 023; fractional ranking, epic progress, ready/estimate, sprint hand-off; non-bug kinds reuse the 13-status workflow (plan deviation); bug lists/counts/exports stay bug-only |
+| Phase 2.5 In-app user guide | Implemented | public `/guide` (static, no data); linked from Help dialogs |
+| Browser smoke suite (Playwright) | Implemented | `npm run test:e2e` (`e2e/smoke.spec.ts`): signed-out surface, no-leak check, guide, demo-sign-in sweep with screenshots |
+| Phase 3 (burndown, SLA, alerts, releases, GitHub/GitLab, AI triage, phone capture, feedback widget, SSO/MFA) | Planned | same plan, Phase 3 section |
+| Jira sync / import | Not planned | Decision D1, 2026-10-28 |
 
 Source: 2026-10-22 media/theme brief (remaining items) and `roadmap.md`. New feature requests should be added here as **Planned** before implementation.

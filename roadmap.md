@@ -17,5 +17,6 @@
 - [x] Shared rules and tests for count definitions, workflow, scoped exports.
 - [x] Browser verification of navigation, filters, report dialog, template copy and direct links.
 - [x] Neon bug reporting, scoped lists, assignments, priority/status updates and independent QA verification with real cross-portal readback.
-- [ ] Private S3 media uploads, drag & drop and compression — deferred until the user supplies an approved bucket connection.
-- [ ] Published deep-link checks — requires explicit publishing approval.- [x] Sheet-ready bug copy: per-row Copy button and Select mode with checkboxes; copies a header row plus one tab-separated row per bug (ID, title, module, severity, priority, status, people, dates, description, expected/actual, steps, environment, evidence) so each field pastes into its own cell; verified signed-in (1-row and 2-row clipboard reads).
+- [x] Private media uploads (R2 bucket, connected 2026-10-23), drag & drop and compression; end-to-end test against the real bucket incl. production CORS still pending.
+- [ ] Published deep-link checks — requires explicit publishing approval.
+- [x] Sheet-ready bug copy: per-row Copy button and Select mode with checkboxes; copies a header row plus one tab-separated row per bug (ID, title, module, severity, priority, status, people, dates, description, expected/actual, steps, environment, evidence) so each field pastes into its own cell; verified signed-in (1-row and 2-row clipboard reads).

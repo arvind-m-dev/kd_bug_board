@@ -67,21 +67,26 @@ const readCache = (): Cache => {
 
 /** Light/dark is personal (this browser). The appearance is the workspace's, optionally overridden by the member on their portal. */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [dark, setDarkState] = useState(true);
+  // Seed from the same cache the boot script painted, so React's first paint matches it and there is no flash to
+  // the default theme. On the server read() returns null (no localStorage), so SSR renders the defaults.
+  const [dark, setDarkState] = useState(() => {
+    const m = read("bugflow-theme");
+    return m ? m === "dark" : true;
+  });
   const [ready, setReady] = useState(false);
-  const [workspace, setWorkspace] = useState<Appearance>(DEFAULT_APPEARANCE);
-  const [personal, setPersonalState] = useState<PortalAppearance | null>(null);
+  const [workspace, setWorkspace] = useState<Appearance>(() => {
+    const c = readCache();
+    return c.workspace ? normalizeAppearance(c.workspace) : DEFAULT_APPEARANCE;
+  });
+  const [personal, setPersonalState] = useState<PortalAppearance | null>(() => {
+    const c = readCache();
+    if (!c.personal) return null;
+    const p = portalAppearanceSchema.safeParse(c.personal);
+    return p.success ? p.data : null;
+  });
   const [draft, setDraft] = useState<Appearance | null>(null);
   useEffect(() => {
-    const m = read("bugflow-theme");
-    if (m) setDarkState(m === "dark");
-    // Start from what this browser saw last (the boot script already painted it), then refresh from the server.
-    const c = readCache();
-    if (c.workspace) setWorkspace(normalizeAppearance(c.workspace));
-    if (c.personal) {
-      const p = portalAppearanceSchema.safeParse(c.personal);
-      if (p.success) setPersonalState(p.data);
-    }
+    // The cached appearance was already seeded above; just mark ready and refresh from the server.
     setReady(true);
     getAppearance()
       .then((a) => setWorkspace(normalizeAppearance(a)))
@@ -153,16 +158,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 }
 export const useTheme = () => useContext(ThemeContext);
 export function ThemeToggle() {
-  const { dark, toggle } = useTheme();
+  const { dark, toggle, ready } = useTheme();
+  // Until mounted, show the SSR default (dark) so the hydrated markup matches; the real icon appears once ready.
+  const shown = ready ? dark : true;
   return (
     <Button
       variant="ghost"
       size="icon"
-      aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
-      title={dark ? "Light theme" : "Dark theme"}
+      aria-label={shown ? "Switch to light theme" : "Switch to dark theme"}
+      title={shown ? "Light theme" : "Dark theme"}
       onClick={toggle}
     >
-      {dark ? <Sun size={18} /> : <Moon size={18} />}
+      {shown ? <Sun size={18} /> : <Moon size={18} />}
     </Button>
   );
 }

@@ -2,6 +2,80 @@
 
 Newest first. Earlier history: `git log` and `roadmap.md`.
 
+## 2026-10-29 — Phase 2.4: agile backlog (Phase 2 complete)
+- **Backlog** (`/admin/backlog`, Bugs nav group): epics, stories, tasks and open bugs of a project in one ranked list. Drag to rank (fractional `backlog_rank` string — one row per reorder, `rankBetween`), inline estimate and Ready toggle, epic parent select (kind rules + same project + loop check, `wouldCycle` client + recursive-CTE server), epic progress bars (`epicProgress`: counts, or points when every child has one), one-click hand-off into the project's open sprint. Create dialog for story/task/epic (request-ID idempotent; audited `backlog.created`; rank-only changes are `backlog.ranked`, quiet in the bell).
+- **Deviation from plan**: non-bug kinds reuse the existing 13-status workflow instead of a separate short one — the bugs table's status CHECK and every feature (board, sprints, exports, MCP) are built on it; one workflow, no ripple.
+- **Containment**: the workspace bug lists, counts, exports and MCP `list_bugs` are now explicitly `kind='bug'`, so Phase-1 numbers keep their meaning; epics cannot join sprints (guard in `addToSprint`); migration 023 defaults every existing row to `bug`.
+- **Tests**: `backlog.test.ts` (8 — ranking stability, cycles, parent rules, epic progress); 232/232 vitest, 6-step e2e sweep incl. a backlog screenshot, tsc clean, lint 0 errors / 18 warnings, build OK. Migration applied to Neon and verified.
+
+## 2026-10-29 — Phase 2 wrap (guide, bell reminders, portal tabs) + Playwright smoke suite
+- **2.5 user guide**: public `/guide` (static, no data, no session) — step-by-step per role incl. due dates, sprints, board, media, AI access; linked from the Help dialogs. Route + `guide-page.tsx`.
+- **2.1b bell reminders**: the Admin bell now tops with synthetic "Due soon"/"Overdue" items — open bugs due by tomorrow in the workspace tz, computed on read (`dueReminders`), no stored rows or jobs; unread once per day; clearing the bell never hides a bug still due.
+- **Portal tabs**: member portals get a read-only **Sprint** tab (`portalSprints`, scoped to the portal's projects) and a **Board** tab (same `BoardView`, portal access — moves limited to that member's own permissions; opening a bug jumps to the bugs tab).
+- **Playwright smoke suite** (`npm run test:e2e`, separate from vitest): signed-out surface (login form, `/admin*` redirects, `/guide`), a bad portal link leaks no bug data, and — while demo sign-in is enabled — a signed-in sweep of Overview/Sprints/Board/Calendar with screenshots (`e2e/shots/`). Chromium installed as a devDependency flow; config boots the built server on :4788 against the real DB (read-only pages; the demo sign-in session is the only write).
+- **Found by the suite and fixed**: the board's Done column clipped off-screen at 1280px — the board now scrolls sideways when the content area is narrower than five columns. Verified in the screenshot after the fix.
+- **Gates**: 224/224 vitest + 5/5 e2e, tsc clean, lint 0 errors / 18 warnings, build OK. First features verified in a real (headless) browser.
+
+## 2026-10-29 — Full system re-verification + session housekeeping
+- **Gates**: tsc clean, 224/224 tests, lint 0 errors / 18 warnings (baseline), build OK.
+- **Live smoke** (built server on :4799, signed out): every `/admin*` route (incl. new sprints/board) 307 → `/login?redirect=…`; `/portals` → `/admin/users`; bad member/QA tokens render the shell with **no data and no sensitive strings in the HTML**; `/media/:id` safe; MCP without token → 401; OAuth discovery 200; `/guide` 404 (2.5 not built yet).
+- **DB integrity**: 28 tables; no orphan sprint items, no bug in two open sprints, no double-active sprint; old 'pending' media rows are purged history (by design). **Found + fixed**: expired `admin_sessions` were never deleted (258 rows) — sign-in now also deletes sessions expired >7 days (appended to the batch, result indices unchanged), and a one-time purge removed 178.
+- **Storage**: R2 CORS preflight PUT/GET 204 for localhost:8080 and kd-bug-board.vercel.app.
+- **Still enabled**: `BUGFLOW_DEMO_LOGIN=1` (anyone on /login becomes Admin) — awaiting the user's go-ahead to remove.
+
+## 2026-10-29 — Phase 2.3: scrum board (Admin) + `get_sprint` MCP tool
+- **Board** (`/admin/board`, Bugs nav group): five columns over the existing statuses (To do / Assigned / In progress / Retest / Done). Dragging a card performs the one allowed plain transition directly; a drop that needs a dialog (assigning, retest verdict, choosing a closing status) opens the bug instead; a column the actor cannot reach dims. Rules in `src/lib/board.ts` (`boardColumn`, `dropAction`, `mayDragCard`) on top of `allowedStatuses`/`mayVerify` — a drag can never resolve a bug or skip QA. Every status maps to exactly one column (tested). Cards show code, title, status, priority, due badge, assignee; project filter; a per-card "Move to…" menu covers keyboard use.
+- **Deviation from plan D5**: native HTML drag + the Move menu instead of `@dnd-kit` — the codebase already uses native drag (dropdown options), and the menu gives keyboard access without a new dependency.
+- **MCP**: new read-only `get_sprint` tool — active/next sprint of a project with scope counts and its bugs, compact text; the panel's project scope is checked first (`activeSprint` in `sprints.server.ts` carries no check of its own).
+- **Tests**: `board.test.ts` (8); 224/224 pass, tsc clean, lint 0 errors / 18 warnings, build OK. Not clicked through in a browser.
+
+## 2026-10-28 — Phase 2.2: sprints (Admin)
+- **Feature**: a Sprints page (`/admin/sprints`, in the Bugs nav group). Create a sprint for a project (name, goal, start/end), add/remove bugs, Start it (one active sprint per project, enforced by a partial unique index) and Close it — optionally carrying still-open bugs into another open sprint, recorded with `carried_from_sprint_id`. Each card shows committed / added / open / done / carried, computed from membership history (`summarizeSprint`). A bug can be in only one open sprint at a time.
+- **Data**: migration `022_sprints.sql` — `sprints`, `sprint_items`. Applied to Neon and verified.
+- **Rules** (`src/lib/sprints.ts`): `maySprint`, `canChangeSprintState`, `summarizeSprint`, `carryCandidates`, zod schemas. Server (`sprints.server.ts`): create/update/start/close/add/remove, Admin-gated, audited to `activity` as `sprint.*` (item add/remove are quiet in the bell via `sprint.item_`).
+- **Scope**: Admin-only for now (it is an `/admin` route). Member/`plan`-holder planning from a portal, a read-only "current sprint" portal tab, and the `get_sprint` MCP tool are still pending.
+- **Tests**: `sprints.test.ts` (6); 216/216 pass, tsc clean, lint 0 errors / 18 warnings, build OK. Not clicked through in a browser.
+
+## 2026-10-28 — Phase 2.1b (part): due-date calendar + retest skill
+- **Feature**: All Bugs gets a **Calendar** toggle (`?cal=1`). A month grid (shadcn `Calendar`/react-day-picker) marks days that hold an open bug with a due date, overdue days in red; picking a day filters the list to bugs due then (`?due=YYYY-MM-DD`, survives refresh), Clear day resets. Marks come from the loaded page, matching the other client-side filters.
+- **Skill**: `.claude/skills/retest/SKILL.md` — runs the automated gates (tsc/test/lint/build), DB re-apply check, and a per-feature manual browser checklist for everything on this branch.
+- **Files**: `bug-workspace.tsx` (`DueCalendar`, `dayKey`), `styles.css`. No schema/server changes.
+- **Tests**: 210/210 pass, tsc clean, lint 0 errors / 18 warnings, build OK. Not clicked through in a browser.
+- **Pending (2.1b)**: notification-bell due reminders (needs per-viewer scoping; the current bell is Admin activity-based).
+
+## 2026-10-28 — Seasonal creatures don't reset on refresh
+- **Change**: in the 3D worlds the bats, bugs, ghosts and sleigh snapped back to the same starting spot and replayed the same motion on every reload, because the animation clock started at 0 and each creature's phase/timers were seeded deterministically. Now a per-load `startOffset = Math.random()*600` seeds the clock, and each creature's start timer, wander phase (`seed`), drift distance and direction take a `Math.random` offset. The scene *layout* stays seeded (Theme Studio Shuffle unchanged); only the motion varies per visit, so a refresh looks like the creatures kept wandering rather than resetting. Same offset added to the geometry world's clock.
+- **Files**: `src/components/bugflow/seasonal-scene.ts`, `minimal-geometry-scene.ts`. No schema/server changes.
+- **Tests**: 210/210 pass (seasonal choreography/physics tests use injected RNG, unaffected), tsc clean, lint 0 errors / 18 warnings, build OK. Not clicked through in a browser.
+
+## 2026-10-28 — No theme flash on refresh
+- **Fix**: on reload the default theme flashed for a frame before the chosen one applied. The boot script painted the cached theme pre-paint, but `ThemeProvider` initialised its state to `DEFAULT_APPEARANCE`, so React's first apply-effect overwrote the boot theme with the default until the mount effect read the cache. Now `dark`, `workspace` and `personal` are seeded from the cache in their `useState` initialisers (SSR-safe: `read()` returns null server-side), so the first client paint already matches the boot script.
+- `ThemeToggle` shows the SSR default (dark) icon until `ready` to avoid a hydration mismatch from the lazily-read mode.
+- **Files**: `src/components/bugflow/theme-toggle.tsx`. No schema/server changes.
+- **Tests**: 210/210 pass, tsc clean, lint 0 errors / 18 warnings, build OK. Not clicked through in a browser.
+
+## 2026-10-28 — View state survives a refresh
+- **Fix**: table page numbers and tabs no longer reset on reload. Added `useUrlNumber` (built on `useUrlParam`) and moved to the URL: the bug table page (`?page=`), the member table page (`?page=`), the Overview urgent-list page (`?urgent=`), and the Trash tab (`?tab=`). A refresh or shared link reopens the same page/tab.
+- **Scope**: Activity log pagination left as-is (cursor-based — a page index alone can't be restored). Bug-list filter/severity/search already round-trip through the route's search params.
+- **Files**: `src/hooks/use-url-param.ts`, `bug-workspace.tsx`, `member-portals.tsx`, `dashboard-summary.tsx`, `trash-view.tsx`. No schema, no server changes.
+- **Tests**: 210/210 pass, tsc clean, lint 0 errors / 18 warnings, build OK. Not clicked through in a browser.
+
+## 2026-10-28 — Phase 2.1a: bug due dates
+- **Feature**: an optional due date per bug. Overdue (date past, bug still open) and due-soon badges in the bug list; an **Overdue** Overview card and list filter; "today" is computed in a new **workspace time zone** (Settings → Options). Only planners set dates — new `plan` permission (Admin always; added to the QA preset).
+- **Data**: migration `021_due_dates.sql` — `bugs.due_on date` + partial index. Applied to Neon and verified.
+- **Rules** (`bugflow.ts`): `isOverdue`, `dueSoon`, `dueBadge`, `CLOSED_STATUSES`; `maySetDue` (`bug-workflow.ts`). Due date flows through `reportBug`/`editBugReport` (version-checked, audited in `bug.edited`; non-planners' values dropped/ignored server-side).
+- **UI**: date field in the report/edit form (planners only); `DueBadge` in rows; `TimeZoneCard` in options settings; `saveTimeZone` server function.
+- **Tests**: `due-dates.test.ts` (10 new); 210/210 pass, tsc clean, lint 0 errors / 18 warnings (baseline), build OK. Not yet clicked through in a browser.
+- **Pending (2.1b)**: calendar view and notification-bell due reminders.
+
+## 2026-10-28 — Verification: theme worlds and R2 bucket
+- **Theme worlds**: all 5 worlds (geometry, halloween, winter, christmas, autumn) route to `Seasonal3D`; "3D quality" control saves `quality` (auto/low/high) and reaches both scene builders. tsc clean, 200/200 tests, build OK. Not viewed in a browser (no headless browser installed; dev server was down).
+- **R2 bucket** (`bugboard-media`, custom source): CORS preflight PUT/GET allowed for `http://localhost:8080` and `https://kd-bug-board.vercel.app`; signed PUT (with `If-None-Match: *`) → 200, signed GET → 200 with matching body, delete → 404, using the stored encrypted credentials. Probe object under `bugs/_probe/` removed. No app rows written.
+- **Still open**: click-through in the real app (upload with thumbnail, compression, mark-up; 3D worlds per quality level).
+
+## 2026-10-28 — Doc drift fixed
+- `README.md` migration range now `001 … 020`; `roadmap.md` marks media uploads done (real-bucket test still pending) and splits a merged line; removed both items from "Known issues" in `PROJECT_CONTEXT.md`. Docs only.
+
 ## 2026-10-28 — Nav bar stays on top when scrolling
 - **Fix**: `.bf-bulk-bar` z-index 30 → 19 and `.bf-armed-hint` 20 → 10 in `src/styles.css`, so they scroll under the sticky `.bf-topbar` (z 20) instead of over it; the bulk bar also no longer covers the mobile sidebar (30) / scrim (29).
 - **Rule**: in-page content must stay below z-index 20. Fixed overlays (save bar, FABs, upload tray, dialogs/popovers) and pointer-less seasonal effects stay above on purpose.

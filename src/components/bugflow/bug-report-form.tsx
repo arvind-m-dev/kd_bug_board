@@ -27,6 +27,7 @@ export function BugReportForm({
   initial,
   options = DEFAULT_OPTIONS,
   media = MEDIA_OFF,
+  canPlan = false,
 }: {
   options?: DropdownOptions;
   access: BugAccess;
@@ -34,6 +35,8 @@ export function BugReportForm({
   onSaved: (id: string) => void;
   initial?: LiveBug;
   media?: MediaConfig;
+  /** Planners (Admin or `plan`) may set a due date; others never see the field and the server drops any value. */
+  canPlan?: boolean;
 }) {
   const client = useQueryClient();
   const save = useServerFn(createBug);
@@ -98,6 +101,7 @@ export function BugReportForm({
       browserDevice: read("browserDevice"),
       environment: read("environment"),
       evidenceUrls: links.map((v) => v.trim()).filter(Boolean),
+      dueOn: canPlan ? read("dueOn") : "",
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Check the report details.");
@@ -252,6 +256,14 @@ export function BugReportForm({
               />
             </label>
           </div>
+          {canPlan && (
+            <div className="bf-form-grid">
+              <label className="bf-field">
+                Due date<span className="bf-opt">Optional</span>
+                <Input type="date" name="dueOn" defaultValue={initial?.dueOn ?? ""} />
+              </label>
+            </div>
+          )}
         </section>
         <section className="bf-form-step" data-tone="info">
           <h3 className="bf-form-step-title">

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { shareOrigin, warnIfLocalLink } from "@/lib/share-origin";
-import { useUrlParam } from "@/hooks/use-url-param";
+import { useUrlParam, useUrlNumber } from "@/hooks/use-url-param";
 import { useHighlight } from "@/hooks/use-highlight";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -72,7 +72,8 @@ export function MemberPortals({ initialSearch = "" }: { initialSearch?: string }
   const recent = useHighlight(id, members.data);
   const jumped = useRef<string | null>(null);
   const [error, setError] = useState("");
-  const [page, setPage] = useState(0);
+  // Page index in the URL (?page=) so a refresh keeps the same page of the member table.
+  const [page, setPage] = useUrlNumber("page");
   const [pending, setPending] = useState<Pending | null>(null);
   const rows = (members.data ?? []).filter(
     (m) =>
