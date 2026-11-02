@@ -2,8 +2,11 @@ import { neonQuery, neonExecute } from "./neon.server";
 import { checkOrigin, requireAdmin } from "./portal-access.server";
 import { hashToken, randomToken } from "./portal-access";
 import {
+  AI_TOKEN_IDLE_DAYS,
+  MANUAL_TOKENS_PER_PORTAL,
   formatAiToken,
   type AiToken,
+  type AiTokenSource,
   type NewAiToken,
   type createAiTokenSchema,
   type portalAiTokenSchema,
@@ -20,16 +23,25 @@ const toToken = (r: Record<string, unknown>): AiToken => ({
       : `${String(r["member_name"] ?? "Member")} · ${String(r["scope_type"])} panel`,
   createdAt: String(r["created_iso"]),
   lastUsedAt: r["last_used_iso"] ? String(r["last_used_iso"]) : null,
+  expiresAt: String(r["expires_iso"]),
+  source: r["source"] === "oauth" ? "oauth" : ("manual" satisfies AiTokenSource),
 });
-const COLUMNS = `t.id,t.label,to_json(t.created_at) as created_iso,to_json(t.last_used_at) as last_used_iso,p.type as scope_type,u.name as member_name`;
+const COLUMNS = `t.id,t.label,to_json(t.created_at) as created_iso,to_json(t.last_used_at) as last_used_iso,to_json(t.expires_at) as expires_iso,t.source,p.type as scope_type,u.name as member_name`;
 
 /** Issues a token for a portal and returns the secret once. The caller (requireAdmin or the member's own portal) must have proven access to that portal. */
 async function issueToken(portalId: string, label: string, createdBy: string): Promise<NewAiToken> {
   const secret = randomToken();
   const id = crypto.randomUUID();
   await neonExecute(
-    `insert into bugflow.ai_tokens(id,portal_id,token_hash,label,created_by) values($1,$2,$3,$4,$5)`,
-    [id, portalId, await hashToken(secret), label.trim().slice(0, 60), createdBy],
+    `insert into bugflow.ai_tokens(id,portal_id,token_hash,label,created_by,source,expires_at) values($1,$2,$3,$4,$5,'manual',now()+make_interval(days=>$6))`,
+    [
+      id,
+      portalId,
+      await hashToken(secret),
+      label.trim().slice(0, 60),
+      createdBy,
+      AI_TOKEN_IDLE_DAYS,
+    ],
   );
   return { id, secret: formatAiToken(secret), label: label.trim().slice(0, 60) };
 }
@@ -94,11 +106,14 @@ export async function createPortalAiToken(
   checkOrigin();
   const p = await portalId(data.token, data.type);
   const { rows } = await neonQuery(
-    `select count(*)::int as n from bugflow.ai_tokens where portal_id=$1 and revoked_at is null`,
+    // Only live hand-made tokens count; claude.ai/ChatGPT connections have their own limit (OAUTH_TOKENS_PER_PORTAL).
+    `select count(*)::int as n from bugflow.ai_tokens where portal_id=$1 and revoked_at is null and source='manual' and expires_at>now()`,
     [p.id],
   );
-  if (Number(rows[0]?.["n"] ?? 0) >= 10)
-    throw new Error("This panel already has 10 AI tokens. Revoke one first.");
+  if (Number(rows[0]?.["n"] ?? 0) >= MANUAL_TOKENS_PER_PORTAL)
+    throw new Error(
+      `This panel already has ${MANUAL_TOKENS_PER_PORTAL} AI tokens. Revoke one first.`,
+    );
   return issueToken(p.id, data.label, p.userId);
 }
 export async function listPortalAiTokens(data: {

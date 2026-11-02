@@ -1,6 +1,7 @@
 import { neonQuery, neonExecute } from "./neon.server";
 import { requireAdmin, checkOrigin } from "./portal-access.server";
 import { hashToken } from "./portal-access";
+import { AI_TOKEN_IDLE_DAYS } from "./ai-tokens";
 import {
   formatBugCode,
   statusPath,
@@ -36,11 +37,12 @@ export async function actorFor(access: BugAccess): Promise<BugActor> {
   if (access.kind === "ai") {
     // An AI token resolves to its portal's actor; the admin portal grants full permissions, a member portal its granted set.
     const { rows } = await neonExecute(
-      `update bugflow.ai_tokens t set last_used_at=now() from bugflow.portals p join bugflow.users u on u.id=p.user_id where t.portal_id=p.id and t.token_hash=$1 and t.revoked_at is null and p.active and u.active and p.revoked_at is null and (p.expires_at is null or p.expires_at>now()) returning p.id,p.user_id,p.type,u.name,(select o.permissions from bugflow.portal_onboarding o where o.portal_id=p.id) as permissions`,
-      [await hashToken(access.token)],
+      // Each use pushes the idle expiry out again; an expired token resolves to nothing.
+      `update bugflow.ai_tokens t set last_used_at=now(),expires_at=now()+make_interval(days=>$2) from bugflow.portals p join bugflow.users u on u.id=p.user_id where t.portal_id=p.id and t.token_hash=$1 and t.revoked_at is null and t.expires_at>now() and p.active and u.active and p.revoked_at is null and (p.expires_at is null or p.expires_at>now()) returning p.id,p.user_id,p.type,u.name,(select o.permissions from bugflow.portal_onboarding o where o.portal_id=p.id) as permissions`,
+      [await hashToken(access.token), AI_TOKEN_IDLE_DAYS],
     );
     const r = rows[0];
-    if (!r) throw new Error("This AI token is invalid or has been revoked.");
+    if (!r) throw new Error("This AI token is invalid, expired or has been revoked.");
     const type = String(r["type"]);
     if (type === "admin")
       return {

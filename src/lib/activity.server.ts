@@ -23,6 +23,7 @@ const CATEGORY: Record<string, string[]> = {
     "portal.created",
     "portal.regenerated",
     "portal.revoked",
+    "ai_token.oauth_limit",
     "project.created",
     "project.archived",
     "project.restored",
