@@ -54,6 +54,7 @@ const words: Record<string, string> = {
   "settings.mcp": "AI access settings changed",
   "portal.created": "Portal link created",
   "portal.regenerated": "Portal link replaced",
+  "ai_token.oauth_limit": "Oldest AI connection revoked",
   "portal.revoked": "Portal link revoked",
   "member.updated": "Member profile updated",
   "member.deactivate": "Member deactivated",
@@ -114,6 +115,7 @@ export function notificationTone(action: string, status = "") {
     action === "bug.priority" ||
     action === "member.deactivate" ||
     action === "portal.regenerated" ||
+    action === "ai_token.oauth_limit" ||
     action === "project.archived"
   )
     return "warning";

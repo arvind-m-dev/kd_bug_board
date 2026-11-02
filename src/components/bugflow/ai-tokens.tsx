@@ -28,7 +28,13 @@ import {
   revokePortalAiToken,
 } from "@/lib/ai-tokens.functions";
 import { getMcpConfig, saveMcpConfig } from "@/lib/mcp-config.functions";
-import type { AiToken, NewAiToken } from "@/lib/ai-tokens";
+import {
+  AI_TOKEN_IDLE_DAYS,
+  aiTokenExpiryLabel,
+  aiTokenState,
+  type AiToken,
+  type NewAiToken,
+} from "@/lib/ai-tokens";
 import { timeAgo } from "@/lib/format";
 
 type Scope =
@@ -316,6 +322,15 @@ export function AiTokens({ scope, members = [] }: { scope: Scope; members?: Memb
                 <small className="block text-xs text-muted-foreground">
                   {isAdmin ? `${t.scopeLabel} · ` : ""}created {timeAgo(t.createdAt)}
                   {t.lastUsedAt ? ` · last used ${timeAgo(t.lastUsedAt)}` : " · never used"}
+                  {" · "}
+                  <span
+                    className={
+                      aiTokenState(t.expiresAt) === "active" ? undefined : "text-destructive"
+                    }
+                    title={`Unused tokens stop working after ${AI_TOKEN_IDLE_DAYS} days; each use resets this.`}
+                  >
+                    {aiTokenExpiryLabel(t.expiresAt)}
+                  </span>
                 </small>
               </span>
               <Button

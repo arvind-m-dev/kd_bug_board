@@ -1,6 +1,7 @@
 import { neonQuery, neonExecute } from "./neon.server";
 import { hashToken, randomToken, equalSecret } from "./portal-access";
-import { formatAiToken } from "./ai-tokens";
+import { AI_TOKEN_IDLE_DAYS, OAUTH_TOKENS_PER_PORTAL, formatAiToken } from "./ai-tokens";
+import { audited } from "./audit.server";
 import { beginSignInAttempt, clearSignInFailures } from "./sign-in-throttle.server";
 
 /**
@@ -179,7 +180,7 @@ export async function exchangeCode(p: {
   if (!p.code || !p.codeVerifier) throw new Error("invalid_request");
   const hash = await sha256(p.code);
   const { rows } = await neonExecute(
-    `update bugflow.oauth_codes set used_at=now() where code_hash=$1 and used_at is null and expires_at>now() and client_id=$2 and redirect_uri=$3 returning portal_id,code_challenge,label`,
+    `update bugflow.oauth_codes set used_at=now() where code_hash=$1 and used_at is null and expires_at>now() and client_id=$2 and redirect_uri=$3 returning portal_id,code_challenge,label,(select user_id from bugflow.portals p where p.id=portal_id) as user_id`,
     [hash, p.clientId, p.redirectUri],
   );
   const r = rows[0];
@@ -187,15 +188,35 @@ export async function exchangeCode(p: {
   if ((await sha256(p.codeVerifier)) !== String(r["code_challenge"]))
     throw new Error("invalid_grant");
   const secret = randomToken();
-  await neonExecute(
-    `insert into bugflow.ai_tokens(id,portal_id,token_hash,label) values($1,$2,$3,$4)`,
-    [
-      crypto.randomUUID(),
-      String(r["portal_id"]),
-      await hashToken(secret),
-      String(r["label"] ?? "OAuth"),
-    ],
+  const portalId = String(r["portal_id"]);
+  // Keep only the newest OAUTH_TOKENS_PER_PORTAL connections per panel: reconnecting always works and old ones lapse.
+  const trim = audited(
+    `update bugflow.ai_tokens set revoked_at=now() where id in (select id from bugflow.ai_tokens where portal_id=$1 and source='oauth' and revoked_at is null order by created_at desc,id offset $2) returning id`,
+    [portalId, OAUTH_TOKENS_PER_PORTAL],
+    {
+      actorId: String(r["user_id"]),
+      action: "ai_token.oauth_limit",
+      detail: { portal: portalId, kept: OAUTH_TOKENS_PER_PORTAL },
+    },
   );
+  await neonExecute([
+    // One lock per panel so two connections finishing together cannot both keep an 11th token.
+    {
+      query: `select pg_advisory_xact_lock(hashtextextended('bugflow.ai_oauth:' || $1::text, 0))`,
+      params: [portalId],
+    },
+    {
+      query: `insert into bugflow.ai_tokens(id,portal_id,token_hash,label,source,expires_at) values($1,$2,$3,$4,'oauth',now()+make_interval(days=>$5))`,
+      params: [
+        crypto.randomUUID(),
+        portalId,
+        await hashToken(secret),
+        String(r["label"] ?? "OAuth"),
+        AI_TOKEN_IDLE_DAYS,
+      ],
+    },
+    trim,
+  ]);
   return { access_token: formatAiToken(secret), token_type: "Bearer", scope: "bugflow" };
 }
 
