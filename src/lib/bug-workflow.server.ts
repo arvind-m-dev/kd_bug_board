@@ -271,7 +271,8 @@ export async function bugDetail(access: BugAccess, id: string) {
   const actor = await actorFor(access);
   if (!actor.permissions.includes("view")) throw new Error("Bug access is not permitted.");
   const { rows } = await neonQuery(
-    `select ${columns} ${joins} where ${scope(actor)} and b.id=$4 limit 1`,
+    // Stories/tasks/epics belong to the Admin-only backlog; member panels (and member AI tokens) reach bugs only.
+    `select ${columns} ${joins} where ${scope(actor)}${actor.role === "admin" ? "" : " and b.kind='bug'"} and b.id=$4 limit 1`,
     [
       actor.portalId,
       actor.userId,
@@ -492,7 +493,7 @@ export async function editBugReport(access: BugAccess, data: BugEdit) {
   return { saved: true };
 }
 
-async function dropdownOptions() {
+export async function dropdownOptions() {
   const { rows } = await neonQuery(
     `select value from bugflow.settings where key='dropdown_options'`,
   );
@@ -567,11 +568,8 @@ export async function deleteBugReport(id: string, reason: string) {
   const admin = await requireAdmin();
   const { results } = await neonExecute<{ results: { rows: Record<string, unknown>[] }[] }>([
     {
-      query: `update bugflow.bugs set deleted_at=now(),updated_at=clock_timestamp() where id=$1 and deleted_at is null returning id,title`,
-      params: [id],
-    },
-    {
-      query: `insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $1,$2,$3,'bug.deleted',jsonb_build_object('reason',$4::text) where exists(select 1 from bugflow.bugs where id=$2 and deleted_at is not null)`,
+      // The audit row is written only when this call moved the bug to the Trash, so a repeat adds no second entry.
+      query: `with done as (update bugflow.bugs set deleted_at=now(),updated_at=clock_timestamp() where id=$2 and deleted_at is null returning id,title), logged as (insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $1,id,$3,'bug.deleted',jsonb_build_object('reason',$4::text) from done) select id,title from done`,
       params: [crypto.randomUUID(), id, admin.userId, reason],
     },
   ]);
@@ -583,7 +581,7 @@ export async function deleteBugReport(id: string, reason: string) {
 /** Every bug in the actor's scope (newest first, up to 2000) with the latest developer and QA comment and the ids of its attachments — for the spreadsheet export. */
 export async function exportBugs(
   access: BugAccess,
-  filter: { projectId: string | null; includeClosed: boolean },
+  filter: { projectId: string | null; includeClosed: boolean; newestFirst?: boolean },
 ): Promise<ExportBug[]> {
   const actor = await actorFor(access);
   if (!actor.permissions.includes("view"))
@@ -600,7 +598,7 @@ export async function exportBugs(
   const comment = (types: string) =>
     `(select c.content from bugflow.comments c where c.bug_id=b.id and exists(select 1 from bugflow.portals px where px.user_id=c.actor_id and px.type in (${types})) order by c.created_at desc limit 1)`;
   const { rows } = await neonQuery(
-    `select ${columns},${comment("'developer'")} as dev_comment,${comment("'qa','admin'")} as qa_comment,coalesce((select jsonb_agg(m.id order by m.created_at) from bugflow.bug_media m where m.bug_id=b.id and m.status='ready' and m.deleted_at is null),'[]'::jsonb) as media_ids ${joins} where ${scope(actor)} and b.kind='bug' and ($4::uuid is null or b.project_id=$4::uuid)${closed} order by b.created_at,b.id limit 2000`,
+    `select ${columns},${comment("'developer'")} as dev_comment,${comment("'qa','admin'")} as qa_comment,coalesce((select jsonb_agg(m.id order by m.created_at) from bugflow.bug_media m where m.bug_id=b.id and m.status='ready' and m.deleted_at is null),'[]'::jsonb) as media_ids ${joins} where ${scope(actor)} and b.kind='bug' and ($4::uuid is null or b.project_id=$4::uuid)${closed} order by ${filter.newestFirst ? "b.created_at desc,b.id desc" : "b.created_at,b.id"} limit 2000`,
     params,
   );
   return rows.map((r) => ({

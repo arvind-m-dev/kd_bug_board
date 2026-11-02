@@ -32,7 +32,7 @@ export async function personMetrics(
   const agg = (col: string, where: string) =>
     `(select coalesce(jsonb_object_agg(k,n),'{}'::jsonb) from (select ${col} as k,count(*)::int as n from b where ${where} group by ${col}) x)`;
   const { rows } = await neonQuery(
-    `with b as (select * from bugflow.bugs where deleted_at is null),
+    `with b as (select * from bugflow.bugs where deleted_at is null and kind='bug'),
     own as (select bug_id, user_id from bugflow.bug_assignees union select id, assignee_id from b where assignee_id is not null),
     h as (select * from bugflow.status_history where ${win("created_at")}),
     resolved as (select sh.bug_id, max(sh.created_at) as at from bugflow.status_history sh join b on b.id=sh.bug_id where sh.new_status='RESOLVED' and b.status='RESOLVED' group by sh.bug_id),
@@ -124,7 +124,7 @@ export async function personDetail(
       // Weekly raised vs fixed for the last 12 weeks (Monday-start weeks).
       {
         query: `with weeks as (select generate_series(date_trunc('week', now())-interval '11 weeks', date_trunc('week', now()), '1 week') as wk),
-    b as (select * from bugflow.bugs where deleted_at is null),
+    b as (select * from bugflow.bugs where deleted_at is null and kind='bug'),
     own as (select bug_id from bugflow.bug_assignees where user_id=$1::uuid union select id from b where assignee_id=$1::uuid),
     res as (select sh.bug_id, max(sh.created_at) as at from bugflow.status_history sh join b on b.id=sh.bug_id where sh.new_status='RESOLVED' and b.status='RESOLVED' group by sh.bug_id)
     select to_char(w.wk,'YYYY-MM-DD') as week,
@@ -137,7 +137,7 @@ export async function personDetail(
         query: `select b.id, b.title, b.status, b.priority, b.severity, b.code_prefix, to_json(b.updated_at) as updated_at,
       (b.reporter_id=$1::uuid) as raised,
       (b.assignee_id=$1::uuid or exists(select 1 from bugflow.bug_assignees x where x.bug_id=b.id and x.user_id=$1::uuid)) as assigned
-    from bugflow.bugs b where b.deleted_at is null and (b.reporter_id=$1::uuid or b.assignee_id=$1::uuid or exists(select 1 from bugflow.bug_assignees x where x.bug_id=b.id and x.user_id=$1::uuid))
+    from bugflow.bugs b where b.deleted_at is null and b.kind='bug' and (b.reporter_id=$1::uuid or b.assignee_id=$1::uuid or exists(select 1 from bugflow.bug_assignees x where x.bug_id=b.id and x.user_id=$1::uuid))
     order by b.updated_at desc limit 12`,
         params: [person],
       },
@@ -178,7 +178,7 @@ export async function teamDetail(): Promise<{
   const [trend, recent] = await neonBatch([
     {
       query: `with weeks as (select generate_series(date_trunc('week', now())-interval '11 weeks', date_trunc('week', now()), '1 week') as wk),
-      b as (select * from bugflow.bugs where deleted_at is null),
+      b as (select * from bugflow.bugs where deleted_at is null and kind='bug'),
       res as (select sh.bug_id, max(sh.created_at) as at from bugflow.status_history sh join b on b.id=sh.bug_id where sh.new_status='RESOLVED' and b.status='RESOLVED' group by sh.bug_id)
       select to_char(w.wk,'YYYY-MM-DD') as week,
         (select count(*) from b where date_trunc('week', b.created_at)=w.wk)::int as raised,
@@ -186,7 +186,7 @@ export async function teamDetail(): Promise<{
       from weeks w order by w.wk`,
     },
     {
-      query: `select b.id, b.title, b.status, b.priority, b.severity, b.code_prefix, to_json(b.updated_at) as updated_at from bugflow.bugs b where b.deleted_at is null order by b.updated_at desc limit 15`,
+      query: `select b.id, b.title, b.status, b.priority, b.severity, b.code_prefix, to_json(b.updated_at) as updated_at from bugflow.bugs b where b.deleted_at is null and b.kind='bug' order by b.updated_at desc limit 15`,
     },
   ]);
   return {

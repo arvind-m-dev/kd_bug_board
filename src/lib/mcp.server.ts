@@ -2,7 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
 import { parseAiToken } from "./ai-tokens";
-import { PRIORITIES, formatBugCode, type BugAccess } from "./bug-workflow";
+import { PRIORITIES, formatBugCode, parseBugRef, type BugAccess } from "./bug-workflow";
+import { neonUserError } from "./neon.server";
 
 /**
  * BugFlow's Model Context Protocol server: any MCP client (Claude, Cursor, VS Code, ChatGPT) can read and report bugs
@@ -130,6 +131,15 @@ function bugDetailText(
   return lines.join("\n");
 }
 
+/** A message safe to show an AI client: database failures become the same friendly text the app shows. */
+function errorText<F extends string | undefined>(e: unknown, fallback: F): string | F {
+  if (e && typeof e === "object" && "kind" in e) {
+    console.error(e);
+    return neonUserError(e).message;
+  }
+  return e instanceof Error ? e.message : fallback;
+}
+
 /** Builds the server for one AI token; all tools act as that token's panel. */
 async function serverFor(access: BugAccess) {
   const bw = await import("./bug-workflow.server");
@@ -183,7 +193,7 @@ async function serverFor(access: BugAccess) {
       const ws = await bw.workspaceData(access);
       if (!ws.projects.some((p) => p.id === projectId))
         return fail("That project is not available to this panel.");
-      const sprint = await (await import("./sprints.server")).activeSprint(projectId);
+      const sprint = await (await import("./sprints.server")).activeSprint(projectId, actor);
       if (!sprint) return text("No open sprint for this project.");
       const s = sprint.summary;
       const lines = [
@@ -218,6 +228,7 @@ async function serverFor(access: BugAccess) {
       let bugs = await bw.exportBugs(access, {
         projectId: projectId ?? null,
         includeClosed: includeClosed ?? true,
+        newestFirst: true,
       });
       if (status) bugs = bugs.filter((b) => b.status.toLowerCase() === status.toLowerCase());
       if (query) {
@@ -252,8 +263,8 @@ async function serverFor(access: BugAccess) {
     },
     async ({ id }) => {
       if (!can("view")) return fail("This panel cannot view bugs.");
-      const numeric = id.replace(/^BF-?0*/i, "").replace(/\D/g, "");
-      if (!/^[1-9]\d*$/.test(numeric)) return fail("Give a bug id like 51 or BF-000051.");
+      const numeric = parseBugRef(id);
+      if (!numeric) return fail("Give a bug id like 51 or BF-000051.");
       try {
         const d = await bw.bugDetail(access, numeric);
         const b = d.bug;
@@ -270,7 +281,7 @@ async function serverFor(access: BugAccess) {
           ),
         );
       } catch (e) {
-        return fail(e instanceof Error ? e.message : "This bug could not be read.");
+        return fail(errorText(e, "This bug could not be read."));
       }
     },
   );
@@ -317,7 +328,7 @@ async function serverFor(access: BugAccess) {
         const r = await bw.reportBug(access, data);
         return text(`Reported ${r.code} (id ${r.id}).`);
       } catch (e) {
-        return fail(e instanceof Error ? e.message : "The bug could not be reported.");
+        return fail(errorText(e, "The bug could not be reported."));
       }
     },
   );
@@ -363,7 +374,7 @@ async function serverFor(access: BugAccess) {
         await change({ id, version, action: "status", status, notes });
         return text(`Status of bug #${id} updated to ${status}.`);
       } catch (e) {
-        return fail(e instanceof Error ? e.message : "The status could not be changed.");
+        return fail(errorText(e, "The status could not be changed."));
       }
     },
   );
@@ -385,7 +396,7 @@ async function serverFor(access: BugAccess) {
         await change({ id, version, action: "comment", notes: comment });
         return text(`Comment added to bug #${id}.`);
       } catch (e) {
-        return fail(e instanceof Error ? e.message : "The comment could not be added.");
+        return fail(errorText(e, "The comment could not be added."));
       }
     },
   );
@@ -408,7 +419,7 @@ async function serverFor(access: BugAccess) {
           await change({ id, version, action: "assign", assigneeIds });
           return text(`Bug #${id} assigned.`);
         } catch (e) {
-          return fail(e instanceof Error ? e.message : "The bug could not be assigned.");
+          return fail(errorText(e, "The bug could not be assigned."));
         }
       },
     );
@@ -428,7 +439,7 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
   try {
     server = await serverFor({ kind: "ai", token });
   } catch (e) {
-    return unauthorized(request, e instanceof Error ? e.message : undefined);
+    return unauthorized(request, errorText(e, undefined));
   }
   const options = { enableJsonResponse: true } as ConstructorParameters<
     typeof WebStandardStreamableHTTPServerTransport

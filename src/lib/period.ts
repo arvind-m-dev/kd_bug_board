@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isCalendarDate } from "./bugflow";
 
 /** Reporting period shared by Activity, Team performance and Team reports. */
 
@@ -18,7 +19,7 @@ export const PERIOD_PRESETS: { value: string; label: string }[] = [
 const isoDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .refine((v) => !Number.isNaN(new Date(`${v}T00:00:00Z`).getTime()), "Invalid date");
+  .refine(isCalendarDate, "Invalid date");
 
 /** Period fields for a request schema: preset days, or a from/to range (inclusive) in the viewer's time zone. */
 export const periodFields = {

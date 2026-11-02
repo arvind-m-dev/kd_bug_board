@@ -21,7 +21,7 @@ import {
   getPortalSprints,
 } from "@/lib/sprints.functions";
 import type { SprintsData } from "@/lib/sprints.server";
-import type { BugAccess } from "@/lib/bug-workflow";
+import { parseBugRef, type BugAccess } from "@/lib/bug-workflow";
 import { ThemedSelect } from "./themed-select";
 import { ErrorNotice, actionError } from "./action-feedback";
 import { SkeletonRows } from "./loading";
@@ -129,8 +129,10 @@ function SprintCard({
       await fn();
       await onChanged();
       toast.success(done);
+      return true;
     } catch (e) {
       toast.error(actionError(e, "That action could not be completed."));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -253,10 +255,16 @@ function SprintCard({
           className="bf-sprint-add"
           onSubmit={(e) => {
             e.preventDefault();
-            const id = bugId.replace(/\D/g, "");
-            if (!id) return;
+            // Accepts 42 or a code with any prefix (PROD2-000042); keep the input when the add fails so it can be retried.
+            const id = parseBugRef(bugId);
+            if (!id) {
+              toast.error("Enter a bug number like 42 or a code like BF-000042.");
+              return;
+            }
             void run(() => add({ data: { sprintId: sprint.id, bugId: id } }), "Bug added").then(
-              () => setBugId(""),
+              (ok) => {
+                if (ok) setBugId("");
+              },
             );
           }}
         >

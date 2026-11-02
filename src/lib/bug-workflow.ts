@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /** Allowed bug-ID prefix shape: 1-10 capitals/digits, letter first (BF, DEPLOY, PROD2…). */
 export const CODE_PREFIX_RE = /^[A-Z][A-Z0-9]{0,9}$/;
-import { STATUSES, canTransition, type Status, type Role } from "./bugflow";
+import { STATUSES, canTransition, isCalendarDate, type Status, type Role } from "./bugflow";
 import type { MediaConfig } from "./bug-media";
 export const PRIORITIES = ["P0", "P1", "P2", "P3", "P4", "P5"] as const;
 export const priorityNames: Record<string, string> = {
@@ -31,17 +31,22 @@ export const priorityTone = (p: string) =>
         : p === "P4"
           ? "success"
           : "neutral";
+const adminAccess = z.object({ kind: z.literal("admin") }).strict();
+const portalAccess = z
+  .object({
+    kind: z.literal("portal"),
+    token: z.string().regex(/^[a-f0-9]{64}$/),
+    type: z.enum(["reporter", "qa", "developer", "member"]),
+  })
+  .strict();
+/** Every access kind the server layer resolves, including MCP's AI tokens. */
 export const accessSchema = z.union([
-  z.object({ kind: z.literal("admin") }).strict(),
-  z
-    .object({
-      kind: z.literal("portal"),
-      token: z.string().regex(/^[a-f0-9]{64}$/),
-      type: z.enum(["reporter", "qa", "developer", "member"]),
-    })
-    .strict(),
+  adminAccess,
+  portalAccess,
   z.object({ kind: z.literal("ai"), token: z.string().regex(/^[a-f0-9]{64}$/) }).strict(),
 ]);
+/** Browser server functions accept only Admin and portal access; AI tokens are resolved by `/api/mcp` alone, so they can't reach tools MCP doesn't expose (e.g. media delete). */
+export const clientAccessSchema = z.union([adminAccess, portalAccess]);
 export type BugAccess = z.infer<typeof accessSchema>;
 export const evidenceUrlSchema = z
   .string()
@@ -86,7 +91,7 @@ const reportFields = z
       .transform((v) => v || null),
     // Plain calendar date or empty (cleared). Permission to actually set it is checked on the server (maySetDue).
     dueOn: z
-      .union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a valid date.")])
+      .union([z.literal(""), z.string().refine(isCalendarDate, "Enter a valid date.")])
       .default("")
       .transform((v) => v || null),
   })
@@ -399,6 +404,19 @@ export function assignmentMessage(people: { name: string; role: string; task: As
       ? parts[0]
       : `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
   return `Assigned to ${list}.`;
+}
+/**
+ * The numeric bug id from what a person typed: `51`, `#51`, or a display code with any workspace prefix
+ * (`BF-000051`, `DEPLOY-000123`, `PROD2-000051`, or `BF000051`). Null when it isn't a bug reference.
+ */
+export function parseBugRef(input: string): string | null {
+  const v = input.trim();
+  const m =
+    /^#?0*(\d+)$/.exec(v) ??
+    /^[A-Za-z][A-Za-z0-9]{0,9}-0*(\d+)$/.exec(v) ??
+    /^[A-Za-z]+0*(\d+)$/.exec(v);
+  const id = m?.[1];
+  return id && /^[1-9]\d{0,17}$/.test(id) ? id : null;
 }
 /** The display code: stable number, workspace-named prefix (stamped on the row when the bug was reported). */
 export function formatBugCode(id: string, prefix = "BF") {

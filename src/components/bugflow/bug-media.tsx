@@ -372,6 +372,28 @@ export function MediaThumb({ item, onOpen }: { item: MediaItem; onOpen: () => vo
  * Full-size viewer with previous/next (buttons and arrow keys), inline PDF, copy link, and whatever extra actions the caller adds.
  * View only: recordings play with the uploader's timed marks; nothing is marked up here.
  */
+/**
+ * The signed link changes every 5-minute window and the bug refetches every 20 s, so the open file keeps the link it
+ * opened with (until it is about to expire). Otherwise a playing recording restarts and an open PDF reloads.
+ */
+function usePinnedUrl(m: MediaItem | null): string | null {
+  const [pinned, setPinned] = useState<{
+    id: string;
+    url: string | null;
+    expiresAt: string | null;
+  }>();
+  const stale =
+    !pinned ||
+    !m ||
+    pinned.id !== m.id ||
+    !pinned.url ||
+    (pinned.expiresAt !== null && Date.parse(pinned.expiresAt) - Date.now() < 60_000);
+  useEffect(() => {
+    if (m && stale) setPinned({ id: m.id, url: m.url, expiresAt: m.expiresAt });
+  }, [m, stale]);
+  return !m ? null : stale ? m.url : (pinned?.url ?? m.url);
+}
+
 export function MediaLightbox({
   items,
   index,
@@ -388,6 +410,7 @@ export function MediaLightbox({
   videoRef?: React.RefObject<HTMLVideoElement | null> | undefined;
 }) {
   const m = index === null ? null : (items[index] ?? null);
+  const src = usePinnedUrl(m);
   const videoState = useRef({ editing: false, dirty: false });
   const onVideoState = useCallback((s: { editing: boolean; dirty: boolean }) => {
     videoState.current = s;
@@ -434,20 +457,20 @@ export function MediaLightbox({
         </DialogHeader>
         {m && (
           <div className="bf-lightbox-stage">
-            {m.kind === "image" && m.url && (
-              <img src={m.url} alt={m.name} referrerPolicy="no-referrer" />
+            {m.kind === "image" && src && (
+              <img src={src} alt={m.name} referrerPolicy="no-referrer" />
             )}
-            {m.kind === "video" && m.url && (
+            {m.kind === "video" && src && (
               <VideoPlayer
                 key={m.id}
-                src={m.url}
+                src={src}
                 poster={m.thumbUrl}
                 initialMarks={m.marks}
                 videoRef={videoRef}
                 onState={onVideoState}
               />
             )}
-            {m.kind === "pdf" && m.url && <iframe key={m.id} src={m.url} title={m.name} />}
+            {m.kind === "pdf" && src && <iframe key={m.id} src={src} title={m.name} />}
             {!m.url && (
               <p className="p-8 text-center text-sm text-muted-foreground">
                 This file cannot be shown because media storage is not connected right now.
@@ -783,7 +806,11 @@ export function BugMedia({
           const source = section.current?.getBoundingClientRect() ?? null;
           const n = items.length;
           await clearAll({ data: { access, media: { bugId: bug.id } } });
-          await Promise.all([refresh(), client.invalidateQueries({ queryKey: ["trash"] })]);
+          await Promise.all([
+            refresh(),
+            client.invalidateQueries({ queryKey: ["trash"] }),
+            client.invalidateQueries({ queryKey: ["media-trash"] }),
+          ]);
           moveToTrashToast({
             title: "Files removed",
             label: `${n} ${n === 1 ? "file" : "files"} from ${bug.code}`,
@@ -807,7 +834,11 @@ export function BugMedia({
           if (!removing) return;
           const source = removingRect.current;
           await remove({ data: { access, media: { id: removing.id } } });
-          await Promise.all([refresh(), client.invalidateQueries({ queryKey: ["trash"] })]);
+          await Promise.all([
+            refresh(),
+            client.invalidateQueries({ queryKey: ["trash"] }),
+            client.invalidateQueries({ queryKey: ["media-trash"] }),
+          ]);
           const gone = removing;
           moveToTrashToast({
             title: "File moved to Trash",
@@ -817,7 +848,11 @@ export function BugMedia({
             trashLink: access.kind === "admin",
             onUndo: async () => {
               await restoreFile({ data: { access, media: { id: gone.id } } });
-              await Promise.all([refresh(), client.invalidateQueries({ queryKey: ["trash"] })]);
+              await Promise.all([
+                refresh(),
+                client.invalidateQueries({ queryKey: ["trash"] }),
+                client.invalidateQueries({ queryKey: ["media-trash"] }),
+              ]);
             },
           });
           setRemoving(null);

@@ -745,6 +745,8 @@ function ProjectsView({ onDialog }: { onDialog: (s: string) => void }) {
     await Promise.all([
       client.invalidateQueries({ queryKey: ["project-summary"] }),
       client.invalidateQueries({ queryKey: ["projects"] }),
+      // The report form lists projects from the workspace query.
+      client.invalidateQueries({ queryKey: ["bug-workspace"] }),
     ]);
     toast.success(pending.archived ? `${pending.name} restored` : `${pending.name} archived`);
   }
@@ -1207,6 +1209,7 @@ function NewProjectForm({ close }: { close: () => void }) {
       await Promise.all([
         client.invalidateQueries({ queryKey: ["projects"] }),
         client.invalidateQueries({ queryKey: ["project-summary"] }),
+        client.invalidateQueries({ queryKey: ["bug-workspace"] }),
       ]);
       toast.success(`Project “${p.name}” created`);
       close();

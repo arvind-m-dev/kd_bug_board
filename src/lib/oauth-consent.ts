@@ -13,6 +13,13 @@ export function consentPage(p: {
     .map(([k, v]) => `<input type="hidden" name="${esc(k)}" value="${esc(v)}">`)
     .join("");
   const who = p.clientName ? esc(p.clientName) : "An AI client";
+  // The client name is self-chosen at registration; the redirect host is where approval actually sends access.
+  let host = "";
+  try {
+    host = new URL(p.params["redirect_uri"] ?? "").host;
+  } catch {
+    /* validated before render */
+  }
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connect to Bug Board</title>
 <style>
 :root{color-scheme:dark;--bg:#13111c;--card:#1d1b2a;--line:#312e45;--fg:#eceaf5;--mut:#a7a3c0;--pri:#8b7cf6;--err:#f1707a}
@@ -29,6 +36,7 @@ button.go:hover{filter:brightness(1.08)}.err{background:color-mix(in oklab,var(-
 .hide{display:none}.foot{margin-top:16px;font-size:11.5px;color:var(--mut);text-align:center}
 </style></head><body><form class="card" method="post" action="/api/oauth/authorize">
 <h1>Connect to Bug Board</h1><p class="sub">${who} wants to read and report bugs on your behalf. Sign in to approve, or close this window to deny.</p>
+${host ? `<p class="sub">Access will be sent to <strong style="color:var(--fg)">${esc(host)}</strong>. Only approve if you started this connection from that app.</p>` : ""}
 ${p.error ? `<div class="err">${esc(p.error)}</div>` : ""}
 ${hidden}
 <div class="tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-m="admin">Admin</button><button type="button" role="tab" aria-selected="false" data-m="portal">Member portal</button></div>

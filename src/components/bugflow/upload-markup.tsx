@@ -125,23 +125,31 @@ export function SavedMediaMarkup({
   useEffect(() => {
     if (kind !== "image" || !src) return;
     let url = "";
+    // A newer file (or closing) cancels this load: no state updates, no stray close, and the copy is revoked.
+    let cancelled = false;
     // Read the picture as a local copy so the canvas can export it.
     // no-store: the list may have cached this same link without CORS headers, which would block the read.
     fetch(src, { cache: "no-store", mode: "cors" })
       .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((blob) => {
+        if (cancelled) return null;
         url = URL.createObjectURL(blob);
         setLocal(url);
         return loadImage(url);
       })
-      .then((img) => setSource({ image: img, width: img.naturalWidth, height: img.naturalHeight }))
+      .then((img) => {
+        if (img && !cancelled)
+          setSource({ image: img, width: img.naturalWidth, height: img.naturalHeight });
+      })
       .catch(() => {
+        if (cancelled) return;
         toast.error("This image could not be opened for drawing.", {
           description: "Check that the bucket's CORS rule allows GET from this address.",
         });
         close.current();
       });
     return () => {
+      cancelled = true;
       if (url) URL.revokeObjectURL(url);
     };
   }, [kind, src]);

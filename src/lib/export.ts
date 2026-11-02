@@ -1,7 +1,15 @@
 /** Client-side report exports: CSV text that opens cleanly in Excel and Sheets, and a download trigger. */
 
+/**
+ * Spreadsheet apps run a cell that starts with = + - @ (or tab/CR) as a formula, so user text such as a bug titled
+ * `=HYPERLINK(...)` gets a leading apostrophe. Real numbers (including negatives) are left alone.
+ */
+export function neutralizeFormula(s: string) {
+  if (/^[=+@\t\r]/.test(s) || (/^-/.test(s) && !/^-\d+(\.\d+)?$/.test(s))) return `'${s}`;
+  return s;
+}
 const cell = (v: string | number | null | undefined) => {
-  const s = v == null ? "" : String(v);
+  const s = v == null ? "" : typeof v === "number" ? String(v) : neutralizeFormula(v);
   return /[",\r\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
 };
 

@@ -1,6 +1,6 @@
 import { neonBatch, neonQuery } from "./neon.server";
 import { requireAdmin } from "./portal-access.server";
-import { formatBugCode } from "./bug-workflow";
+import { formatBugCode, parseBugRef } from "./bug-workflow";
 import type { ActivityFilters, ActivityInsights, ActivityRow, TeamPerformance } from "./activity";
 import { periodWindow, type Period } from "./period";
 
@@ -63,9 +63,10 @@ function filterSql(
   }
   const q = f.query.trim();
   if (q) {
-    const m = /^BF-?(\d+)$/i.exec(q);
-    if (m) {
-      params.push(Number(m[1]));
+    // Any workspace prefix (BF-000051, DEPLOY-000123); a bare number still searches names and titles as before.
+    const ref = /^\d+$/.test(q) ? null : parseBugRef(q);
+    if (ref) {
+      params.push(Number(ref));
       conds.push(`a.bug_id=$${params.length}::int`);
     } else {
       params.push(`%${q}%`);
@@ -235,7 +236,7 @@ export async function teamPerformance(period: Period & { tz?: string }): Promise
   await requireAdmin();
   const params: unknown[] = [];
   const win = periodWindow(period, params);
-  const cte = `with b as (select * from bugflow.bugs where deleted_at is null),
+  const cte = `with b as (select * from bugflow.bugs where deleted_at is null and kind='bug'),
     resolved as (select h.bug_id, max(h.created_at) as at from bugflow.status_history h join b on b.id=h.bug_id where h.new_status='RESOLVED' and b.status='RESOLVED' group by h.bug_id),
     first_assigned as (select bug_id, min(created_at) as at from bugflow.assignments group by bug_id),
     owners as (select bug_id, user_id from bugflow.bug_assignees union select id, assignee_id from b where assignee_id is not null),

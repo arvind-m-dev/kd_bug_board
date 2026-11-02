@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { accessSchema } from "./bug-workflow";
+import { clientAccessSchema } from "./bug-workflow";
 import {
   createSprintSchema,
   updateSprintSchema,
@@ -9,7 +9,7 @@ import {
 } from "./sprints";
 
 export const getPortalSprints = createServerFn({ method: "POST" })
-  .validator((v: unknown) => z.object({ access: accessSchema }).strict().parse(v))
+  .validator((v: unknown) => z.object({ access: clientAccessSchema }).strict().parse(v))
   .handler(async ({ data }) => {
     const s = await import("./sprints.server");
     const a = await import("./portal-access.server");

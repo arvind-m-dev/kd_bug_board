@@ -63,7 +63,7 @@ export async function handleOauth(request: Request): Promise<Response | null> {
         return html(consentPage({ clientName: name, params: keep }));
       } catch (e) {
         return html(
-          `<!doctype html><meta charset="utf-8"><body style="font:15px sans-serif;padding:40px;background:#13111c;color:#eceaf5">This connection request is invalid: ${e instanceof Error ? e.message : "bad request"}.</body>`,
+          `<!doctype html><meta charset="utf-8"><body style="font:15px sans-serif;padding:40px;background:#13111c;color:#eceaf5">This connection request is invalid: ${escapeHtml(e instanceof Error ? e.message : "bad request")}.</body>`,
           400,
         );
       }
@@ -131,7 +131,7 @@ export async function handleOauth(request: Request): Promise<Response | null> {
           return html(consentPage({ clientName, params: keep, error: message }), 400);
         }
         return html(
-          `<!doctype html><meta charset="utf-8"><body style="font:15px sans-serif;padding:40px;background:#13111c;color:#eceaf5">${message}</body>`,
+          `<!doctype html><meta charset="utf-8"><body style="font:15px sans-serif;padding:40px;background:#13111c;color:#eceaf5">${escapeHtml(message)}</body>`,
           400,
         );
       }
@@ -166,6 +166,18 @@ export async function handleOauth(request: Request): Promise<Response | null> {
 function html(body: string, status = 200) {
   return new Response(body, {
     status,
-    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      // The consent page takes the Admin password: never let another site frame it (clickjacking).
+      "x-frame-options": "DENY",
+      "content-security-policy": "frame-ancestors 'none'",
+    },
   });
+}
+function escapeHtml(v: string) {
+  return v.replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
+  );
 }
