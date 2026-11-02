@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CLOSED_STATUSES, type Status } from "./bugflow";
+import { CLOSED_STATUSES, isCalendarDate, type Status } from "./bugflow";
 
 export const SPRINT_STATES = ["planned", "active", "closed"] as const;
 export type SprintState = (typeof SPRINT_STATES)[number];
@@ -79,11 +79,11 @@ export const createSprintSchema = z
     name: z.string().trim().min(1, "Name the sprint.").max(120),
     goal: z.string().trim().max(2000).default(""),
     startsOn: z
-      .union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)])
+      .union([z.literal(""), z.string().refine(isCalendarDate, "Enter a valid date.")])
       .default("")
       .transform((v) => v || null),
     endsOn: z
-      .union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)])
+      .union([z.literal(""), z.string().refine(isCalendarDate, "Enter a valid date.")])
       .default("")
       .transform((v) => v || null),
   })
@@ -96,11 +96,11 @@ export const updateSprintSchema = z
     name: z.string().trim().min(1).max(120),
     goal: z.string().trim().max(2000).default(""),
     startsOn: z
-      .union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)])
+      .union([z.literal(""), z.string().refine(isCalendarDate, "Enter a valid date.")])
       .default("")
       .transform((v) => v || null),
     endsOn: z
-      .union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)])
+      .union([z.literal(""), z.string().refine(isCalendarDate, "Enter a valid date.")])
       .default("")
       .transform((v) => v || null),
   })

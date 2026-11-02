@@ -1,4 +1,5 @@
 import { neonQuery, neonExecute } from "./neon.server";
+import { audited } from "./audit.server";
 import { checkOrigin, requireAdmin } from "./portal-access.server";
 import { formatBugCode } from "./bug-workflow";
 import {
@@ -89,15 +90,6 @@ export async function backlogData(): Promise<BacklogData> {
   };
 }
 
-async function audit(actorId: string, bugId: string, action: string, detail: object) {
-  await neonExecute([
-    {
-      query: `insert into bugflow.activity(id,actor_id,bug_id,action,detail) values($1,$2,$3::bigint,$4,$5::jsonb)`,
-      params: [crypto.randomUUID(), actorId, bugId, action, JSON.stringify(detail)],
-    },
-  ]);
-}
-
 /** Parent checks shared by create and update: kinds fit, same project, and no ancestry loop. */
 async function assertParent(
   childId: string | null,
@@ -141,13 +133,17 @@ export async function createWorkItem(data: CreateWorkItem) {
   const admin = await requireAdmin();
   if (data.parentId) await assertParent(null, data.kind, data.projectId, data.parentId);
   const rank = await tailRank(data.projectId);
+  // New items take the workspace's default bug-ID prefix, the same as a reported bug.
+  const { dropdownOptions } = await import("./bug-workflow.server");
+  const codePrefix = (await dropdownOptions()).prefixes[0] ?? "BF";
   const { rows } = await neonExecute(
     `with existing as (select b.id from bugflow.bug_details d join bugflow.bugs b on b.id=d.bug_id where d.request_id=$1 and b.reporter_id=$2),
-     created as (insert into bugflow.bugs(title,project_id,reporter_id,priority,severity,description,expected,actual,kind,parent_id,estimate,backlog_rank)
-       select $3,$4,$2,'P3','Medium',$5,'','',$6,$7::bigint,$8,$9 from bugflow.projects p where p.id=$4 and not p.archived and not exists(select 1 from existing) returning id),
+     created as (insert into bugflow.bugs(title,project_id,reporter_id,priority,severity,description,expected,actual,kind,parent_id,estimate,backlog_rank,code_prefix)
+       select $3,$4,$2,'P3','Medium',$5,'','',$6,$7::bigint,$8,$9,$10 from bugflow.projects p where p.id=$4 and not p.archived and not exists(select 1 from existing) returning id),
      details as (insert into bugflow.bug_details(bug_id,request_id,module_name,evidence_urls) select id,$1,'','[]'::jsonb from created),
-     history as (insert into bugflow.status_history(id,bug_id,actor_id,new_status) select gen_random_uuid(),id,$2,'NEW' from created)
-     select id from created union all select id from existing`,
+     history as (insert into bugflow.status_history(id,bug_id,actor_id,new_status) select gen_random_uuid(),id,$2,'NEW' from created),
+     logged as (insert into bugflow.activity(id,actor_id,bug_id,action,detail) select gen_random_uuid(),$2,id,'backlog.created',jsonb_build_object('kind',$6::text,'title',$3::text) from created)
+     select id,$10::text as code_prefix from created union all select e.id,b.code_prefix from existing e join bugflow.bugs b on b.id=e.id`,
     [
       data.requestId,
       admin.userId,
@@ -158,12 +154,16 @@ export async function createWorkItem(data: CreateWorkItem) {
       data.parentId ?? null,
       data.estimate,
       rank,
+      codePrefix,
     ],
   );
   const id = rows[0]?.["id"];
   if (!id) throw new Error("Choose an active project.");
-  await audit(admin.userId, String(id), "backlog.created", { kind: data.kind, title: data.title });
-  return { id: String(id), code: formatBugCode(String(id)) };
+  // The audit row was written in the same statement, only for a new item (a retried request returns the existing id).
+  return {
+    id: String(id),
+    code: formatBugCode(String(id), String(rows[0]?.["code_prefix"] ?? codePrefix)),
+  };
 }
 
 export async function updateWorkItem(data: UpdateWorkItem) {
@@ -182,7 +182,12 @@ export async function updateWorkItem(data: UpdateWorkItem) {
       String(row["project_id"]),
       data.parentId,
     );
-  const { rows } = await neonExecute(
+  const rankOnly =
+    data.rank !== undefined &&
+    data.ready === undefined &&
+    data.estimate === undefined &&
+    data.parentId === undefined;
+  const q = audited(
     `update bugflow.bugs set
        backlog_rank=coalesce($2,backlog_rank),
        ready=coalesce($3,ready),
@@ -198,18 +203,19 @@ export async function updateWorkItem(data: UpdateWorkItem) {
       data.parentId !== undefined,
       data.parentId ?? null,
     ],
+    {
+      actorId: admin.userId,
+      bugId: data.id,
+      action: rankOnly ? "backlog.ranked" : "backlog.updated",
+      detail: {
+        rank: data.rank,
+        ready: data.ready,
+        estimate: data.estimate,
+        parent: data.parentId,
+      },
+    },
   );
+  const { rows } = await neonExecute(q.query, q.params);
   if (!rows[0]) throw new Error("This item is not available.");
-  const rankOnly =
-    data.rank !== undefined &&
-    data.ready === undefined &&
-    data.estimate === undefined &&
-    data.parentId === undefined;
-  await audit(admin.userId, data.id, rankOnly ? "backlog.ranked" : "backlog.updated", {
-    rank: data.rank,
-    ready: data.ready,
-    estimate: data.estimate,
-    parent: data.parentId,
-  });
   return { saved: true };
 }

@@ -18,12 +18,7 @@ import {
   type portalReadSchema,
 } from "./portal-access";
 import { encryptPortal } from "./portal-crypto.server";
-import {
-  assertSignInAllowed,
-  clearSignInFailures,
-  clientKey,
-  recordSignInFailure,
-} from "./sign-in-throttle.server";
+import { beginSignInAttempt, clearSignInFailures, clientKey } from "./sign-in-throttle.server";
 import { normalizePortalAppearance } from "./appearance";
 import type { z } from "zod";
 
@@ -106,13 +101,10 @@ export async function unlockAdmin(data: z.infer<typeof unlockSchema>) {
   const email = process.env["BUGFLOW_ADMIN_EMAIL"];
   if (!password || !email) throw new Error("Admin sign-in is not configured.");
   const attempt = clientKey(getRequest().headers);
-  assertSignInAllowed(attempt);
+  beginSignInAttempt(attempt);
   const passwordValid = await equalSecret(data.password, password);
   const emailValid = await equalSecret(data.email.toLowerCase(), email.toLowerCase());
-  if (!passwordValid || !emailValid) {
-    recordSignInFailure(attempt);
-    throw new Error("Incorrect email or password.");
-  }
+  if (!passwordValid || !emailValid) throw new Error("Incorrect email or password.");
   clearSignInFailures(attempt);
   const userId = crypto.randomUUID();
   const portalId = crypto.randomUUID();
@@ -206,8 +198,8 @@ export async function projectSummary() {
   await requireAdmin();
   const { rows } =
     await neonQuery(`select p.id, p.name, p.environment, p.archived, to_json(p.created_at) as created_at,
-    (select count(*)::int from bugflow.bugs b where b.project_id=p.id and b.deleted_at is null) as total,
-    (select count(*)::int from bugflow.bugs b where b.project_id=p.id and b.deleted_at is null and b.status not in ('RESOLVED','NOT_A_BUG','DUPLICATE','WONT_FIX')) as open,
+    (select count(*)::int from bugflow.bugs b where b.project_id=p.id and b.deleted_at is null and b.kind='bug') as total,
+    (select count(*)::int from bugflow.bugs b where b.project_id=p.id and b.deleted_at is null and b.kind='bug' and b.status not in ('RESOLVED','NOT_A_BUG','DUPLICATE','WONT_FIX')) as open,
     (select count(distinct d.module_name)::int from bugflow.bugs b join bugflow.bug_details d on d.bug_id=b.id where b.project_id=p.id and b.deleted_at is null and d.module_name<>'') as modules,
     (select count(*)::int from bugflow.portal_projects pp join bugflow.portals x on x.id=pp.portal_id join bugflow.users u on u.id=x.user_id where pp.project_id=p.id and x.type<>'admin' and x.active and u.active and u.deleted_at is null and x.revoked_at is null and (x.expires_at is null or x.expires_at>now())) as members,
     (select to_json(max(b.updated_at)) from bugflow.bugs b where b.project_id=p.id and b.deleted_at is null) as last_update
@@ -326,6 +318,12 @@ export async function changePortal(id: string, regenerate: boolean) {
         ? "update bugflow.portals set token_hash=$2,token_ciphertext=$3,active=true,revoked_at=null,expires_at=now()+interval '90 days' where id=$1 and type<>'admin' returning type"
         : "update bugflow.portals set active=false,revoked_at=now() where id=$1 and type<>'admin' returning type",
       params: regenerate && token ? [id, await hashToken(token), await encryptPortal(token)] : [id],
+    },
+    {
+      // AI tokens (and OAuth connections) minted from the old link must not outlive it.
+      query:
+        "update bugflow.ai_tokens set revoked_at=now() where portal_id=$1 and revoked_at is null and exists(select 1 from bugflow.portals where id=$1 and type<>'admin')",
+      params: [id],
     },
     {
       query:

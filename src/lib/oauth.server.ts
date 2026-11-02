@@ -1,11 +1,7 @@
 import { neonQuery, neonExecute } from "./neon.server";
 import { hashToken, randomToken, equalSecret } from "./portal-access";
 import { formatAiToken } from "./ai-tokens";
-import {
-  assertSignInAllowed,
-  clearSignInFailures,
-  recordSignInFailure,
-} from "./sign-in-throttle.server";
+import { beginSignInAttempt, clearSignInFailures } from "./sign-in-throttle.server";
 
 /**
  * OAuth 2.1 (authorization code + PKCE S256) for the MCP endpoint, so connectors that cannot paste a token
@@ -46,12 +42,24 @@ export function protectedResourceMetadata(origin: string) {
   };
 }
 
+const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
+/** OAuth 2.1: redirect URIs must be https, except loopback (native/desktop clients); no fragments; bounded length. */
+export function allowedRedirectUri(u: unknown): u is string {
+  if (typeof u !== "string" || u.length > 2000) return false;
+  try {
+    const url = new URL(u);
+    if (url.hash) return false;
+    if (url.protocol === "https:") return true;
+    return url.protocol === "http:" && LOOPBACK.has(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 /** Dynamic Client Registration: store the client's redirect URIs and give it a public client_id (no secret; PKCE protects it). */
 export async function registerClient(body: { redirect_uris?: unknown; client_name?: unknown }) {
   const uris = Array.isArray(body.redirect_uris)
-    ? body.redirect_uris
-        .filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u))
-        .slice(0, 10)
+    ? body.redirect_uris.filter(allowedRedirectUri).slice(0, 10)
     : [];
   if (!uris.length) throw new Error("redirect_uris is required.");
   const clientId = `bf_${randomToken().slice(0, 32)}`;
@@ -101,7 +109,7 @@ export async function validateAuthorize(p: {
 const findAdminPortal = async () =>
   (
     await neonQuery(
-      `select id from bugflow.portals where type='admin' and active and revoked_at is null limit 1`,
+      `select p.id from bugflow.portals p join bugflow.users u on u.id=p.user_id where p.type='admin' and p.active and u.active and p.revoked_at is null and (p.expires_at is null or p.expires_at>now()) limit 1`,
     )
   ).rows[0]?.["id"] as string | undefined;
 const findMemberPortal = async (token: string, type: string) =>
@@ -132,16 +140,14 @@ export async function approveAuthorize(p: {
   if (p.login.kind === "admin") {
     const password = process.env["BUGFLOW_ADMIN_PASSWORD"];
     const email = process.env["BUGFLOW_ADMIN_EMAIL"];
-    assertSignInAllowed(p.attemptKey);
+    beginSignInAttempt(p.attemptKey);
     if (
       !password ||
       !email ||
       !(await equalSecret(p.login.password, password)) ||
       !(await equalSecret(p.login.email.toLowerCase(), email.toLowerCase()))
-    ) {
-      recordSignInFailure(p.attemptKey);
+    )
       throw new Error("Incorrect email or password.");
-    }
     clearSignInFailures(p.attemptKey);
     portalId = await findAdminPortal();
     label = `OAuth · ${p.clientName || "AI client"} · Admin`;

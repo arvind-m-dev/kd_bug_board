@@ -22,8 +22,23 @@ export function assertSignInAllowed(key: string) {
   if (recent(key).length >= LIMIT) throw new Error(TOO_MANY_ATTEMPTS);
 }
 export function recordSignInFailure(key: string) {
-  if (failures.size > 5000) failures.clear();
+  // Bound memory by dropping the oldest addresses only; clearing everything would reset every attacker's count.
+  if (failures.size > 5000) {
+    let drop = failures.size - 4000;
+    for (const k of failures.keys()) {
+      if (drop-- <= 0) break;
+      if (k !== key) failures.delete(k);
+    }
+  }
   failures.set(key, [...recent(key), Date.now()]);
+}
+/**
+ * Checks the limit and counts this attempt before the (async) password comparison, so parallel requests can't all
+ * pass the check before any failure is recorded. A successful sign-in then calls `clearSignInFailures`.
+ */
+export function beginSignInAttempt(key: string) {
+  assertSignInAllowed(key);
+  recordSignInFailure(key);
 }
 export function clearSignInFailures(key: string) {
   failures.delete(key);

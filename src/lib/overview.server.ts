@@ -8,7 +8,8 @@ export async function overviewStats(period: Period & { tz?: string }) {
   await requireAdmin();
   const params: unknown[] = [];
   const win = periodWindow(period, params)("b.created_at");
-  const base = `bugflow.bugs b where b.deleted_at is null and ${win}`;
+  // Bugs only: stories/tasks/epics live on the backlog and are not counted here (as in the workspace counts).
+  const base = `bugflow.bugs b where b.deleted_at is null and b.kind='bug' and ${win}`;
   const owners = `(select x.bug_id, x.user_id from bugflow.bug_assignees x union select id, assignee_id from bugflow.bugs where assignee_id is not null)`;
   const open = `b.status not in ('RESOLVED','NOT_A_BUG','DUPLICATE','WONT_FIX')`;
   const attention = `(b.status in ('NEW','REOPENED','RECHECK','NEEDS_INFORMATION') or (b.status in ('VALIDATED','READY_FOR_ASSIGNMENT') and not exists(select 1 from ${owners} o where o.bug_id=b.id)))`;
@@ -17,7 +18,7 @@ export async function overviewStats(period: Period & { tz?: string }) {
     { query: `select b.priority as k, count(*)::int as n from ${base} group by 1`, params },
     { query: `select b.severity as k, count(*)::int as n from ${base} group by 1`, params },
     {
-      query: `select u.id, u.name, count(distinct b.id)::int as n from bugflow.bugs b join ${owners} o on o.bug_id=b.id join bugflow.users u on u.id=o.user_id where b.deleted_at is null and ${win} and ${open} group by u.id, u.name order by n desc, u.name`,
+      query: `select u.id, u.name, count(distinct b.id)::int as n from bugflow.bugs b join ${owners} o on o.bug_id=b.id join bugflow.users u on u.id=o.user_id where b.deleted_at is null and b.kind='bug' and ${win} and ${open} group by u.id, u.name order by n desc, u.name`,
       params,
     },
     {

@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
-  accessSchema,
+  clientAccessSchema,
   reportSchema,
   bugChangeSchema,
   editSchema,
@@ -10,7 +10,7 @@ import {
 export const getBugWorkspace = createServerFn({ method: "POST" })
   .validator((v: unknown) =>
     z
-      .object({ access: accessSchema, cursor: z.string().regex(/^\d+$/).optional() })
+      .object({ access: clientAccessSchema, cursor: z.string().regex(/^\d+$/).optional() })
       .strict()
       .parse(v),
   )
@@ -23,7 +23,7 @@ export const getBugExport = createServerFn({ method: "POST" })
   .validator((v: unknown) =>
     z
       .object({
-        access: accessSchema,
+        access: clientAccessSchema,
         projectId: z.string().uuid().nullable().default(null),
         includeClosed: z.boolean().default(true),
       })
@@ -39,7 +39,7 @@ export const getBugExport = createServerFn({ method: "POST" })
   });
 export const createBug = createServerFn({ method: "POST" })
   .validator((v: unknown) =>
-    z.object({ access: accessSchema, report: reportSchema }).strict().parse(v),
+    z.object({ access: clientAccessSchema, report: reportSchema }).strict().parse(v),
   )
   .handler(async ({ data }) => {
     const s = await import("./bug-workflow.server");
@@ -49,7 +49,7 @@ export const createBug = createServerFn({ method: "POST" })
 export const getBugDetail = createServerFn({ method: "POST" })
   .validator((v: unknown) =>
     z
-      .object({ access: accessSchema, id: z.string().regex(/^\d+$/) })
+      .object({ access: clientAccessSchema, id: z.string().regex(/^\d+$/) })
       .strict()
       .parse(v),
   )
@@ -60,7 +60,7 @@ export const getBugDetail = createServerFn({ method: "POST" })
   });
 export const updateBug = createServerFn({ method: "POST" })
   .validator((v: unknown) =>
-    z.object({ access: accessSchema, change: bugChangeSchema }).strict().parse(v),
+    z.object({ access: clientAccessSchema, change: bugChangeSchema }).strict().parse(v),
   )
   .handler(async ({ data }) => {
     const s = await import("./bug-workflow.server");
@@ -68,7 +68,9 @@ export const updateBug = createServerFn({ method: "POST" })
     return a.databaseCall(() => s.changeBug(data.access, data.change));
   });
 export const editBug = createServerFn({ method: "POST" })
-  .validator((v: unknown) => z.object({ access: accessSchema, edit: editSchema }).strict().parse(v))
+  .validator((v: unknown) =>
+    z.object({ access: clientAccessSchema, edit: editSchema }).strict().parse(v),
+  )
   .handler(async ({ data }) => {
     const s = await import("./bug-workflow.server");
     const a = await import("./portal-access.server");

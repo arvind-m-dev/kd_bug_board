@@ -182,6 +182,8 @@ export async function compressVideo(
         video.pause();
         reject(err);
       };
+      // The abort may have fired while metadata was loading, before this listener existed.
+      if (signal?.aborted) return fail(new Error("Compression cancelled."));
       signal?.addEventListener("abort", () => fail(new Error("Compression cancelled.")), {
         once: true,
       });

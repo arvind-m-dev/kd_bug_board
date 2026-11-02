@@ -138,7 +138,8 @@ export function MediaLibrary({
     }
   }
   const [q, setQ] = useState("");
-  const [open, setOpen] = useState<number | null>(null);
+  // The open file is tracked by id: the list refetches every 30 s, and an index could then point at another file.
+  const [openId, setOpenId] = useState<string | null>(null);
   const items = useMemo(() => {
     const all = library.data ?? [];
     const needle = q.trim().toLowerCase();
@@ -146,6 +147,7 @@ export function MediaLibrary({
       ? all.filter((m) => `${m.name} ${m.bugCode} ${m.bugTitle}`.toLowerCase().includes(needle))
       : all;
   }, [library.data, q]);
+  const openIndex = openId === null ? null : items.findIndex((m) => m.id === openId);
   const groups = useMemo(() => {
     const map = new Map<string, LibraryItem[]>();
     for (const m of items) map.set(m.bugId, [...(map.get(m.bugId) ?? []), m]);
@@ -285,7 +287,7 @@ export function MediaLibrary({
                     <MediaThumb
                       item={m}
                       onOpen={() =>
-                        selecting ? setPicked((p) => toggle(p, m.id)) : setOpen(items.indexOf(m))
+                        selecting ? setPicked((p) => toggle(p, m.id)) : setOpenId(m.id)
                       }
                     />
                     <figcaption className="bf-media-cap">
@@ -498,8 +500,11 @@ export function MediaLibrary({
               const r = await each([...picked], (id) =>
                 remove({ data: { access, media: { id } } }),
               );
+              // Nothing removed: keep the confirmation open with an error so it can be retried.
+              if (!r.ok.length) throw new Error("The selected files could not be removed.");
               await refresh();
-              setPicked(new Set());
+              // Files that failed stay selected for another try.
+              setPicked(new Set([...picked].filter((id) => !r.ok.includes(id))));
               if (r.ok.length)
                 moveToTrashToast({
                   title: "Files moved to Trash",
@@ -519,8 +524,9 @@ export function MediaLibrary({
               const r = await each([...pickedRemoved], (id) =>
                 forever({ data: { access, media: { id } } }),
               );
+              if (!r.ok.length) throw new Error("The selected files could not be deleted.");
               await refresh();
-              setPickedRemoved(new Set());
+              setPickedRemoved(new Set([...pickedRemoved].filter((id) => !r.ok.includes(id))));
               toast.success(
                 `${r.ok.length} ${r.ok.length === 1 ? "file" : "files"} deleted forever`,
                 {
@@ -529,12 +535,17 @@ export function MediaLibrary({
               );
             }
           } finally {
+            // ConfirmAction closes itself on success and stays open (with the error) when this throws.
             setBulkBusy(false);
-            setBulk(null);
           }
         }}
       />
-      <MediaLightbox items={items} index={open} onIndex={setOpen} onClose={() => setOpen(null)} />
+      <MediaLightbox
+        items={items}
+        index={openIndex === -1 ? null : openIndex}
+        onIndex={(i) => setOpenId(items[i]?.id ?? null)}
+        onClose={() => setOpenId(null)}
+      />
       {marking && (
         <SavedMediaMarkup item={marking} access={access} onClose={() => setMarking(null)} />
       )}

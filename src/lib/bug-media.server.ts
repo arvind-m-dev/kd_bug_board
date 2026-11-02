@@ -437,6 +437,8 @@ export async function finishUpload(
     !isMediaType(contentType);
   if (bad) {
     await remove(config, key).catch(() => undefined);
+    // The row is marked purged, so the sweep never returns for its preview: remove that now too.
+    if (data.thumb) await remove(config, thumbKey(key)).catch(() => undefined);
     await neonExecute(
       `update bugflow.bug_media set deleted_at=now(),deleted_by=$2,purged_at=now() where id=$1`,
       [data.id, actor.userId],
@@ -455,10 +457,12 @@ export async function finishUpload(
     preview.size <= MEDIA_THUMB_MAX &&
     (!preview.contentType || preview.contentType.startsWith("image/jpeg"));
   if (data.thumb && !hasThumb) await remove(config, thumbKey(key)).catch(() => undefined);
-  await neonExecute([
+  const { results: finished } = await neonExecute<{
+    results: { rows: Record<string, unknown>[] }[];
+  }>([
     {
       query: `with u as (update bugflow.bug_media set status='ready',ready_at=now(),size=$6,width=$7,height=$8,has_thumb=$10 where id=$1 and status='pending' and deleted_at is null returning id)
-      insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $2,$3,$4,'bug.media_added',jsonb_build_object('media',$5::text,'kind',$9::text,'size',$6::bigint) from u`,
+      insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $2,$3,$4,'bug.media_added',jsonb_build_object('media',$5::text,'kind',$9::text,'size',$6::bigint) from u returning bug_id`,
       params: [
         data.id,
         crypto.randomUUID(),
@@ -473,6 +477,9 @@ export async function finishUpload(
       ],
     },
   ]);
+  // Nothing updated: the pending row was swept or removed meanwhile, so the file is not on the bug.
+  if (!finished[0]?.rows.length)
+    throw new Error("This upload expired before it finished. Attach the file again.");
   return (
     await toItems(
       [{ ...row, size: obj.size, width: data.width, height: data.height, has_thumb: hasThumb }],

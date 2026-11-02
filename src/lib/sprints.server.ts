@@ -1,6 +1,7 @@
 import { neonQuery, neonExecute } from "./neon.server";
+import { audited } from "./audit.server";
 import { checkOrigin, requireAdmin } from "./portal-access.server";
-import { formatBugCode } from "./bug-workflow";
+import { formatBugCode, type BugActor } from "./bug-workflow";
 import {
   summarizeSprint,
   type Sprint,
@@ -39,6 +40,32 @@ function parseItem(r: Record<string, unknown>): SprintItem {
     removedAt: r["removed_iso"] ? String(r["removed_iso"]) : null,
     carriedFromSprintId: r["carried_from_sprint_id"] ? String(r["carried_from_sprint_id"]) : null,
   };
+}
+
+/**
+ * The same per-bug rule as the bug lists: Admin, QA and `view_all` see every bug of their projects; other members see
+ * only bugs they reported or are assigned to. Without an actor (Admin pages) everything is visible.
+ */
+async function visibleItems(
+  rows: Record<string, unknown>[],
+  items: SprintItem[],
+  actor?: BugActor,
+): Promise<SprintItem[]> {
+  if (
+    !actor ||
+    actor.role === "admin" ||
+    actor.role === "qa" ||
+    actor.permissions.includes("view_all")
+  )
+    return items;
+  const ids = [...new Set(rows.map((r) => String(r["bug_id"])))];
+  if (!ids.length) return [];
+  const { rows: mine } = await neonQuery(
+    `select b.id from bugflow.bugs b where b.id=any($1::bigint[]) and (b.reporter_id=$2::uuid or b.assignee_id=$2::uuid or exists(select 1 from bugflow.bug_assignees ba where ba.bug_id=b.id and ba.user_id=$2::uuid))`,
+    [ids, actor.userId],
+  );
+  const allowed = new Set(mine.map((r) => String(r["id"])));
+  return items.filter((i) => allowed.has(i.bugId));
 }
 
 export type SprintsData = {
@@ -85,37 +112,40 @@ export async function sprintsData(): Promise<SprintsData> {
   };
 }
 
-async function audit(actorId: string, bugId: string | null, action: string, detail: object) {
-  await neonExecute([
-    {
-      query: `insert into bugflow.activity(id,actor_id,bug_id,action,detail) values($1,$2,$3::bigint,$4,$5::jsonb)`,
-      params: [crypto.randomUUID(), actorId, bugId, action, JSON.stringify(detail)],
-    },
-  ]);
-}
-
 export async function createSprint(data: CreateSprint) {
   checkOrigin();
   const admin = await requireAdmin();
-  const { rows } = await neonExecute(
-    `insert into bugflow.sprints(project_id,name,goal,starts_on,ends_on,created_by) select $1,$2,$3,$4::date,$5::date,$6 where exists(select 1 from bugflow.projects where id=$1 and not archived) returning id`,
-    [data.projectId, data.name, data.goal, data.startsOn, data.endsOn, admin.userId],
+  // The id is chosen here so the audit row, written in the same statement, can name the sprint.
+  const sprintId = crypto.randomUUID();
+  const q = audited(
+    `insert into bugflow.sprints(id,project_id,name,goal,starts_on,ends_on,created_by) select $7,$1,$2,$3,$4::date,$5::date,$6 where exists(select 1 from bugflow.projects where id=$1 and not archived) returning id`,
+    [data.projectId, data.name, data.goal, data.startsOn, data.endsOn, admin.userId, sprintId],
+    {
+      actorId: admin.userId,
+      action: "sprint.created",
+      detail: { sprint: sprintId, name: data.name },
+    },
   );
+  const { rows } = await neonExecute(q.query, q.params);
   const id = rows[0]?.["id"];
   if (!id) throw new Error("Choose an active project for the sprint.");
-  await audit(admin.userId, null, "sprint.created", { sprint: String(id), name: data.name });
   return { id: String(id) };
 }
 
 export async function updateSprint(data: z.infer<typeof updateSprintSchema>) {
   checkOrigin();
   const admin = await requireAdmin();
-  const { rows } = await neonExecute(
+  const q = audited(
     `update bugflow.sprints set name=$2,goal=$3,starts_on=$4::date,ends_on=$5::date where id=$1 and state<>'closed' returning id`,
     [data.id, data.name, data.goal, data.startsOn, data.endsOn],
+    {
+      actorId: admin.userId,
+      action: "sprint.updated",
+      detail: { sprint: data.id, name: data.name },
+    },
   );
+  const { rows } = await neonExecute(q.query, q.params);
   if (!rows[0]) throw new Error("This sprint is closed or no longer exists.");
-  await audit(admin.userId, null, "sprint.updated", { sprint: data.id, name: data.name });
   return { saved: true };
 }
 
@@ -123,10 +153,12 @@ export async function startSprint(data: z.infer<typeof sprintActionSchema>) {
   checkOrigin();
   const admin = await requireAdmin();
   try {
-    const { rows } = await neonExecute(
+    const q = audited(
       `update bugflow.sprints set state='active',started_at=now() where id=$1 and state='planned' returning id`,
       [data.id],
+      { actorId: admin.userId, action: "sprint.started", detail: { sprint: data.id } },
     );
+    const { rows } = await neonExecute(q.query, q.params);
     if (!rows[0]) throw new Error("Only a planned sprint can be started.");
   } catch (e) {
     // The partial unique index blocks a second active sprint in the same project.
@@ -134,7 +166,6 @@ export async function startSprint(data: z.infer<typeof sprintActionSchema>) {
       throw new Error("That project already has an active sprint. Close it first.");
     throw e;
   }
-  await audit(admin.userId, null, "sprint.started", { sprint: data.id });
   return { started: true };
 }
 
@@ -158,22 +189,27 @@ export async function closeSprint(data: z.infer<typeof sprintActionSchema>) {
           and exists(select 1 from bugflow.sprints t where t.id=$2 and t.state in ('planned','active')
             and t.project_id=(select project_id from bugflow.sprints where id=$1))
           and exists(select 1 from bugflow.sprints c where c.id=$1 and c.state='closed')
-        on conflict (sprint_id,bug_id) do nothing`,
+        on conflict (sprint_id,bug_id) do update set removed_at=null,removed_by=null,added_at=now(),added_by=$3,carried_from_sprint_id=$1
+          where bugflow.sprint_items.removed_at is not null`,
+      params: [data.id, data.carryTo ?? null, admin.userId],
+    },
+    // Audited in the same transaction, only when this call closed the sprint; carriedTo only when bugs really moved.
+    {
+      query: `insert into bugflow.activity(id,actor_id,bug_id,action,detail)
+        select gen_random_uuid(),$3::uuid,null,'sprint.closed',jsonb_build_object('sprint',$1::text,'carriedTo',
+          case when exists(select 1 from bugflow.sprint_items i where i.sprint_id=$2::uuid and i.carried_from_sprint_id=$1::uuid) then $2::text end)
+        where exists(select 1 from bugflow.sprints c where c.id=$1::uuid and c.state='closed' and c.closed_at=now())`,
       params: [data.id, data.carryTo ?? null, admin.userId],
     },
   ]);
   if (!results[0]?.rows[0]) throw new Error("Only an active sprint can be closed.");
-  await audit(admin.userId, null, "sprint.closed", {
-    sprint: data.id,
-    carriedTo: data.carryTo ?? null,
-  });
   return { closed: true };
 }
 
 export async function addToSprint(data: z.infer<typeof sprintItemSchema>) {
   checkOrigin();
   const admin = await requireAdmin();
-  const { rows } = await neonExecute(
+  const q = audited(
     `insert into bugflow.sprint_items(sprint_id,bug_id,added_by)
       select $1,$2::bigint,$3 from bugflow.sprints s
       where s.id=$1 and s.state in ('planned','active')
@@ -185,24 +221,44 @@ export async function addToSprint(data: z.infer<typeof sprintItemSchema>) {
       where bugflow.sprint_items.removed_at is not null
     returning bug_id`,
     [data.sprintId, data.bugId, admin.userId],
+    {
+      actorId: admin.userId,
+      bugId: data.bugId,
+      action: "sprint.item_added",
+      detail: { sprint: data.sprintId },
+    },
   );
+  // One lock per bug serialises concurrent adds, so the "not in another open sprint" check sees the other insert.
+  const { results } = await neonExecute<{ results: { rows: Record<string, unknown>[] }[] }>([
+    {
+      query: `select pg_advisory_xact_lock(hashtextextended('bugflow.sprint_item:' || $1::text, 0))`,
+      params: [data.bugId],
+    },
+    q,
+  ]);
+  const rows = results[1]?.rows ?? [];
   if (!rows[0])
     throw new Error(
       "Could not add this bug: the sprint must be open, the bug must belong to its project, and the bug cannot already be in another open sprint.",
     );
-  await audit(admin.userId, data.bugId, "sprint.item_added", { sprint: data.sprintId });
   return { added: true };
 }
 
 export async function removeFromSprint(data: z.infer<typeof sprintItemSchema>) {
   checkOrigin();
   const admin = await requireAdmin();
-  const { rows } = await neonExecute(
+  const q = audited(
     `update bugflow.sprint_items set removed_at=now(),removed_by=$3 where sprint_id=$1 and bug_id=$2::bigint and removed_at is null returning bug_id`,
     [data.sprintId, data.bugId, admin.userId],
+    {
+      actorId: admin.userId,
+      bugId: data.bugId,
+      action: "sprint.item_removed",
+      detail: { sprint: data.sprintId },
+    },
   );
+  const { rows } = await neonExecute(q.query, q.params);
   if (!rows[0]) throw new Error("That bug is not in this sprint.");
-  await audit(admin.userId, data.bugId, "sprint.item_removed", { sprint: data.sprintId });
   return { removed: true };
 }
 
@@ -210,7 +266,7 @@ export async function removeFromSprint(data: z.infer<typeof sprintItemSchema>) {
  * The active (else newest planned) sprint of one project, with its live items. Carries NO access check of its own:
  * callers (the MCP tools) must already have verified the project is visible to their panel.
  */
-export async function activeSprint(projectId: string) {
+export async function activeSprint(projectId: string, actor?: BugActor) {
   const { rows } = await neonQuery(
     `select s.*,pr.name as project_name,to_json(s.started_at) as started_iso,to_json(s.closed_at) as closed_iso,to_json(s.created_at) as created_iso
      from bugflow.sprints s join bugflow.projects pr on pr.id=s.project_id
@@ -227,7 +283,11 @@ export async function activeSprint(projectId: string) {
     [sprint.id],
   );
   const items = itemRows.map(parseItem);
-  return { ...sprint, items, summary: summarizeSprint(items, sprint.startedAt) };
+  return {
+    ...sprint,
+    items: await visibleItems(itemRows, items, actor),
+    summary: summarizeSprint(items, sprint.startedAt),
+  };
 }
 
 /**
@@ -255,8 +315,16 @@ export async function portalSprints(access: import("./bug-workflow").BugAccess) 
      where si.sprint_id=any($1::uuid[]) and si.removed_at is null and b.deleted_at is null order by si.added_at limit 1000`,
     [ids],
   );
+  const visible = new Set(
+    (await visibleItems(itemRows, itemRows.map(parseItem), actor)).map((i) => i.bugId),
+  );
   return sprints.map((s) => {
     const items = itemRows.filter((r) => String(r["sprint_id"]) === s.id).map(parseItem);
-    return { ...s, items, summary: summarizeSprint(items, s.startedAt) };
+    // Counts cover the whole sprint; the listed items are only the bugs this panel may see.
+    return {
+      ...s,
+      items: items.filter((i) => visible.has(i.bugId)),
+      summary: summarizeSprint(items, s.startedAt),
+    };
   });
 }

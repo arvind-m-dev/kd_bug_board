@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -86,7 +86,11 @@ function useBugChange(access: BugAccess, bug: LiveBug) {
   const update = useServerFn(updateBug);
   const client = useQueryClient();
   const [busy, setBusy] = useState(false);
+  // A second Enter/click before the first save returns would reuse the same version and fail as a "conflict".
+  const inFlight = useRef(false);
   async function send(change: Partial<BugChange>, done: string) {
+    if (inFlight.current) return false;
+    inFlight.current = true;
     setBusy(true);
     try {
       await update({
@@ -111,6 +115,7 @@ function useBugChange(access: BugAccess, bug: LiveBug) {
       toast.error(actionError(e, "This change could not be saved."));
       return false;
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
