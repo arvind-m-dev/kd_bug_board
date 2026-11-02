@@ -16,6 +16,7 @@ import { addToSprintFn } from "@/lib/sprints.functions";
 import type { BacklogData, BacklogItem } from "@/lib/backlog.server";
 import {
   rankBetween,
+  compareRank,
   epicProgress,
   KIND_LABEL,
   type WorkKind,
@@ -67,7 +68,7 @@ export function BacklogView() {
       : (d.projects[0]?.id ?? "");
   const items = d.items
     .filter((i) => i.projectId === projectId)
-    .sort((a, b) => (a.rank ?? "~").localeCompare(b.rank ?? "~") || Number(a.id) - Number(b.id));
+    .sort((a, b) => compareRank(a.rank, b.rank) || Number(a.id) - Number(b.id));
   const epics = items.filter((i) => i.kind === "epic");
   const sprints = d.openSprints.filter((s) => s.projectId === projectId);
 
