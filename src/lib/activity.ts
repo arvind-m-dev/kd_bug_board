@@ -213,3 +213,39 @@ export function changeText(row: ActivityRow) {
   const text = parts.join(" · ");
   return text.length > 160 ? `${text.slice(0, 157)}…` : text;
 }
+
+/** What someone did to a bug, as Overview's "Recent activity" says it ("Arvind attached a file"). */
+const CHANGE_VERBS: Record<string, string> = {
+  "bug.created": "reported a bug",
+  "bug.sample_created": "added a sample bug",
+  "bug.status": "changed the status",
+  "bug.priority": "changed the priority",
+  "bug.severity": "changed the severity",
+  "bug.assign": "assigned the bug",
+  "bug.verify": "verified a fix",
+  "bug.comment": "commented",
+  "bug.edited": "edited the details",
+  "bug.deleted": "moved the bug to Trash",
+  "bug.restored": "restored the bug",
+  "bug.media_added": "attached a file",
+  "bug.media_deleted": "removed a file",
+  "bug.media_restored": "restored a file",
+  "bug.media_purged": "deleted a file forever",
+  "bug.media_renamed": "renamed a file",
+  "bug.media_marked": "marked up a recording",
+  "bug.media_cleared": "cleared old files",
+  "sprint.item_added": "added it to a sprint",
+  "sprint.item_removed": "removed it from a sprint",
+  "backlog.created": "created the item",
+  "backlog.updated": "updated the item",
+  "backlog.ranked": "re-ranked the item",
+};
+export function changeVerb(action: string) {
+  return (
+    CHANGE_VERBS[action] ??
+    action
+      .replace(/^[a-z]+\./, "")
+      .replaceAll("_", " ")
+      .toLowerCase()
+  );
+}

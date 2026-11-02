@@ -38,6 +38,7 @@ import { MemberProfile } from "./member-profile";
 import { PeriodPicker } from "./period-picker";
 import { Presence } from "./presence";
 import { getOverviewStats } from "@/lib/overview.functions";
+import { changeVerb } from "@/lib/activity";
 import { periodLabel as describePeriod, viewerTimeZone, type Period } from "@/lib/period";
 
 const admin: BugAccess = { kind: "admin" };
@@ -115,18 +116,6 @@ function ago(at: string) {
   if (h < 24) return `${h}h`;
   return `${Math.round(h / 24)}d`;
 }
-const VERBS: Record<string, string> = {
-  "bug.created": "reported a bug",
-  "bug.sample_created": "added a sample bug",
-  "bug.status": "changed the status",
-  "bug.priority": "changed the priority",
-  "bug.severity": "changed the severity",
-  "bug.assign": "assigned the bug",
-  "bug.verify": "verified a fix",
-  "bug.comment": "commented",
-  "bug.edited": "edited the details",
-};
-const changeVerb = (action: string) => VERBS[action] ?? label(action.replace(/^bug\./, ""));
 const PRIORITY_RANK = (p: string) => {
   const i = PRIORITIES.indexOf(p as never);
   return i < 0 ? 9 : i;
