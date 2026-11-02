@@ -40,6 +40,16 @@ export function wouldCycle(
 
 const DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
 /**
+ * Backlog order, matching the server's `backlog_rank nulls last`: plain code-unit comparison (localeCompare would
+ * sort punctuation and case differently), unranked items after every ranked one.
+ */
+export function compareRank(a: string | null, b: string | null): number {
+  if (a === b) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return a < b ? -1 : 1;
+}
+/**
  * A rank string strictly between two neighbours (either side may be open), so a reorder writes exactly one row.
  * Lexicographic midpoint in base 36; adjacent ranks grow one character instead of renumbering the list.
  */

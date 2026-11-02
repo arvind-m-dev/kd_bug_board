@@ -4,6 +4,7 @@ import {
   validParent,
   wouldCycle,
   rankBetween,
+  compareRank,
   epicProgress,
 } from "@/lib/backlog";
 
@@ -65,6 +66,18 @@ describe("rankBetween", () => {
     const second = rankBetween(first, null);
     const between = rankBetween(first, second);
     expect([first, between, second]).toEqual([first, between, second].slice().sort());
+  });
+});
+
+describe("compareRank", () => {
+  it("puts unranked items after ranked ones, like the server's nulls last", () => {
+    const ranks = [null, "i", "9", null, "z", "i0"];
+    expect(ranks.slice().sort(compareRank)).toEqual(["9", "i", "i0", "z", null, null]);
+  });
+  it("agrees with rankBetween's ordering", () => {
+    const top = rankBetween(null, "i");
+    expect(compareRank(top, "i")).toBe(-1);
+    expect(compareRank("i", rankBetween("i", null))).toBe(-1);
   });
 });
 
