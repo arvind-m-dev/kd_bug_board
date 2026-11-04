@@ -26,6 +26,11 @@ export const getBugExport = createServerFn({ method: "POST" })
         access: clientAccessSchema,
         projectId: z.string().uuid().nullable().default(null),
         includeClosed: z.boolean().default(true),
+        ids: z
+          .array(z.string().regex(/^[1-9]\d{0,17}$/))
+          .max(2000)
+          .nullable()
+          .default(null),
       })
       .strict()
       .parse(v),
@@ -34,7 +39,11 @@ export const getBugExport = createServerFn({ method: "POST" })
     const s = await import("./bug-workflow.server");
     const a = await import("./portal-access.server");
     return a.databaseCall(() =>
-      s.exportBugs(data.access, { projectId: data.projectId, includeClosed: data.includeClosed }),
+      s.exportBugs(data.access, {
+        projectId: data.projectId,
+        includeClosed: data.includeClosed,
+        ids: data.ids,
+      }),
     );
   });
 export const createBug = createServerFn({ method: "POST" })

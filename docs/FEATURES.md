@@ -85,6 +85,6 @@ Status key: **Implemented** = code present with unit tests or verified per `road
 | Phase 2.5 In-app user guide | Implemented | public `/guide` (static, no data); linked from Help dialogs |
 | Browser smoke suite (Playwright) | Implemented | `npm run test:e2e` (`e2e/smoke.spec.ts`): signed-out surface, no-leak check, guide, demo-sign-in sweep with screenshots |
 | Phase 3 (burndown, SLA, alerts, releases, GitHub/GitLab, AI triage, phone capture, feedback widget, SSO/MFA) | Planned | same plan, Phase 3 section |
-| Jira sync / import | Not planned | Decision D1, 2026-10-28 |
+| Jira CSV export (for Jira's CSV importer) | Done | 2026-11-04 · `src/lib/jira-csv.ts`; live Jira sync ("Send to Jira") discussed, not started |
 
 Source: 2026-10-22 media/theme brief (remaining items) and `roadmap.md`. New feature requests should be added here as **Planned** before implementation.

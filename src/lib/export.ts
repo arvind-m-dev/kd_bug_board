@@ -18,11 +18,17 @@ export function toCsv(headers: string[], rows: (string | number | null | undefin
   return [headers, ...rows].map((r) => r.map(cell).join(",")).join("\r\n");
 }
 
-/** Saves text as a file from the browser; the BOM makes Excel read UTF-8 (names with accents) correctly. */
-export function downloadText(filename: string, text: string, type = "text/csv;charset=utf-8") {
-  const url = URL.createObjectURL(
-    new Blob([type.startsWith("text/csv") ? `\uFEFF${text}` : text], { type }),
-  );
+/**
+ * Saves text as a file from the browser; the BOM makes Excel read UTF-8 (names with accents) correctly. Pass
+ * `bom: false` for files meant for importers (Jira) that would read the BOM into the first column name.
+ */
+export function downloadText(
+  filename: string,
+  text: string,
+  type = "text/csv;charset=utf-8",
+  { bom = type.startsWith("text/csv") }: { bom?: boolean } = {},
+) {
+  const url = URL.createObjectURL(new Blob([bom ? `\uFEFF${text}` : text], { type }));
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
