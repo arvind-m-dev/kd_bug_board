@@ -2,7 +2,7 @@ import { useState } from "react";
 import { shareOrigin } from "@/lib/share-origin";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { FileSpreadsheet, LoaderCircle } from "lucide-react";
+import { FileSpreadsheet, FileText, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,6 +11,7 @@ import { ErrorNotice, actionError } from "./action-feedback";
 import { getBugExport, getBugWorkspace } from "@/lib/bug-workflow.functions";
 import { sheetFileName } from "@/lib/bug-sheet";
 import type { BugAccess, BugWorkspaceData } from "@/lib/bug-workflow";
+import { JiraImportSteps, downloadJiraCsv } from "./jira-export";
 
 /**
  * Download the bugs you can see as an .xlsx in the team's sheet layout: columns A–M as the shared sheet has them,
@@ -28,6 +29,8 @@ export function BugSheetExport({
   const fetch = useServerFn(getBugExport);
   const [projectId, setProjectId] = useState("all");
   const [includeClosed, setIncludeClosed] = useState(true);
+  // Excel keeps the team's sheet layout; Jira CSV is for Jira's CSV importer.
+  const [format, setFormat] = useState<"xlsx" | "jira">("xlsx");
   const [busy, setBusy] = useState(false);
   async function run() {
     setBusy(true);
@@ -39,6 +42,15 @@ export function BugSheetExport({
         toast.info("Nothing to export with these choices.");
         return;
       }
+      const projectName =
+        projectId === "all"
+          ? null
+          : (workspace.projects.find((p) => p.id === projectId)?.name ?? null);
+      if (format === "jira") {
+        downloadJiraCsv(bugs, projectName);
+        close();
+        return;
+      }
       const { buildBugSheet, downloadBlob } = await import("@/lib/bug-sheet-client");
       const people = [...new Set(workspace.developers.map((d) => d.name))];
       const blob = await buildBugSheet(
@@ -46,11 +58,7 @@ export function BugSheetExport({
         { categories: workspace.options.modules, builds: workspace.options.environments, people },
         shareOrigin(),
       );
-      const project =
-        projectId === "all"
-          ? null
-          : (workspace.projects.find((p) => p.id === projectId)?.name ?? null);
-      downloadBlob(blob, sheetFileName(project));
+      downloadBlob(blob, sheetFileName(projectName));
       toast.success(`${bugs.length} ${bugs.length === 1 ? "bug" : "bugs"} exported`, {
         description: "Opens in Excel, Google Sheets or Numbers with colours, dropdowns and links.",
       });
@@ -63,6 +71,31 @@ export function BugSheetExport({
   }
   return (
     <div className="grid gap-4">
+      <div className="grid gap-1 text-sm" role="group" aria-label="File type">
+        <span className="text-xs font-semibold">File type</span>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={format === "xlsx" ? "default" : "outline"}
+            aria-pressed={format === "xlsx"}
+            onClick={() => setFormat("xlsx")}
+          >
+            <FileSpreadsheet />
+            Excel (team sheet)
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={format === "jira" ? "default" : "outline"}
+            aria-pressed={format === "jira"}
+            onClick={() => setFormat("jira")}
+          >
+            <FileText />
+            Jira CSV
+          </Button>
+        </div>
+      </div>
       <div className="grid gap-1 text-sm">
         <span className="text-xs font-semibold">Project</span>
         <ThemedSelect
@@ -79,19 +112,30 @@ export function BugSheetExport({
         <Checkbox checked={includeClosed} onCheckedChange={(v) => setIncludeClosed(v === true)} />
         Include resolved and closed bugs
       </label>
-      <p className="text-xs text-muted-foreground">
-        Columns A to M match the team's bug sheet (ticket, Web/Mobile, category, build, date,
-        status, priority, assigned to, issue, steps, media, dev and QA comments). Severity,
-        reporter, project, expected and actual results, device, fix notes, last update and a link to
-        open the bug follow after. Bugs are grouped under a green band per day, like the shared
-        sheet.
-      </p>
+      {format === "jira" ? (
+        <JiraImportSteps admin={access.kind === "admin"} />
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Columns A to M match the team's bug sheet (ticket, Web/Mobile, category, build, date,
+          status, priority, assigned to, issue, steps, media, dev and QA comments). Severity,
+          reporter, project, expected and actual results, device, fix notes, last update and a link
+          to open the bug follow after. Bugs are grouped under a green band per day, like the shared
+          sheet.
+        </p>
+      )}
       <div className="flex justify-end gap-2">
         <Button variant="outline" size="sm" onClick={close} disabled={busy}>
           Cancel
         </Button>
         <Button size="sm" onClick={() => void run()} disabled={busy}>
-          {busy ? <LoaderCircle className="animate-spin" /> : <FileSpreadsheet />}Download .xlsx
+          {busy ? (
+            <LoaderCircle className="animate-spin" />
+          ) : format === "jira" ? (
+            <FileText />
+          ) : (
+            <FileSpreadsheet />
+          )}
+          {format === "jira" ? "Download Jira CSV" : "Download .xlsx"}
         </Button>
       </div>
     </div>

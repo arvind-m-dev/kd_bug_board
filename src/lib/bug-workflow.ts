@@ -209,7 +209,16 @@ export type BugActor = {
   permissions: string[];
 };
 /** A bug as exported to a spreadsheet: the live bug plus the latest comments and attachment ids. */
-export type ExportBug = LiveBug & { devComment: string; qaComment: string; mediaIds: string[] };
+export type ExportBug = LiveBug & {
+  devComment: string;
+  qaComment: string;
+  mediaIds: string[];
+  /** File names and kinds, in upload order (same files as mediaIds). */
+  media?: { id: string; name: string; kind: string }[];
+  /** Admin exports only; empty for member panels. */
+  reporterEmail?: string;
+  assigneeEmails?: string[];
+};
 export type LiveBug = {
   id: string;
   code: string;
