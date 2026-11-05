@@ -1565,7 +1565,7 @@ function BugHistory({
             const k = HISTORY_KIND[e.action] ?? {
               icon: History,
               tone: "neutral",
-              label: statusLabel(e.action.replace(/^[a-z]+\./, "")),
+              label: lastActivityLabel(e.action, statusLabel),
             };
             const Icon = k.icon;
             const moved =

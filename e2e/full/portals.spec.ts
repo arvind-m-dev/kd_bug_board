@@ -317,6 +317,61 @@ test("delete closes the portal, removes the member and keeps their bug's reporte
   }
 });
 
+test("revoke closes the link but keeps the member active; replace issues a working one", async ({
+  page,
+  browser,
+}) => {
+  const name = `${tag("portals")} revoked`;
+  await adminSignIn(page);
+  const link = await createMember(page, name, "developer");
+
+  const m = await memberPage(browser);
+  try {
+    await expectPortalOpen(m.page, link, name);
+
+    // Cancel keeps the link working.
+    await page.goto(usersPage(name));
+    await page.getByRole("button", { name: `Revoke portal link for ${name}` }).click();
+    let alert = page.getByRole("alertdialog");
+    await expect(alert.getByText("Revoke portal link?")).toBeVisible();
+    await alert.getByRole("button", { name: "Cancel" }).click();
+    await expect(alert).toBeHidden();
+    await expectPortalOpen(m.page, link, name);
+
+    // Confirm revokes: the portal closes, the member stays active and is shown as revoked.
+    await page.getByRole("button", { name: `Revoke portal link for ${name}` }).click();
+    alert = page.getByRole("alertdialog");
+    await alert.getByRole("button", { name: "Revoke link", exact: true }).click();
+    await expect(alert).toBeHidden({ timeout: 15_000 });
+    await expect(page.getByText(`Portal link for ${name} revoked`)).toBeVisible();
+    await expectUnavailable(m.page, link);
+    await page.reload();
+    const row = memberRow(page, name);
+    await expect(row.locator("td[data-label=Access]")).toContainText("Revoked / expired", {
+      timeout: 15_000,
+    });
+    await expect(row.getByRole("button", { name: `Deactivate ${name}` })).toBeVisible();
+    await expect(row.getByRole("button", { name: `Copy portal for ${name}` })).toHaveCount(0);
+
+    // Replace link gives a new, working link; the revoked one stays closed.
+    await row
+      .getByRole("button", { name: `Replace portal link for ${name}` })
+      .first()
+      .click();
+    await row
+      .getByRole("button", { name: `Confirm replacing the portal link for ${name}` })
+      .first()
+      .click();
+    await expect(page.getByText(`New link for ${name} copied`)).toBeVisible({ timeout: 15_000 });
+    const fresh = pathOf(await readClipboard(page));
+    expect(fresh).not.toBe(link);
+    await expectPortalOpen(m.page, fresh, name);
+    await expectUnavailable(m.page, link);
+  } finally {
+    await m.ctx.close();
+  }
+});
+
 test("links are distinct per member and garbled tokens show nothing", async ({ page, browser }) => {
   const a = `${tag("portals")} alpha`;
   const b = `${tag("portals")} beta`;
