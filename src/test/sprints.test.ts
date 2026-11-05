@@ -4,6 +4,7 @@ import {
   canChangeSprintState,
   summarizeSprint,
   carryCandidates,
+  createSprintSchema,
   type SprintItem,
 } from "@/lib/sprints";
 
@@ -80,5 +81,22 @@ describe("carryCandidates", () => {
       item({ bugId: "3", status: "NEW", removedAt: "2026-10-09T00:00:00.000Z" }),
     ];
     expect(carryCandidates(items).map((i) => i.bugId)).toEqual(["1"]);
+  });
+});
+
+describe("sprint dates", () => {
+  const base = { projectId: "550e8400-e29b-41d4-a716-446655440001", name: "S1" };
+  it("refuses an end date before the start date", () => {
+    expect(
+      createSprintSchema.safeParse({ ...base, startsOn: "2026-11-20", endsOn: "2026-11-10" })
+        .success,
+    ).toBe(false);
+    expect(
+      createSprintSchema.safeParse({ ...base, startsOn: "2026-11-10", endsOn: "2026-11-10" })
+        .success,
+    ).toBe(true);
+  });
+  it("a parsed sprint parses again", () => {
+    expect(createSprintSchema.safeParse(createSprintSchema.parse(base)).success).toBe(true);
   });
 });

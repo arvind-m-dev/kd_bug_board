@@ -39,23 +39,37 @@ test("a bad portal link shows no bug data", async ({ page }) => {
 });
 
 /**
- * Signed-in sweep: signs in with the real Admin credentials from .env.local (loaded by the config; never written
- * into this file). Self-skips when they are not configured.
+ * Signed-in sweep: uses the one-click demo login ("Login without credentials", shown only when the server runs with
+ * BUGFLOW_DEMO_LOGIN=1). The password never enters the test process. Self-skips when demo login is off.
  */
 async function adminSignIn(page: Page): Promise<boolean> {
-  const email = process.env["BUGFLOW_ADMIN_EMAIL"];
-  const password = process.env["BUGFLOW_ADMIN_PASSWORD"];
-  if (!email || !password) return false;
   await page.goto("/login");
-  await page.locator("input[type=email]").fill(email);
-  await page.locator("input[type=password]").fill(password);
-  await page.getByRole("button", { name: /sign in/i }).click();
+  const demo = page.getByRole("button", { name: /login without credentials/i });
+  const shown = await demo.waitFor({ state: "visible", timeout: 10_000 }).then(
+    () => true,
+    () => false,
+  );
+  if (!shown) return false;
+  await demo.click();
   await page.waitForURL(/\/admin/, { timeout: 15_000 });
   return true;
 }
 
+test("demo login button is hidden behind the server flag", async ({ page }) => {
+  await page.goto("/login");
+  await expect(page.locator("input[type=password]")).toBeVisible();
+  const shown = await page
+    .getByRole("button", { name: /login without credentials/i })
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(
+      () => true,
+      () => false,
+    );
+  expect(shown).toBe(process.env["BUGFLOW_DEMO_LOGIN"] === "1");
+});
+
 test("admin overview, sprints and board render (signed in)", async ({ page }) => {
-  test.skip(!(await adminSignIn(page)), "admin credentials not configured");
+  test.skip(!(await adminSignIn(page)), "demo login is off (BUGFLOW_DEMO_LOGIN!=1)");
   await expect(page.getByRole("heading", { name: /needs your attention/i })).toBeVisible({
     timeout: 15_000,
   });

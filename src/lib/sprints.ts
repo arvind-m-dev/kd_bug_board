@@ -73,21 +73,30 @@ export function carryCandidates(items: SprintItem[]): SprintItem[] {
   return items.filter((i) => !i.removedAt && !CLOSED_STATUSES.includes(i.status));
 }
 
+/** Plain calendar date or empty; null is accepted so an already-parsed value validates again. */
+const optionalDate = () =>
+  z
+    .union([z.literal(""), z.null(), z.string().refine(isCalendarDate, "Enter a valid date.")])
+    .default("")
+    .transform((v) => v || null);
+/** ISO dates compare as strings, so this needs no Date parsing. */
+const datesInOrder = (v: { startsOn: string | null; endsOn: string | null }) =>
+  !v.startsOn || !v.endsOn || v.endsOn >= v.startsOn;
+const DATE_ORDER = {
+  message: "The end date must be on or after the start date.",
+  path: ["endsOn"],
+};
+
 export const createSprintSchema = z
   .object({
     projectId: z.string().uuid(),
     name: z.string().trim().min(1, "Name the sprint.").max(120),
     goal: z.string().trim().max(2000).default(""),
-    startsOn: z
-      .union([z.literal(""), z.string().refine(isCalendarDate, "Enter a valid date.")])
-      .default("")
-      .transform((v) => v || null),
-    endsOn: z
-      .union([z.literal(""), z.string().refine(isCalendarDate, "Enter a valid date.")])
-      .default("")
-      .transform((v) => v || null),
+    startsOn: optionalDate(),
+    endsOn: optionalDate(),
   })
-  .strict();
+  .strict()
+  .refine(datesInOrder, DATE_ORDER);
 export type CreateSprint = z.infer<typeof createSprintSchema>;
 
 export const updateSprintSchema = z
@@ -95,16 +104,11 @@ export const updateSprintSchema = z
     id: z.string().uuid(),
     name: z.string().trim().min(1).max(120),
     goal: z.string().trim().max(2000).default(""),
-    startsOn: z
-      .union([z.literal(""), z.string().refine(isCalendarDate, "Enter a valid date.")])
-      .default("")
-      .transform((v) => v || null),
-    endsOn: z
-      .union([z.literal(""), z.string().refine(isCalendarDate, "Enter a valid date.")])
-      .default("")
-      .transform((v) => v || null),
+    startsOn: optionalDate(),
+    endsOn: optionalDate(),
   })
-  .strict();
+  .strict()
+  .refine(datesInOrder, DATE_ORDER);
 
 export const sprintActionSchema = z
   .object({

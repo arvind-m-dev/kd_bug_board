@@ -79,3 +79,12 @@ describe("dropAction", () => {
     expect(dropAction(admin, bug("VALIDATED"), "assigned")).toBeNull();
   });
 });
+
+describe("asking for information from the board", () => {
+  it("opens the bug for a note instead of silently setting Needs information", () => {
+    expect(dropAction(actor(), bug("IN_PROGRESS"), "todo")).toEqual({
+      kind: "open",
+      reason: "Say what information is needed.",
+    });
+  });
+});

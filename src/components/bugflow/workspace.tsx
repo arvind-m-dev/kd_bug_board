@@ -1,3 +1,4 @@
+import { statusLabel } from "@/lib/format";
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { useHighlight } from "@/hooks/use-highlight";
@@ -994,6 +995,7 @@ function SettingsNav({ current }: { current: string }) {
         <Link
           key={t.view}
           to={t.to}
+          activeOptions={{ exact: true }}
           className="bf-settings-tab"
           data-active={t.view === current ? "" : undefined}
           data-highlight={"highlight" in t && t.highlight ? "" : undefined}
@@ -1331,9 +1333,7 @@ function QuickSearch({ close }: { close: () => void }) {
                 {b.code}
               </span>
               <span className="min-w-0 flex-1 truncate text-left">{b.title}</span>
-              <span className="bf-status-pill shrink-0">
-                {b.status.toLowerCase().replaceAll("_", " ")}
-              </span>
+              <span className="bf-status-pill shrink-0">{statusLabel(b.status)}</span>
             </Button>
           ))}
           {memberHits.map((m) => (

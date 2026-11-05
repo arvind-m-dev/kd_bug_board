@@ -1031,6 +1031,7 @@ html[data-skin=glass]:not([data-radius=sharp]) .bf-eye { border-radius: 12px; }
 /* ───────────── Colourful dialogs: bug details and raise a bug ───────────── */
 [data-tone=danger] { --t: var(--destructive); }
 .bf-rc-card { --t: var(--primary); display: grid; gap: 10px; padding: 14px 16px; border-radius: 12px; border: 1px solid color-mix(in oklab, var(--t) 22%, var(--border)); border-left: 3px solid var(--t); background: color-mix(in oklab, var(--t) 6%, var(--card)); }
+.bf-rc-card { min-width: 0; overflow-wrap: anywhere; } /* long unbroken text (URLs, logs) wraps inside the card */
 .bf-rc-card[data-tone=teal] { --t: var(--primary); } .bf-rc-card[data-tone=violet] { --t: var(--violet); } .bf-rc-card[data-tone=success] { --t: var(--success); } .bf-rc-card[data-tone=danger] { --t: var(--destructive); } .bf-rc-card[data-tone=info] { --t: var(--info); }
 .bf-rc-icon { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; color: var(--t); background: color-mix(in oklab, var(--t) 16%, transparent); }
 .bf-rc-card .bf-section-title svg { color: inherit; }
@@ -1980,3 +1981,8 @@ html[data-density=compact] .bf-settings-tabs { top: 52px; }
 .bf-role-tag[data-role=qa] { color: oklch(.66 .15 155); background: color-mix(in oklab, oklch(.66 .15 155) 16%, transparent); }
 .bf-role-tag[data-role=reporter] { color: oklch(.7 .14 70); background: color-mix(in oklab, oklch(.7 .14 70) 16%, transparent); }
 .bf-role-more { flex-shrink: 0; font-size: 11px; font-weight: 600; color: var(--muted-foreground); }
+/* Backlog on phones: the row wraps so estimate, ready and sprint controls drop under the title instead of clipping. */
+@media (max-width: 640px) {
+  .bf-backlog-row { flex-wrap: wrap; row-gap: 6px; }
+  .bf-backlog-title { flex-basis: calc(100% - 90px); }
+}

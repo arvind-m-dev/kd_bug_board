@@ -13,7 +13,19 @@ import {
 
 export function actionError(cause: unknown, fallback: string) {
   if (!(cause instanceof Error)) return fallback;
-  const message = cause.message;
+  let message = cause.message;
+  // A server-side validation failure arrives as the Zod issue list in JSON; show its first readable message.
+  if (message?.trimStart().startsWith("[")) {
+    try {
+      const issues = JSON.parse(message) as { message?: unknown }[];
+      const first = Array.isArray(issues) ? issues[0]?.message : undefined;
+      if (typeof first !== "string" || !first || /^(invalid input|expected|required)/i.test(first))
+        return fallback;
+      message = first;
+    } catch {
+      return fallback;
+    }
+  }
   if (
     !message ||
     message.length > 300 ||

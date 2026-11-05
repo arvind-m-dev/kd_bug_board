@@ -86,12 +86,13 @@ const reportFields = z
     evidenceUrls: z.array(evidenceUrlSchema).max(10).default([]),
     // The bug-ID prefix, from the Admin-managed list; empty means the workspace default (the list's first entry).
     codePrefix: z
-      .union([z.literal(""), z.string().trim().toUpperCase().regex(CODE_PREFIX_RE)])
+      // null is accepted so an already-parsed report (form → server re-parse) validates again.
+      .union([z.literal(""), z.null(), z.string().trim().toUpperCase().regex(CODE_PREFIX_RE)])
       .default("")
       .transform((v) => v || null),
     // Plain calendar date or empty (cleared). Permission to actually set it is checked on the server (maySetDue).
     dueOn: z
-      .union([z.literal(""), z.string().refine(isCalendarDate, "Enter a valid date.")])
+      .union([z.literal(""), z.null(), z.string().refine(isCalendarDate, "Enter a valid date.")])
       .default("")
       .transform((v) => v || null),
   })
@@ -300,7 +301,14 @@ export function mayUpdateStatus(
   )
     return true;
   if (actor.role === "admin") return canTransition("admin", bug.status, to);
-  if (actor.role === "qa" && actor.permissions.includes("validate"))
+  // QA triages and closes, but development steps (start work, send for retest) belong to the assignee, so one QA
+  // member cannot carry a bug from triage to Resolved alone.
+  if (
+    actor.role === "qa" &&
+    actor.permissions.includes("validate") &&
+    to !== "IN_PROGRESS" &&
+    to !== "RECHECK"
+  )
     return canTransition("qa", bug.status, to);
   if (bug.assigneeId !== actor.userId) return false;
   if (["NOT_A_BUG", "DUPLICATE", "WONT_FIX"].includes(to))
@@ -344,12 +352,16 @@ export function allowedStatuses(
 ) {
   return STATUSES.filter((to) => mayUpdateStatus(actor, bug, to));
 }
-/** Pass/fail a QA retest: authorized QA or Admin, never the person who made the fix. */
-export function mayVerify(actor: BugActor, bug: { status: Status; assigneeId: string | null }) {
+/** Pass/fail a QA retest: authorized QA or Admin, never anyone assigned to the fix (primary or co-assignee). */
+export function mayVerify(
+  actor: BugActor,
+  bug: { status: Status; assigneeId: string | null; assignees?: { id: string }[] | undefined },
+) {
   return (
     (actor.role === "admin" || (actor.role === "qa" && actor.permissions.includes("verify"))) &&
     bug.status === "RECHECK" &&
-    bug.assigneeId !== actor.userId
+    bug.assigneeId !== actor.userId &&
+    !(actor.role !== "admin" && bug.assignees?.some((a) => a.id === actor.userId))
   );
 }
 /** What an assignee is asked to do; part of the assignment message everyone sees on the bug. */

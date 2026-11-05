@@ -6,11 +6,18 @@ const failures = new Map<string, number[]>();
 
 export const TOO_MANY_ATTEMPTS = "Too many sign-in attempts. Wait 15 minutes and try again.";
 
-/** The client address as the hosting proxy reports it (Vercel sets x-real-ip / x-forwarded-for). */
-export function clientKey(headers: Headers) {
-  const ip =
-    headers.get("x-real-ip") ?? headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "";
-  return (ip || "unknown").slice(0, 64);
+/**
+ * The client address for throttling. Proxy headers are trusted only on Vercel, whose edge overwrites x-real-ip and
+ * x-forwarded-for; anywhere else a client could send them to dodge the limit, so the socket address (srvx `ip`) is
+ * used instead. Never collapses to one shared key that would lock everyone out.
+ */
+export function clientKey(request: Request, onVercel = Boolean(process.env["VERCEL"])) {
+  const headers = request.headers;
+  const proxied = onVercel
+    ? (headers.get("x-real-ip") ?? headers.get("x-forwarded-for")?.split(",")[0]?.trim())
+    : undefined;
+  const socket = (request as Request & { ip?: string }).ip;
+  return (proxied || socket || "local").slice(0, 64);
 }
 function recent(key: string, now = Date.now()) {
   const list = (failures.get(key) ?? []).filter((t) => now - t < WINDOW_MS);

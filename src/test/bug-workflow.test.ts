@@ -7,6 +7,7 @@ import {
   maySeeBug,
   formatBugCode,
   reportSchema,
+  editSchema,
   NOTES_REQUIRED,
   type BugActor,
 } from "@/lib/bug-workflow";
@@ -334,5 +335,55 @@ describe("admin QA retest", () => {
     expect(mayVerify(admin, { status: "RECHECK", assigneeId: "dev" })).toBe(true);
     expect(mayVerify(admin, { status: "RECHECK", assigneeId: "admin" })).toBe(false);
     expect(mayVerify(admin, { status: "IN_PROGRESS", assigneeId: "dev" })).toBe(false);
+  });
+});
+
+describe("form → server double parse", () => {
+  // The form validates in the browser and sends parsed output; the server function parses it again.
+  const raw = {
+    requestId: "550e8400-e29b-41d4-a716-446655440000",
+    projectId: "550e8400-e29b-41d4-a716-446655440001",
+    description: "Save fails",
+    steps: ["Click save"],
+    codePrefix: "",
+    dueOn: "",
+  };
+  it("a parsed report parses again (no prefix, no due date)", () => {
+    const once = reportSchema.parse(raw);
+    expect(once.codePrefix).toBeNull();
+    expect(reportSchema.safeParse(once).success).toBe(true);
+  });
+  it("a parsed edit parses again", () => {
+    const { requestId: _r, projectId: _p, ...rest } = reportSchema.parse(raw);
+    const once = editSchema.parse({ ...rest, id: "7", version: "v1" });
+    expect(editSchema.safeParse(once).success).toBe(true);
+  });
+});
+
+describe("QA cannot carry a bug alone", () => {
+  const qa = actor("qa", ["validate", "verify"], "qa1");
+  it("QA cannot start work or send for retest unless assigned", () => {
+    const b = { status: "ASSIGNED" as const, reporterId: "r", assigneeId: "dev" };
+    expect(mayUpdateStatus(qa, b, "IN_PROGRESS")).toBe(false);
+    expect(mayUpdateStatus(qa, { ...b, status: "IN_PROGRESS" }, "RECHECK")).toBe(false);
+  });
+  it("a co-assigned QA cannot verify the fix", () => {
+    const b = {
+      status: "RECHECK" as const,
+      assigneeId: "dev",
+      assignees: [{ id: "dev" }, { id: "qa1" }],
+    };
+    expect(mayVerify(qa, b)).toBe(false);
+    expect(mayVerify(qa, { ...b, assignees: [{ id: "dev" }] })).toBe(true);
+  });
+});
+
+describe("developer asks for more information", () => {
+  const dev = actor("developer", ["progress"], "dev");
+  it("an assigned developer can pause for info and resume", () => {
+    const b = { status: "IN_PROGRESS" as const, reporterId: "r", assigneeId: "dev" };
+    expect(mayUpdateStatus(dev, b, "NEEDS_INFORMATION")).toBe(true);
+    expect(mayUpdateStatus(dev, { ...b, status: "NEEDS_INFORMATION" }, "IN_PROGRESS")).toBe(true);
+    expect(mayUpdateStatus(dev, { ...b, assigneeId: "other" }, "NEEDS_INFORMATION")).toBe(false);
   });
 });

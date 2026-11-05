@@ -41,9 +41,12 @@ async function directFetch(
 ): Promise<NeonResponse> {
   const started = Date.now();
   try {
-    const { neon, neonConfig } = await import("@neondatabase/serverless");
+    const { neon, neonConfig, types } = await import("@neondatabase/serverless");
     if (process.env["DATABASE_DOH"] === "1" && !neonConfig.fetchFunction)
       neonConfig.fetchFunction = (await import("./dev-dns.server")).dohFetch;
+    // Keep plain DATE columns (due_on, sprint dates) as "YYYY-MM-DD": the default parser makes a local-midnight
+    // Date, which JSON turns into the previous day's UTC timestamp on any server east of UTC.
+    types.setTypeParser(1082, (v: string) => v);
     const sql = neon(url, { fullResults: true });
     const result = body.queries
       ? {

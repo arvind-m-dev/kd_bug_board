@@ -345,6 +345,20 @@ export async function prepareFile(
         error: e instanceof Error ? e.message : "The file could not be prepared.",
       };
   }
+  // Some browsers' encoders ignore the target bitrate; a "smaller" copy that came out bigger is discarded and the
+  // original (faststarted) recording is kept when it fits the limit.
+  if (
+    heavy &&
+    mediaKind(type) === "video" &&
+    r.blob.size >= file.size &&
+    file.size <= maxBytesFor(type)
+  )
+    r = {
+      blob: type === "video/mp4" ? await faststartBlob(file, type) : new Blob([file], { type }),
+      contentType: type,
+      width: null,
+      height: null,
+    };
   if (r.blob.size > maxBytesFor(r.contentType))
     return {
       ok: false,

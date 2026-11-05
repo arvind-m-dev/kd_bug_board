@@ -18,11 +18,17 @@ describe("Admin sign-in attempt limit", () => {
     clearSignInFailures("203.0.113.9");
     expect(() => assertSignInAllowed("203.0.113.9")).not.toThrow();
   });
-  it("keys on the proxy-reported client address", () => {
-    expect(clientKey(new Headers({ "x-real-ip": "203.0.113.9" }))).toBe("203.0.113.9");
-    expect(clientKey(new Headers({ "x-forwarded-for": "198.51.100.4, 10.0.0.1" }))).toBe(
+  it("trusts proxy headers only on Vercel; elsewhere keys on the socket address", () => {
+    const req = (headers: Record<string, string>, ip?: string) =>
+      Object.assign(new Request("http://x/", { headers }), ip ? { ip } : {});
+    expect(clientKey(req({ "x-real-ip": "203.0.113.9" }), true)).toBe("203.0.113.9");
+    expect(clientKey(req({ "x-forwarded-for": "198.51.100.4, 10.0.0.1" }), true)).toBe(
       "198.51.100.4",
     );
-    expect(clientKey(new Headers())).toBe("unknown");
+    // Off Vercel a spoofed header must not change the key.
+    expect(clientKey(req({ "x-forwarded-for": "198.51.100.8" }, "127.0.0.1"), false)).toBe(
+      "127.0.0.1",
+    );
+    expect(clientKey(req({}), false)).toBe("local");
   });
 });

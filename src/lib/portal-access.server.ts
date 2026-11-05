@@ -100,7 +100,7 @@ export async function unlockAdmin(data: z.infer<typeof unlockSchema>) {
   const password = process.env["BUGFLOW_ADMIN_PASSWORD"];
   const email = process.env["BUGFLOW_ADMIN_EMAIL"];
   if (!password || !email) throw new Error("Admin sign-in is not configured.");
-  const attempt = clientKey(getRequest().headers);
+  const attempt = clientKey(getRequest());
   beginSignInAttempt(attempt);
   const passwordValid = await equalSecret(data.password, password);
   const emailValid = await equalSecret(data.email.toLowerCase(), email.toLowerCase());

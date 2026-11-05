@@ -172,7 +172,7 @@ export function BugReportForm({
               <input type="hidden" name="projectId" value={projects[0]?.id ?? ""} />
             ) : (
               <label className="bf-field">
-                Project
+                Project <span className="bf-req">Required</span>
                 <select name="projectId" aria-label="Project" className="bf-select" required>
                   <option value="">Choose project</option>
                   {projects.map((p) => (

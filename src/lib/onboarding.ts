@@ -54,7 +54,7 @@ export const collaboratorSchema = z
           "plan",
         ]),
       )
-      .max(11),
+      .max(12),
   })
   .strict()
   .superRefine((value, ctx) => {
