@@ -15,6 +15,7 @@ import {
   Trash2,
   Check,
   KeyRound,
+  Link2Off,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +36,11 @@ import { refreshPeople } from "@/lib/refresh-people";
 import { Presence } from "./presence";
 import { SkeletonRows } from "./loading";
 const PAGE = 10;
-type Pending = { id: string; name: string; action: "deactivate" | "activate" | "delete" };
+type Pending = {
+  id: string;
+  name: string;
+  action: "deactivate" | "activate" | "delete" | "revoke";
+};
 const copyText: Record<Pending["action"], { title: string; desc: string; label: string }> = {
   deactivate: {
     title: "Deactivate member?",
@@ -46,6 +51,11 @@ const copyText: Record<Pending["action"], { title: string; desc: string; label: 
     title: "Activate member?",
     desc: "Their private portal link works again.",
     label: "Activate",
+  },
+  revoke: {
+    title: "Revoke portal link?",
+    desc: "The current link stops working immediately, along with AI connections made from it. The member stays active; use Replace link to give them a new one.",
+    label: "Revoke link",
   },
   delete: {
     title: "Delete member?",
@@ -75,6 +85,7 @@ export function MemberPortals({ initialSearch = "" }: { initialSearch?: string }
   // Page index in the URL (?page=) so a refresh keeps the same page of the member table.
   const [page, setPage] = useUrlNumber("page");
   const [pending, setPending] = useState<Pending | null>(null);
+  const portal = useServerFn(manageMemberPortal);
   const rows = (members.data ?? []).filter(
     (m) =>
       (role === "all" || m.role === role) &&
@@ -141,13 +152,17 @@ export function MemberPortals({ initialSearch = "" }: { initialSearch?: string }
         pending.action === "delete"
           ? before.filter((m) => m.id !== pending.id)
           : before.map((m) =>
-              m.id === pending.id
-                ? { ...m, userActive: on, active: on, online: on && m.online }
-                : m,
+              m.id !== pending.id
+                ? m
+                : pending.action === "revoke"
+                  ? { ...m, active: false, online: false }
+                  : { ...m, userActive: on, active: on, online: on && m.online },
             ),
       );
     try {
-      await change({ data: { id: pending.id, action: pending.action } });
+      if (pending.action === "revoke")
+        await portal({ data: { id: pending.id, regenerate: false } });
+      else await change({ data: { id: pending.id, action: pending.action } });
     } catch (e) {
       if (before) client.setQueryData(["members"], before);
       throw e;
@@ -156,9 +171,11 @@ export function MemberPortals({ initialSearch = "" }: { initialSearch?: string }
     toast.success(
       pending.action === "delete"
         ? `${pending.name} deleted`
-        : pending.action === "activate"
-          ? `${pending.name} activated`
-          : `${pending.name} deactivated`,
+        : pending.action === "revoke"
+          ? `Portal link for ${pending.name} revoked`
+          : pending.action === "activate"
+            ? `${pending.name} activated`
+            : `${pending.name} deactivated`,
     );
   }
   const filter = (fn: (v: string) => void) => (v: string) => {
@@ -294,6 +311,17 @@ export function MemberPortals({ initialSearch = "" }: { initialSearch?: string }
                           <Copy size={13} />
                           Copy
                         </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          title="Revoke link — it stops working; the member stays active"
+                          onClick={() => setPending({ id: m.id, name: m.name, action: "revoke" })}
+                          aria-label={`Revoke portal link for ${m.name}`}
+                        >
+                          <Link2Off size={13} className="text-warning" />
+                          Revoke
+                        </Button>
                       </>
                     ) : m.userActive ? (
                       <ReplaceLinkButton id={m.id} name={m.name} label />
@@ -403,7 +431,7 @@ export function MemberPortals({ initialSearch = "" }: { initialSearch?: string }
         description={pending ? `${pending.name}: ${copyText[pending.action].desc}` : ""}
         confirmLabel={pending ? copyText[pending.action].label : ""}
         onConfirm={confirm}
-        destructive={pending?.action === "delete"}
+        destructive={pending?.action === "delete" || pending?.action === "revoke"}
       />
       <Dialog
         open={id !== null}

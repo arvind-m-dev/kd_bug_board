@@ -111,6 +111,11 @@ export function MediaDropZone({
       );
     onFiles(files.slice(0, Math.max(0, remaining)));
   };
+  // The paste listener reads the latest `take` through a ref, so it is attached once per enable, not every render.
+  const takeRef = useRef(take);
+  useEffect(() => {
+    takeRef.current = take;
+  });
   // Paste a screenshot or file from the clipboard anywhere on the page; text pastes are left alone.
   useEffect(() => {
     if (disabled) return;
@@ -120,11 +125,11 @@ export function MediaDropZone({
       e.preventDefault();
       const dt = new DataTransfer();
       for (const f of files) dt.items.add(f);
-      take(dt.files);
+      takeRef.current(dt.files);
     };
     document.addEventListener("paste", onPaste);
     return () => document.removeEventListener("paste", onPaste);
-  }, [disabled, take]);
+  }, [disabled]);
   const editable = (u: UploadState) =>
     !!onLabel && (u.status === "preparing" || u.status === "queued" || u.status === "failed");
   return (
