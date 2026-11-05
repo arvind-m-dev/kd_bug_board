@@ -583,7 +583,13 @@ export async function deleteBugReport(id: string, reason: string) {
 /** Every bug in the actor's scope (newest first, up to 2000) with the latest developer and QA comment and the ids of its attachments — for the spreadsheet export. */
 export async function exportBugs(
   access: BugAccess,
-  filter: { projectId: string | null; includeClosed: boolean; newestFirst?: boolean },
+  filter: {
+    projectId: string | null;
+    includeClosed: boolean;
+    newestFirst?: boolean;
+    /** Only these bugs (ticked in the list); still limited to what this panel may see. */
+    ids?: string[] | null;
+  },
 ): Promise<ExportBug[]> {
   const actor = await actorFor(access);
   if (!actor.permissions.includes("view"))
@@ -593,20 +599,40 @@ export async function exportBugs(
     actor.userId,
     actor.role === "qa" || actor.permissions.includes("view_all"),
     filter.projectId,
+    filter.ids?.length ? filter.ids : null,
   ];
+  // Email addresses go only to Admin (a Jira import matches people by email); members never see teammates' emails.
+  const emails =
+    actor.role === "admin"
+      ? `,r.email as reporter_email,coalesce((select jsonb_agg(distinct ue.email) from bugflow.users ue where ue.id=b.assignee_id or ue.id in (select bx.user_id from bugflow.bug_assignees bx where bx.bug_id=b.id)),'[]'::jsonb) as assignee_emails`
+      : "";
   const closed = filter.includeClosed
     ? ""
     : " and b.status not in ('RESOLVED','DUPLICATE','NOT_A_BUG','WONT_FIX')";
   const comment = (types: string) =>
     `(select c.content from bugflow.comments c where c.bug_id=b.id and exists(select 1 from bugflow.portals px where px.user_id=c.actor_id and px.type in (${types})) order by c.created_at desc limit 1)`;
   const { rows } = await neonQuery(
-    `select ${columns},${comment("'developer'")} as dev_comment,${comment("'qa','admin'")} as qa_comment,coalesce((select jsonb_agg(m.id order by m.created_at) from bugflow.bug_media m where m.bug_id=b.id and m.status='ready' and m.deleted_at is null),'[]'::jsonb) as media_ids ${joins} where ${scope(actor)} and b.kind='bug' and ($4::uuid is null or b.project_id=$4::uuid)${closed} order by ${filter.newestFirst ? "b.created_at desc,b.id desc" : "b.created_at,b.id"} limit 2000`,
+    `select ${columns},${comment("'developer'")} as dev_comment,${comment("'qa','admin'")} as qa_comment,coalesce((select jsonb_agg(jsonb_build_object('id',m.id,'name',m.name,'kind',m.kind) order by m.created_at) from bugflow.bug_media m where m.bug_id=b.id and m.status='ready' and m.deleted_at is null),'[]'::jsonb) as media${emails} ${joins} where ${scope(actor)} and b.kind='bug' and ($4::uuid is null or b.project_id=$4::uuid) and ($5::bigint[] is null or b.id=any($5::bigint[]))${closed} order by ${filter.newestFirst ? "b.created_at desc,b.id desc" : "b.created_at,b.id"} limit 2000`,
     params,
   );
-  return rows.map((r) => ({
-    ...parseBug(r, actor.permissions.includes("evidence")),
-    devComment: r["dev_comment"] == null ? "" : String(r["dev_comment"]),
-    qaComment: r["qa_comment"] == null ? "" : String(r["qa_comment"]),
-    mediaIds: Array.isArray(r["media_ids"]) ? (r["media_ids"] as unknown[]).map(String) : [],
-  }));
+  return rows.map((r) => {
+    const media = Array.isArray(r["media"])
+      ? (r["media"] as Record<string, unknown>[]).map((m) => ({
+          id: String(m["id"]),
+          name: String(m["name"] ?? "File"),
+          kind: String(m["kind"] ?? "image"),
+        }))
+      : [];
+    return {
+      ...parseBug(r, actor.permissions.includes("evidence")),
+      devComment: r["dev_comment"] == null ? "" : String(r["dev_comment"]),
+      qaComment: r["qa_comment"] == null ? "" : String(r["qa_comment"]),
+      mediaIds: media.map((m) => m.id),
+      media,
+      reporterEmail: r["reporter_email"] == null ? "" : String(r["reporter_email"]),
+      assigneeEmails: Array.isArray(r["assignee_emails"])
+        ? (r["assignee_emails"] as unknown[]).map(String).filter(Boolean)
+        : [],
+    };
+  });
 }

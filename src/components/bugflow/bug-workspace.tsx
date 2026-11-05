@@ -31,6 +31,7 @@ import {
   ClipboardCheck,
   Flag,
   UserPlus,
+  FileDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,7 +42,14 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { getBugWorkspace, getBugDetail, updateBug, deleteBug } from "@/lib/bug-workflow.functions";
+import {
+  getBugWorkspace,
+  getBugDetail,
+  getBugExport,
+  updateBug,
+  deleteBug,
+} from "@/lib/bug-workflow.functions";
+import { downloadJiraCsv } from "./jira-export";
 import { restoreFromTrash } from "@/lib/trash.functions";
 import { moveToTrashToast } from "./trash-bin";
 import { lastActivityLabel } from "@/lib/activity";
@@ -167,6 +175,28 @@ export function BugWorkspace({
   const [copying, setCopying] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const fetchDetail = useServerFn(getBugDetail);
+  const fetchExport = useServerFn(getBugExport);
+  const [exportingJira, setExportingJira] = useState(false);
+  /** The ticked bugs as a Jira CSV; the server still limits them to what this panel may see. */
+  async function exportJira(ids: string[]) {
+    if (exportingJira || ids.length === 0) return;
+    setExportingJira(true);
+    try {
+      const bugs = await fetchExport({
+        data: { access, projectId: null, includeClosed: true, ids },
+      });
+      if (!bugs.length) {
+        toast.info("None of the selected bugs can be exported.");
+        return;
+      }
+      const projects = [...new Set(bugs.map((b) => b.project))];
+      downloadJiraCsv(bugs, projects.length === 1 ? projects[0]! : null);
+    } catch (e) {
+      toast.error(actionError(e, "The Jira file could not be built. Try again."));
+    } finally {
+      setExportingJira(false);
+    }
+  }
   const SHEET_HEADERS = [
     "Bug ID",
     "Title",
@@ -447,6 +477,28 @@ export function BugWorkspace({
               {copying ? <RefreshCw className="animate-spin" /> : <CopyCheck />}Copy selected (
               {selected.size})
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={selected.size === 0 || exportingJira}
+              title="Download the selected bugs as a CSV for Jira's importer"
+              onClick={() => {
+                void exportJira([...selected]);
+              }}
+            >
+              {exportingJira ? <RefreshCw className="animate-spin" /> : <FileDown />}Jira CSV (
+              {selected.size})
+            </Button>
+            {rows.length > selected.size && (
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Select every bug that matches the current filters, on all pages"
+                onClick={() => setSelected(new Set(rows.map((b) => b.id)))}
+              >
+                Select all {rows.length}
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
