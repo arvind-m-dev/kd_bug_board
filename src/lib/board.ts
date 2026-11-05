@@ -50,6 +50,9 @@ export function dropAction(
   if (boardColumn(bug.status) === column) return null; // same column: nothing to do
   const columnStatuses = BOARD_COLUMNS.find((c) => c.key === column)?.statuses ?? [];
   const direct = allowedStatuses(actor, bug).filter((s) => columnStatuses.includes(s));
+  // Asking for information without saying what is needed helps nobody, so that move opens the bug for a note.
+  if (direct.length === 1 && direct[0] === "NEEDS_INFORMATION")
+    return { kind: "open", reason: "Say what information is needed." };
   if (direct.length === 1) return { kind: "status", status: direct[0]! };
   if (direct.length > 1) return { kind: "open", reason: "Choose the exact status on the bug." };
   // No plain move: the column may still be reachable through an action that needs its own dialog.

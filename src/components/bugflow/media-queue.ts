@@ -226,7 +226,14 @@ async function add(
  * compressing follow as soon as they finish. Returns how many files were handed over.
  */
 function handoff(owner: string, target: string, bugCode: string) {
-  const mine = items.filter((u) => u.owner === owner && u.target === null && u.status !== "done");
+  // Files refused while preparing (wrong type, too big) have nothing to send, so they are neither handed over nor counted.
+  const mine = items.filter(
+    (u) =>
+      u.owner === owner &&
+      u.target === null &&
+      u.status !== "done" &&
+      !(u.status === "failed" && !u.file),
+  );
   commit(items.map((u) => (mine.includes(u) ? { ...u, target, bugCode } : u)));
   void (async () => {
     for (const u of mine)

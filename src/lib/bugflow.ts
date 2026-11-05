@@ -107,6 +107,9 @@ export function canTransition(role: Role, from: Status, to: Status, verified = f
     return (
       ((from === "ASSIGNED" || from === "REOPENED") && to === "IN_PROGRESS") ||
       (from === "IN_PROGRESS" && to === "RECHECK") ||
+      // Ask the reporter for more information, then resume once it arrives.
+      (from === "IN_PROGRESS" && to === "NEEDS_INFORMATION") ||
+      (from === "NEEDS_INFORMATION" && to === "IN_PROGRESS") ||
       (["ASSIGNED", "IN_PROGRESS", "REOPENED"].includes(from) &&
         ["NOT_A_BUG", "DUPLICATE", "WONT_FIX"].includes(to))
     );

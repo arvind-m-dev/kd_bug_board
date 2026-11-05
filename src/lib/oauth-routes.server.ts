@@ -99,7 +99,7 @@ export async function handleOauth(request: Request): Promise<Response | null> {
           ...base,
           login,
           clientName: name,
-          attemptKey: clientKey(request.headers),
+          attemptKey: clientKey(request),
         });
         const state = g("state");
         return redirectBack(

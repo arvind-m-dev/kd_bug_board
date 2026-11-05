@@ -976,7 +976,7 @@ export async function mediaStatus(test: boolean): Promise<MediaStatus> {
     };
   }
 }
-/** The addresses people open this app at: the current request's, plus the production URL when Vercel provides it. */
+/** The addresses people open this app at: the current request's, the production URL Vercel provides, and VITE_SITE_URL. */
 function appOrigins(): string[] {
   const list: string[] = [];
   try {
@@ -986,6 +986,13 @@ function appOrigins(): string[] {
   }
   const prod = process.env["VERCEL_PROJECT_PRODUCTION_URL"];
   if (prod) list.push(`https://${prod.replace(/^https?:\/\//, "").replace(/\/.*$/, "")}`);
+  // The configured public address too, so a rule copied from localhost never drops the live site.
+  try {
+    const site = process.env["VITE_SITE_URL"];
+    if (site) list.push(new URL(site).origin);
+  } catch {
+    /* not a URL */
+  }
   return [...new Set(list)];
 }
 /**

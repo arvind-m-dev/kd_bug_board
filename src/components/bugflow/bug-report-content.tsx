@@ -21,6 +21,7 @@ export function BugReportContent({ bug, showEvidence }: { bug: LiveBug; showEvid
           </span>
           Steps to replicate
         </h3>
+        {bug.steps.length === 0 && <p className="text-sm text-muted-foreground">Not specified</p>}
         <ol className="grid gap-2">
           {bug.steps.map((step, i) => (
             <li key={i} className="flex gap-3 text-sm leading-6">

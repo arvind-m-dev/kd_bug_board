@@ -70,3 +70,15 @@ describe("Safe action errors", () => {
     );
   });
 });
+
+describe("server validation messages", () => {
+  it("shows the first readable Zod message, never the raw JSON", () => {
+    const zod = (m: string) =>
+      new Error(JSON.stringify([{ code: "custom", message: m, path: ["x"] }]));
+    expect(actionError(zod("The end date must be on or after the start date."), "fb")).toBe(
+      "The end date must be on or after the start date.",
+    );
+    expect(actionError(zod("Expected string, received null"), "fb")).toBe("fb");
+    expect(actionError(new Error("[not json"), "fb")).toBe("fb");
+  });
+});

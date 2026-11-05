@@ -1,13 +1,15 @@
 /** Display helpers shared by every panel, so a status, a date or a person reads the same everywhere. */
 
-/** Human status: RECHECK → "Ready for QA retest", NEEDS_INFORMATION → "Needs information". */
+/** Human status: RECHECK → "Ready for QA retest", WONT_FIX → "Won't fix", NEEDS_INFORMATION → "Needs information". */
 export const statusLabel = (v: string) =>
   v === "RECHECK"
     ? "Ready for QA retest"
-    : v
-        .toLowerCase()
-        .replaceAll("_", " ")
-        .replace(/^./, (c) => c.toUpperCase());
+    : v === "WONT_FIX"
+      ? "Won't fix"
+      : v
+          .toLowerCase()
+          .replaceAll("_", " ")
+          .replace(/^./, (c) => c.toUpperCase());
 
 /** Colour tone for a status pill; the same mapping is used in tables, cards, history and notifications. */
 export const statusTone = (s: string) =>

@@ -1,3 +1,4 @@
+import { statusLabel } from "@/lib/format";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -32,11 +33,7 @@ const STATE_LABEL: Record<string, string> = {
   active: "Active",
   closed: "Closed",
 };
-const pretty = (s: string) =>
-  s
-    .replace(/_/g, " ")
-    .toLowerCase()
-    .replace(/^./, (c) => c.toUpperCase());
+const pretty = statusLabel;
 
 type Sprint = SprintsData["sprints"][number];
 

@@ -18,6 +18,7 @@ import {
   rankBetween,
   compareRank,
   epicProgress,
+  validParent,
   KIND_LABEL,
   type WorkKind,
   type CreateWorkItem,
@@ -101,15 +102,15 @@ export function BacklogView() {
 
   return (
     <section className="grid gap-4">
-      <div className="bf-section-heading">
-        <div className="flex items-center gap-2">
+      <div className="bf-section-heading flex-wrap gap-y-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <Layers size={18} className="text-primary" />
           <h2>Backlog</h2>
           <span className="text-xs text-muted-foreground">
             Drag to rank. Epics group work; stories and tasks plan it; bugs fix it.
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <ThemedSelect
             label="Project"
             value={projectId}
@@ -204,18 +205,19 @@ export function BacklogView() {
                     {it.kind !== "bug" && (
                       <select
                         className="bf-board-move"
-                        aria-label={`Epic for ${it.code}`}
+                        aria-label={`Parent for ${it.code}`}
                         value={it.parentId ?? ""}
                         onChange={(e) =>
                           void save(it, { parentId: e.target.value === "" ? null : e.target.value })
                         }
                       >
-                        <option value="">No epic</option>
-                        {epics
-                          .filter((epic) => epic.id !== it.id)
-                          .map((epic) => (
-                            <option key={epic.id} value={epic.id}>
-                              {epic.title}
+                        <option value="">No parent</option>
+                        {/* Every allowed parent (epics, and stories for a task), so a task in a story shows it. */}
+                        {items
+                          .filter((p) => p.id !== it.id && validParent(it.kind, p.kind))
+                          .map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.kind === "story" ? `Story: ${p.title}` : p.title}
                             </option>
                           ))}
                       </select>

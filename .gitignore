@@ -34,3 +34,8 @@ dist-ssr
 .env
 .vercel
 e2e/shots/
+
+# Playwright output (kept outside the repo)
+test-results/
+playwright-report/
+e2e/shots/

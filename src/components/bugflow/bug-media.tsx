@@ -610,7 +610,9 @@ export function BugMedia({
       setSavingName(false);
     }
   }
-  const waiting = uploader.uploads.filter((u) => u.target === null && u.status !== "done").length;
+  const waiting = uploader.uploads.filter(
+    (u) => u.target === null && u.status !== "done" && !(u.status === "failed" && !u.file),
+  ).length;
   const remaining =
     config.maxFiles - items.length - uploader.uploads.filter((u) => u.status !== "failed").length;
   return (

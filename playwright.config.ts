@@ -1,14 +1,14 @@
 import { defineConfig } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
-// The test process needs the admin credentials for the signed-in sweep; load .env.local like the server does.
+// Load .env.local like the server does, so the test knows whether BUGFLOW_DEMO_LOGIN is on.
 try {
   for (const line of readFileSync(".env.local", "utf8").split("\n")) {
     const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
     if (m && process.env[m[1]!] === undefined) process.env[m[1]!] = m[2]!;
   }
 } catch {
-  /* no .env.local: the signed-in sweep will self-skip */
+  /* no .env.local: demo login is off and the signed-in sweep self-skips */
 }
 
 /**
