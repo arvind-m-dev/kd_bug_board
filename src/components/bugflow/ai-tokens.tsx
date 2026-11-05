@@ -56,7 +56,7 @@ function CopyBlock({ label, value, hint }: { label: string; value: string; hint?
     }
   };
   return (
-    <div className="grid gap-1">
+    <div className="grid min-w-0 gap-1">
       <span className="text-xs font-semibold">{label}</span>
       <div className="bf-token-secret">
         <code className={value.includes("\n") ? "whitespace-pre" : undefined}>{value}</code>

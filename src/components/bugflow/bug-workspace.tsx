@@ -44,6 +44,7 @@ import {
 import { getBugWorkspace, getBugDetail, updateBug, deleteBug } from "@/lib/bug-workflow.functions";
 import { restoreFromTrash } from "@/lib/trash.functions";
 import { moveToTrashToast } from "./trash-bin";
+import { lastActivityLabel } from "@/lib/activity";
 import {
   PRIORITIES,
   allowedStatuses,
@@ -668,11 +669,7 @@ export function BugWorkspace({
                           title={`${dateLabel(b.lastChange.at)}${b.lastChange.via ? ` · via ${b.lastChange.via} portal` : ""}`}
                         >
                           <span className="bf-activity-action">
-                            {statusLabel(
-                              b.lastChange.action
-                                .replace("bug.", "")
-                                .replace("sample_created", "created"),
-                            )}
+                            {lastActivityLabel(b.lastChange.action, statusLabel)}
                           </span>
                           <span className="bf-activity-meta">
                             {b.lastChange.by} · {timeAgo(b.lastChange.at)}

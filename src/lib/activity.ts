@@ -249,3 +249,12 @@ export function changeVerb(action: string) {
       .toLowerCase()
   );
 }
+
+/** The bug list's "Last activity" label: bug events keep their short status-style name; sprint/backlog events use
+ * the plain verb ("Removed it from a sprint") so a raw action key like "sprint.item_removed" never shows. */
+export function lastActivityLabel(action: string, statusLabel: (s: string) => string) {
+  if (action.startsWith("bug."))
+    return statusLabel(action.slice(4).replace("sample_created", "created"));
+  const verb = changeVerb(action);
+  return verb.charAt(0).toUpperCase() + verb.slice(1);
+}
