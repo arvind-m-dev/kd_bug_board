@@ -15,7 +15,8 @@
     "demo:seed": "python3 database/demo/generate_seed.py > database/demo/seed.sql && node --env-file-if-exists=.env.local node_modules/jiti/lib/jiti-cli.mjs database/demo/apply.ts seed",
     "demo:remove": "node --env-file-if-exists=.env.local node_modules/jiti/lib/jiti-cli.mjs database/demo/apply.ts remove",
     "db:migrate": "node --env-file-if-exists=.env.local node_modules/jiti/lib/jiti-cli.mjs database/migrate.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:full": "playwright test -c playwright.full.config.ts"
   },
   "overrides": {
     "rolldown": "1.2.1"
