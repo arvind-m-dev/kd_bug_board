@@ -89,6 +89,9 @@ const StorageAlarmBanner = lazy(() =>
   import("./system-health").then((m) => ({ default: m.StorageAlarmBanner })),
 );
 const AiTokens = lazy(() => import("./ai-tokens").then((m) => ({ default: m.AiTokens })));
+const JiraSettings = lazy(() =>
+  import("./jira-settings").then((m) => ({ default: m.JiraSettings })),
+);
 const ViewFallback = () => (
   <div className="bf-panel p-5 text-sm text-muted-foreground" role="status">
     Loading…
@@ -150,6 +153,7 @@ type View =
   | "settings-storage"
   | "settings-ai"
   | "settings-health"
+  | "settings-jira"
   | "trash"
   | "notifications";
 const navigation: {
@@ -205,6 +209,7 @@ const titles: Record<View, string> = {
   ["settings-storage"]: "Storage & services",
   ["settings-ai"]: "AI access (MCP)",
   ["settings-health"]: "System health",
+  ["settings-jira"]: "Jira",
   trash: "Trash",
   notifications: "Notifications",
 };
@@ -219,6 +224,7 @@ const subtitles: Record<View, string> = {
     "Live checks of the database, media bucket, encryption key, sign-in and deployment.",
   ["settings-ai"]:
     "Let AI clients (Claude, Cursor, ChatGPT) read and report bugs, and manage their tokens.",
+  ["settings-jira"]: "The Jira Cloud connection: sign in, verify, pause or disconnect.",
   overview: "A clear view of your bugs, team, and everything in between.",
   bugs: "Track, prioritize, and manage every reported issue.",
   users:
@@ -605,6 +611,10 @@ export function Workspace({ view = "overview" }: { view?: View }) {
                 <SettingsPage tab="settings-ai">
                   <AiTokensCard />
                 </SettingsPage>
+              ) : view === "settings-jira" ? (
+                <SettingsPage tab="settings-jira">
+                  <JiraSettings />
+                </SettingsPage>
               ) : view === "trash" ? (
                 <TrashView />
               ) : (
@@ -985,6 +995,13 @@ const SETTINGS_TABS = [
     icon: Bot,
     highlight: true,
     desc: "MCP endpoint, AI tokens and app connectors (OAuth) for Claude, Cursor, ChatGPT.",
+  },
+  {
+    to: "/admin/settings/jira" as const,
+    view: "settings-jira",
+    label: "Jira",
+    icon: Link2,
+    desc: "Connect one Jira Cloud site. Bug syncing is set up separately, per project.",
   },
 ];
 /** Sub-navigation shown on every settings page; the current page is highlighted. */

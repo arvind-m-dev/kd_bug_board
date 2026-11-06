@@ -54,6 +54,30 @@ const adminCache = new Map<
   string,
   { admin: { id: string; userId: string; name: string }; until: number }
 >();
+const ADMIN_SESSION_SQL =
+  "select p.id, p.user_id, u.name from bugflow.admin_sessions s join bugflow.portals p on p.id=s.portal_id join bugflow.users u on u.id=p.user_id where s.token_hash=$1 and s.expires_at>now() and p.type='admin' and p.active and u.active and p.revoked_at is null and (p.expires_at is null or p.expires_at>now()) limit 1";
+/**
+ * The live Admin session carried by a Request, with the session's hash, or null when signed out. For the few
+ * routes answered outside the Start runtime (where `requireAdmin` cannot read cookies), e.g. the Jira OAuth callback,
+ * and for binding a one-time value to the session that created it. Always checks the database (no cache).
+ */
+export async function adminSessionFromRequest(request: Request) {
+  const token = /(?:^|;\s*)bugflow_admin=([a-f0-9]{64})(?:;|$)/.exec(
+    request.headers.get("cookie") ?? "",
+  )?.[1];
+  if (!token) return null;
+  const sessionHash = await hashToken(token);
+  const { rows } = await neonQuery(ADMIN_SESSION_SQL, [sessionHash]);
+  const admin = rows[0];
+  return admin
+    ? {
+        id: String(admin["id"]),
+        userId: String(admin["user_id"]),
+        name: String(admin["name"]),
+        sessionHash,
+      }
+    : null;
+}
 export async function requireAdmin() {
   const token = getCookie("bugflow_admin");
   if (!token || !/^[a-f0-9]{64}$/.test(token)) throw new Error(ADMIN_SIGNED_OUT);
@@ -61,10 +85,7 @@ export async function requireAdmin() {
   const hit = adminCache.get(key);
   if (hit && hit.until > Date.now()) return hit.admin;
   adminCache.delete(key);
-  const { rows } = await neonQuery(
-    "select p.id, p.user_id, u.name from bugflow.admin_sessions s join bugflow.portals p on p.id=s.portal_id join bugflow.users u on u.id=p.user_id where s.token_hash=$1 and s.expires_at>now() and p.type='admin' and p.active and u.active and p.revoked_at is null and (p.expires_at is null or p.expires_at>now()) limit 1",
-    [key],
-  );
+  const { rows } = await neonQuery(ADMIN_SESSION_SQL, [key]);
   const admin = rows[0];
   if (!admin) throw new Error(ADMIN_EXPIRED);
   const result = {

@@ -2,6 +2,10 @@
 
 Bug reporting, assignment and QA verification for your team. Admins manage projects and members; reporters, QA and developers work through private portal links.
 
+## Coding-agent handoff
+
+Claude Code, Cursor and VS Code coding agents should begin with [`CLAUDE.md`](CLAUDE.md). The Phase 3 Jira Cloud two-way synchronization requirements are in [`docs/PHASE_3_JIRA_TWO_WAY_SYNC_PRD.md`](docs/PHASE_3_JIRA_TWO_WAY_SYNC_PRD.md).
+
 ## Stack
 
 TanStack Start (React 19), Tailwind CSS + shadcn/ui, Neon Postgres, deployed on Vercel.
@@ -28,6 +32,11 @@ npm run dev                  # http://localhost:8080
 | `AI_BASE_URL` / `AI_MODEL` | no | Use another OpenAI-compatible provider, e.g. `https://api.openai.com/v1` + `gpt-5-mini` |
 | `MEDIA_S3_ENDPOINT` / `MEDIA_S3_BUCKET` / `MEDIA_S3_ACCESS_KEY_ID` / `MEDIA_S3_SECRET_ACCESS_KEY` | no | All four together enable private screenshot, recording and PDF uploads to an S3-compatible bucket (Cloudflare R2 free tier; guide in Settings → Media storage) | These are only a hosting fallback: the workspace bucket Admin enters in Settings → Media storage (secret stored encrypted with `BUGFLOW_PORTAL_ENCRYPTION_KEY`) is the default for every portal and takes precedence.
 | `MEDIA_S3_REGION` / `MEDIA_S3_FORCE_PATH_STYLE` | no | Defaults `auto` and `1` (right for R2); set the region for Backblaze B2 or AWS S3 |
+| `JIRA_CLIENT_ID` / `JIRA_CLIENT_SECRET` | no | Atlassian OAuth 2.0 (3LO) app for the Jira Cloud connection (Settings → Jira). Needs migration `027`. Connecting alone synchronizes nothing |
+| `JIRA_TOKEN_ENCRYPTION_KEY` | with Jira | Encrypts stored Jira tokens; used for nothing else (`openssl rand -hex 32`) |
+| `JIRA_PUBLIC_ORIGIN` | with Jira | Public https address of this app; the Atlassian callback is `<address>/api/integrations/jira/callback`. Defaults to `SITE_URL` or the Vercel production domain |
+| `JIRA_ALLOWED_SITE_URL` | no | When set, the only Jira site that may be connected (recommended while testing) |
+| `JIRA_JOB_SECRET` | with Jira sync | At least 32 characters (`openssl rand -hex 32`). The only credential for `POST /api/internal/jira/process` (work the queues) and `POST /api/internal/jira/reconcile` (look for missed changes, then work the queues), sent as `Authorization: Bearer …` by a scheduler. Without it both stay closed. Locally `scripts/jira-sync-loop.mjs` plays the scheduler. Connecting a Jira site: `docs/JIRA_CONNECT_STEPS.md` |
 
 ## Database
 
@@ -38,6 +47,7 @@ Schema changes live in versioned SQL files under [`database/`](database/), appli
 - `npm run dev` – dev server (loads `.env.local`)
 - `npm run build` – production build
 - `npm test` – unit tests
+- `npm run test:db` – database checks: the real server code against a throwaway local Postgres that the script starts and deletes (needs PostgreSQL installed locally; never uses `DATABASE_URL`)
 
 ## AI access (MCP)
 

@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { trustedProxyRequest } from "./lib/trusted-proxy";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -83,7 +84,9 @@ function withPortalHeaders(request: Request, response: Response): Response {
 }
 
 export default {
-  async fetch(request: Request, env: unknown, ctx: unknown) {
+  async fetch(incoming: Request, env: unknown, ctx: unknown) {
+    // Only with BUGFLOW_TRUST_PROXY=1 (local trial behind an HTTPS tunnel); otherwise the request is used as is.
+    const request = trustedProxyRequest(incoming);
     try {
       // Keep-warm and uptime probe: one trivial query so a pinger (every few minutes) keeps the function
       // instance warm and Neon out of autosuspend. Needs no session and reveals nothing but latency.
@@ -156,6 +159,15 @@ export default {
         const { handleOauth } = await import("./lib/oauth-routes.server");
         const oauth = await handleOauth(request);
         if (oauth) return mcpCors(oauth);
+      }
+      // Jira integration routes called from outside a signed-in browser (the OAuth callback, the scheduler's job
+      // endpoint). Separate from the AI MCP/OAuth feature.
+      if (
+        mcpPath.startsWith("/api/integrations/jira/") ||
+        mcpPath.startsWith("/api/internal/jira/")
+      ) {
+        const { handleJiraRoute } = await import("./lib/jira/routes.server");
+        return await handleJiraRoute(request);
       }
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
