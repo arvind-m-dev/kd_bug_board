@@ -18,7 +18,15 @@ import { getProjects, addProject, createMemberPortal } from "@/lib/portal-access
 import { toast } from "sonner";
 import { ErrorNotice, actionError } from "./action-feedback";
 
-export function CollaboratorOnboarding() {
+export function CollaboratorOnboarding({
+  initial,
+  onSaved,
+}: {
+  /** Prefill, e.g. a person found in Jira; the Admin still checks and picks the role. */
+  initial?: { name: string; email: string };
+  /** Called with the email the member was saved under. */
+  onSaved?: (saved: { email: string }) => void;
+} = {}) {
   const client = useQueryClient();
   const projects = useQuery({ queryKey: ["projects"], queryFn: () => getProjects(), retry: false });
   const createProject = useServerFn(addProject);
@@ -26,8 +34,8 @@ export function CollaboratorOnboarding() {
   const [projectIds, setProjectIds] = useState<string[]>([]);
   const [projectName, setProjectName] = useState("");
   const [link, setLink] = useState("");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [name, setName] = useState(initial?.name ?? "");
+  const [email, setEmail] = useState(initial?.email ?? "");
   const [role, setRole] = useState<Collaborator["role"]>("tester");
   const scope = (projects.data ?? [])
     .filter((p) => projectIds.includes(p.id))
@@ -66,6 +74,7 @@ export function CollaboratorOnboarding() {
         client.invalidateQueries({ queryKey: ["bug-detail"] }),
       ]);
       toast.success(`${name} added to the team`);
+      onSaved?.({ email });
     } catch (cause) {
       setError(
         actionError(cause, "Member could not be saved. Please check the details and try again."),

@@ -87,9 +87,9 @@ Before step 1, make sure `DATABASE_URL` in `.env.jira-trial` is **not** the same
 2. **Connect Jira** → Atlassian asks for permission → **Accept**. The page should say *Connected*.
 3. **Projects → Map a project**: choose your Bug Board project and `BFT`. The statuses are filled in for you;
    change any you want. **Save**, then **Switch on**. If something is missing in Jira, it is listed.
-4. **People**: for each member, **Link to Jira** if they have an account on your Jira site.
+4. **People**: members whose Bug Board email is their Jira email are linked automatically (every hour, or now with **Match by email**). Link anyone else with **Link to Jira**. People who are in Jira but not in Bug Board are listed under **In Jira, not in Bug Board**; **Add to Bug Board** opens the usual Add-member form so you pick their role.
 
-Switching on sends nothing by itself. A bug goes to Jira when it is next reported or changed.
+Switching on sends nothing by itself. To bring both boards level, click **Sync existing bugs** on the project: it shows what goes each way, then queues it. Jira Bugs already Done stay out, because Bug Board cannot count Jira's Done as fixed without QA.
 
 ## What to try, and what to write down
 
@@ -128,9 +128,9 @@ Please note for each: did it arrive once, how long it took, and anything that sh
 |---|---|
 | Jira's Done resolving a bug | Never, unless you tick the box in the project mapping; then only for a bug waiting for retest |
 | Who may move status from Jira | Anyone in Jira, but only along Bug Board's workflow |
-| Priority, severity, due date changed in Jira | Not taken; Bug Board's value is the one that counts |
+| Priority, severity, due date changed in Jira | Taken into Bug Board (each can be switched off in the project mapping). Both sides changing the same field differently becomes a decision, never an overwrite |
 | Assigning from Jira | Only to a member linked under People who is on the project |
-| Existing bugs when a project is switched on | Not sent in bulk; each goes when it is next changed |
+| Existing bugs when a project is switched on | Not sent by switching on. **Sync existing bugs** on the project sends every Bug Board bug not in Trash (finished ones go to the mapped Done status) and brings in every Jira Bug that is not Done; safe to run again |
 | Sprints | Jira owns them; Bug Board mirrors the ones your bugs are in |
 
 ## Not included

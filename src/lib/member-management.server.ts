@@ -46,6 +46,12 @@ export async function editMember(data: z.infer<typeof editMemberSchema>) {
   const c = data.collaborator;
   await neonExecute([
     { query: "select pg_advisory_xact_lock(7438592)" },
+    // An address held only by someone deleted forever is released first (their old bugs keep their name).
+    {
+      query:
+        "update bugflow.users set email='purged-'||id||'@bugflow.invalid' where email=$1 and purged_at is not null",
+      params: [c.email.toLowerCase()],
+    },
     {
       query:
         "update bugflow.users set name=$2,email=$3 where id=$1 and deleted_at is null and not exists(select 1 from bugflow.portals ap where ap.user_id=bugflow.users.id and ap.type='admin')",

@@ -15,7 +15,7 @@ import {
 } from "./adf";
 import type { Direction } from "./compare";
 import type { FieldPlace, JiraIssue, MappingConfig } from "./schemas";
-import type { SyncField, SyncFields } from "./types";
+import { JIRA_SYNC_USER_ID, type SyncField, type SyncFields } from "./types";
 
 // Pure translation between a BugFlow bug, a Jira issue and the one shape both are compared in (SyncFields).
 // No network, no database: the processor hands rows in and sends the bodies built here.
@@ -40,6 +40,13 @@ export type LocalBug = {
   reporterId: string;
   assigneeId: string | null;
   reporterName: string;
+  /**
+   * Where the bug was raised: the reporter's portal ("reporter", "qa", "developer", "member"), "admin" for the
+   * Admin panel (the Admin is not a named person), or "jira" for a bug that came in from Jira.
+   */
+  raisedIn: string;
+  /** For a bug created in Jira: the Jira person who created it (they may have no BugFlow account). */
+  jiraReporterName?: string | null;
   /** Confirmed Atlassian accounts only; null when the person has none. */
   reporterAccountId: string | null;
   assigneeNames: string[];
@@ -172,11 +179,34 @@ function summary(bug: LocalBug): string {
   return first ? (first.length > 120 ? `${first.slice(0, 117)}...` : first) : bug.code;
 }
 
+/** How the place a bug was raised reads on the Jira issue. */
+const RAISED_IN: Record<string, string> = {
+  reporter: "Tester portal",
+  qa: "QA portal",
+  developer: "Developer portal",
+  member: "Member portal",
+  admin: "Admin panel",
+  jira: "Jira",
+};
+
+/** The reporter's name as written on the issue: the Admin is not a person, and a Jira-made bug keeps its Jira author. */
+function reportedBy(bug: LocalBug) {
+  if (bug.raisedIn === "admin") return "Bug Board Admin";
+  if (bug.raisedIn === "jira")
+    return cleanLine(
+      bug.reporterId === JIRA_SYNC_USER_ID
+        ? (bug.jiraReporterName ?? "") || "Jira"
+        : bug.reporterName,
+    );
+  return cleanLine(bug.reporterName);
+}
+
 export function localFields(bug: LocalBug, config: MappingConfig): SyncFields {
   const status = config.statusOut[bug.status];
   if (!status) throw new MappingError(`BugFlow status ${bug.status} has no Jira status.`);
   const note = [
-    `Reported by: ${cleanLine(bug.reporterName)}`,
+    `Raised in: ${RAISED_IN[bug.raisedIn] ?? "Bug Board"}`,
+    `Reported by: ${reportedBy(bug)}`,
     ...(bug.assigneeNames.length
       ? [`Assigned to: ${bug.assigneeNames.map(cleanLine).join(", ")}`]
       : []),
@@ -328,6 +358,49 @@ function customValue(
 }
 const PLACED = ["steps", "expected", "actual", "severity", "environment", "module"] as const;
 
+/** On a Jira issue whose bug is in Bug Board's Trash (when the project closes issues on Trash). */
+export const TRASH_LABEL = "bugboard-trashed";
+
+/** Labels Bug Board adds for people who have no linked Jira account, so the Jira board can be filtered by them. */
+export const isNameLabel = (label: string) => /^(reported-by|assigned-to)-[a-z0-9-]+$/.test(label);
+const labelSlug = (name: string) =>
+  name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60)
+    .replace(/-+$/, "");
+
+/**
+ * `reported-by-<name>` for a reporter without a linked Jira account, `assigned-to-<name>` for each assignee when
+ * none is linked. The Admin and Jira-made bugs get none: the Admin is not a person, and Jira names its own
+ * reporter. Linked people need no label: Jira shows them by account.
+ */
+export function nameLabels(bug: LocalBug): string[] {
+  const out = new Set<string>();
+  if (!bug.reporterAccountId && bug.raisedIn !== "admin" && bug.raisedIn !== "jira") {
+    const s = labelSlug(bug.reporterName);
+    if (s) out.add(`reported-by-${s}`);
+  }
+  if (!bug.assigneeAccountId)
+    for (const n of bug.assigneeNames) {
+      const s = labelSlug(n);
+      if (s) out.add(`assigned-to-${s}`);
+    }
+  return [...out].sort();
+}
+
+/** The label edits that make Jira's own name labels exactly `wanted`; other labels are never touched. Null: none. */
+export function nameLabelChanges(current: string[], wanted: string[]) {
+  const ops = [
+    ...current.filter((l) => isNameLabel(l) && !wanted.includes(l)).map((l) => ({ remove: l })),
+    ...wanted.filter((l) => !current.includes(l)).map((l) => ({ add: l })),
+  ];
+  return ops.length ? ops : null;
+}
+
 /** The label that finds a created issue again when the reply to the create request was lost. */
 export const isMarkerLabel = (label: string) => /^bf-\d+-[0-9a-f]{8}$/.test(label);
 export const markerLabel = (bugId: string, createOpId: string) =>
@@ -346,7 +419,7 @@ export function createBody(
     issuetype: { id: target.issueTypeId },
     summary: local.title,
     description: buildDescription(descriptionParts(local, config)),
-    labels: [marker],
+    labels: [marker, ...(config.nameLabels ? nameLabels(bug) : [])],
   };
   if (local.priority) fields["priority"] = { id: local.priority };
   if (local.dueOn) fields["duedate"] = local.dueOn;

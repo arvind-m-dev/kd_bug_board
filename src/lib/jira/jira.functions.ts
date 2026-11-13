@@ -112,6 +112,22 @@ export const pauseJiraMappingFn = createServerFn({ method: "POST" })
     return a.databaseCall(() => s.pauseJiraMapping(data.projectId));
   });
 
+export const previewJiraInitialSyncFn = createServerFn({ method: "POST" })
+  .validator((v: unknown) => projectId.parse(v))
+  .handler(async ({ data }) => {
+    const s = await import("./mapping.server");
+    const a = await import("../portal-access.server");
+    return a.databaseCall(() => s.initialSyncPreview(data.projectId));
+  });
+
+export const startJiraInitialSyncFn = createServerFn({ method: "POST" })
+  .validator((v: unknown) => projectId.parse(v))
+  .handler(async ({ data }) => {
+    const s = await import("./mapping.server");
+    const a = await import("../portal-access.server");
+    return a.databaseCall(() => s.startInitialSync(data.projectId));
+  });
+
 // ---- running sync: health, conflicts, people ----
 
 const run = async <T>(work: () => Promise<T>) =>
@@ -184,4 +200,96 @@ export const unlinkJiraPersonFn = createServerFn({ method: "POST" })
   .validator((v: unknown) => z.object({ userId: z.string().uuid() }).strict().parse(v))
   .handler(async ({ data }) =>
     run(async () => (await import("./people.server")).unlinkJiraPerson(data.userId)),
+  );
+
+export const matchJiraPeopleFn = createServerFn({ method: "POST" }).handler(async () =>
+  run(async () => (await import("./people.server")).matchJiraPeopleByEmail()),
+);
+
+export const getJiraOnlyPeopleFn = createServerFn({ method: "POST" }).handler(async () =>
+  run(async () => (await import("./people.server")).jiraOnlyPeople()),
+);
+
+export const linkJiraPersonByEmailFn = createServerFn({ method: "POST" })
+  .validator((v: unknown) =>
+    z
+      .object({
+        email: z.string().trim().email().max(320),
+        accountId: z.string().min(1).max(128),
+        name: z.string().trim().min(1).max(200),
+      })
+      .strict()
+      .parse(v),
+  )
+  .handler(async ({ data }) =>
+    run(async () =>
+      (await import("./people.server")).linkJiraPersonByEmail(data.email, {
+        accountId: data.accountId,
+        name: data.name,
+      }),
+    ),
+  );
+
+export const syncJiraMembersFn = createServerFn({ method: "POST" }).handler(async () =>
+  run(async () => (await import("./people.server")).syncJiraMembers()),
+);
+
+export const getJiraSyncLogFn = createServerFn({ method: "POST" })
+  .validator((v: unknown) =>
+    z
+      .object({
+        filter: z.enum(["all", "to_jira", "from_jira", "decision", "setup", "error"]),
+      })
+      .strict()
+      .parse(v),
+  )
+  .handler(async ({ data }) =>
+    run(async () => (await import("./admin.server")).jiraSyncLog(data.filter)),
+  );
+
+export const applyJiraNameFn = createServerFn({ method: "POST" })
+  .validator((v: unknown) => z.object({ userId: z.string().uuid() }).strict().parse(v))
+  .handler(async ({ data }) =>
+    run(async () => (await import("./people.server")).applyJiraName(data.userId)),
+  );
+
+export const getJiraDuplicatesFn = createServerFn({ method: "POST" }).handler(async () =>
+  run(async () => (await import("./mapping.server")).jiraBugDuplicates()),
+);
+
+export const ignoreJiraDuplicateFn = createServerFn({ method: "POST" })
+  .validator((v: unknown) =>
+    z
+      .object({
+        key: z
+          .string()
+          .regex(/^(pair:\d+:\d+|bb:[\d,]+|jira:[\d,]+)$/)
+          .max(2000),
+      })
+      .strict()
+      .parse(v),
+  )
+  .handler(async ({ data }) =>
+    run(async () => (await import("./mapping.server")).ignoreJiraDuplicate(data.key)),
+  );
+
+export const linkJiraDuplicateFn = createServerFn({ method: "POST" })
+  .validator((v: unknown) =>
+    z
+      .object({
+        projectId: z.string().uuid(),
+        bugId: z.string().regex(/^\d{1,18}$/),
+        issueId: z.string().regex(/^\d{1,20}$/),
+      })
+      .strict()
+      .parse(v),
+  )
+  .handler(async ({ data }) =>
+    run(async () =>
+      (await import("./mapping.server")).linkJiraDuplicate(
+        data.projectId,
+        data.bugId,
+        data.issueId,
+      ),
+    ),
   );

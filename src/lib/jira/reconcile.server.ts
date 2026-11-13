@@ -184,9 +184,11 @@ export const neonReconcileStore: ReconcileStore = {
   },
 
   async touch(connectionId) {
-    await neonExecute(`update bugflow.jira_connections set last_reconciled_at=now() where id=$1`, [
-      connectionId,
-    ]);
+    // Called only after a scan read Jira successfully, so it also counts as a verified Jira read.
+    await neonExecute(
+      `update bugflow.jira_connections set last_reconciled_at=now(),last_api_ok_at=now() where id=$1`,
+      [connectionId],
+    );
   },
 };
 

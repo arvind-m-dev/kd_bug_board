@@ -7,26 +7,41 @@ const request = (headers: Record<string, string>) =>
 
 describe("Jira job endpoint authorization", () => {
   it("accepts only the configured bearer secret", async () => {
-    expect(await jobAuthorized(request({ authorization: `Bearer ${SECRET}` }), SECRET)).toBe("ok");
-    expect(await jobAuthorized(request({ authorization: `Bearer ${SECRET}x` }), SECRET)).toBe(
+    expect(await jobAuthorized(request({ authorization: `Bearer ${SECRET}` }), [SECRET])).toBe(
+      "ok",
+    );
+    expect(await jobAuthorized(request({ authorization: `Bearer ${SECRET}x` }), [SECRET])).toBe(
       "denied",
     );
-    expect(await jobAuthorized(request({ authorization: SECRET }), SECRET)).toBe("denied");
-    expect(await jobAuthorized(request({}), SECRET)).toBe("denied");
+    expect(await jobAuthorized(request({ authorization: SECRET }), [SECRET])).toBe("denied");
+    expect(await jobAuthorized(request({}), [SECRET])).toBe("denied");
   });
 
   it("gives a signed-in browser no authority", async () => {
     const cookies = { cookie: "bugflow_admin=anything", origin: "http://localhost" };
-    expect(await jobAuthorized(request(cookies), SECRET)).toBe("denied");
+    expect(await jobAuthorized(request(cookies), [SECRET])).toBe("denied");
   });
 
   it("stays closed without a secret, or with one too short to be a secret", async () => {
-    expect(await jobAuthorized(request({ authorization: "Bearer " }), "")).toBe("not_configured");
-    expect(await jobAuthorized(request({ authorization: "Bearer short" }), "short")).toBe(
+    expect(await jobAuthorized(request({ authorization: "Bearer " }), [""])).toBe("not_configured");
+    expect(await jobAuthorized(request({ authorization: "Bearer short" }), ["short"])).toBe(
       "not_configured",
     );
-    expect(await jobAuthorized(request({ authorization: `Bearer ${SECRET}` }), undefined)).toBe(
-      process.env["JIRA_JOB_SECRET"] ? "denied" : "not_configured",
+    expect(await jobAuthorized(request({ authorization: `Bearer ${SECRET}` }), [undefined])).toBe(
+      "not_configured",
     );
+  });
+
+  it("also accepts Vercel Cron's secret, so its scheduled calls work", async () => {
+    const cron = "c".repeat(40);
+    expect(await jobAuthorized(request({ authorization: `Bearer ${cron}` }), [SECRET, cron])).toBe(
+      "ok",
+    );
+    expect(
+      await jobAuthorized(request({ authorization: `Bearer ${cron}` }), [undefined, cron]),
+    ).toBe("ok");
+    expect(
+      await jobAuthorized(request({ authorization: `Bearer ${SECRET}` }), [undefined, cron]),
+    ).toBe("denied");
   });
 });

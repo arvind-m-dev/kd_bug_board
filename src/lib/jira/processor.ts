@@ -22,6 +22,9 @@ import {
   createBody,
   directions,
   isMarkerLabel,
+  nameLabelChanges,
+  nameLabels,
+  TRASH_LABEL,
   localFields,
   markerLabel,
   updateBody,
@@ -127,10 +130,15 @@ export type InboundMeta = { linkId: string; issueKey: string; actor: RemoteActor
 export interface JiraPort {
   getIssue(issueId: string): Promise<Remote>;
   createIssue(body: { fields: Record<string, unknown> }): Promise<{ id: string; key: string }>;
-  updateIssue(issueId: string, body: { fields: Record<string, unknown> }): Promise<void>;
+  updateIssue(
+    issueId: string,
+    body: { fields?: Record<string, unknown>; update?: Record<string, unknown[]> },
+  ): Promise<void>;
   transitions(issueId: string): Promise<{ id: string; to: string }[]>;
   transition(issueId: string, transitionId: string): Promise<void>;
   findByLabel(projectId: string, label: string): Promise<{ id: string; key: string }[]>;
+  /** Whether the Jira project can still be read: tells a deleted issue apart from lost access. */
+  projectVisible(projectId: string): Promise<boolean>;
 }
 
 export interface SyncStore {
@@ -147,6 +155,11 @@ export interface SyncStore {
   finishCreate(link: Link, bugId: string, issue: { id: string; key: string }): Promise<void>;
   saveSync(link: Link, bugId: string, result: SyncResult): Promise<void>;
   setLinkState(linkId: string, state: LinkState): Promise<void>;
+  /**
+   * Moves the bug to Bug Board's Trash because its Jira issue was deleted, as the Jira integration (audited,
+   * recoverable from the Trash), and marks the link missing.
+   */
+  trashFromJira(bugId: string, linkId: string): Promise<void>;
   /** The bug an issue is (or was, when `unlinked`) linked to, if any. */
   linkByIssue(
     connectionId: string,
@@ -225,6 +238,16 @@ function decided(plan: SyncPlan, o: Overrides, local: SyncFields, remote: SyncFi
   };
 }
 
+/** Labels the issue of a trashed bug and moves it to the closing status, when Jira offers exactly that step. */
+async function closeForTrash(jira: JiraPort, issueId: string, closed: string | undefined) {
+  const remote = await jira.getIssue(issueId);
+  if (!remote.labels.includes(TRASH_LABEL))
+    await jira.updateIssue(issueId, { update: { labels: [{ add: TRASH_LABEL }] } });
+  if (!closed || remote.fields.status === closed) return;
+  const options = (await jira.transitions(issueId)).filter((t) => t.to === closed);
+  if (options.length === 1) await jira.transition(issueId, options[0]!.id);
+}
+
 /** One comparison of a linked bug and its issue, with everything it allows carried out. */
 async function pass(
   bugId: string,
@@ -241,12 +264,38 @@ async function pass(
   if (link?.state === "disabled") return end(done("unlinked"));
   if (!link || !issueId || link.state === "creating") return end(done("not_linked"));
   if (link.state === "remote_missing") return end(done("remote_missing"));
+  const { config } = mapping;
+  /** The issue is gone: with the option on (and the project still readable, so it is not lost access), the
+   * bug follows it to Bug Board's Trash; otherwise the link only records it. */
+  const gone = async () => {
+    if (
+      config.followJiraDeletes &&
+      !loaded.trashed &&
+      (await jira.projectVisible(mapping.jiraProjectId))
+    ) {
+      await store.trashFromJira(bugId, link.id);
+      return end(done("trashed_from_jira"));
+    }
+    await store.setLinkState(link.id, "remote_missing");
+    return end(done("remote_missing"));
+  };
   if (loaded.trashed) {
-    // Trash never deletes in Jira, and nothing is taken from Jira for a trashed bug: the link records it.
-    if (link.state !== "local_trashed") await store.setLinkState(link.id, "local_trashed");
+    // Trash never deletes in Jira, and nothing is taken from Jira for a trashed bug: the link records it. With
+    // the option on, the issue is closed instead (once), so the Jira board stops showing it as open work.
+    if (link.state !== "local_trashed") {
+      if (config.trashCloses) {
+        try {
+          await closeForTrash(jira, issueId, config.statusOut["WONT_FIX"]);
+        } catch (error) {
+          if (!(error instanceof JiraApiError)) throw error;
+          if (error.kind === "not_found") return gone();
+          if (!["validation", "forbidden"].includes(error.kind)) throw error;
+        }
+      }
+      await store.setLinkState(link.id, "local_trashed");
+    }
     return end(done("trashed"));
   }
-  const { config } = mapping;
   const local = localFields(loaded.bug, config);
 
   let remote: Remote;
@@ -254,8 +303,14 @@ async function pass(
     remote = await jira.getIssue(issueId);
   } catch (error) {
     if (!(error instanceof JiraApiError) || error.kind !== "not_found") throw error;
-    await store.setLinkState(link.id, "remote_missing");
-    return end(done("remote_missing"));
+    return gone();
+  }
+  // Back from the Trash after the issue was closed for it: the label goes, and Bug Board's status is sent again
+  // (the close was Bug Board's own doing, so it is not taken as a Jira change).
+  const reopening = remote.labels.includes(TRASH_LABEL);
+  if (reopening) {
+    await jira.updateIssue(issueId, { update: { labels: [{ remove: TRASH_LABEL }] } });
+    remote = { ...remote, labels: remote.labels.filter((l) => l !== TRASH_LABEL) };
   }
   // No snapshot yet (just created or adopted): Jira's current values are the starting point on both sides, so
   // whatever BugFlow holds differently counts as a BugFlow change and is sent.
@@ -302,7 +357,7 @@ async function pass(
   const dirs = directions(config);
   const { plan, forced } = decided(
     planSync(baseLocal, baseRemote, local, remote.fields, dirs),
-    link.overrides,
+    reopening ? { ...link.overrides, push: [...link.overrides.push, "status"] } : link.overrides,
     local,
     remote.fields,
   );
@@ -355,6 +410,31 @@ async function pass(
   for (const f of send) Object.assign(values, { [f]: local[f] });
   const body = updateBody(send, values, remote.description, config);
   if (body) await jira.updateIssue(issueId, body);
+
+  // BugFlow → Jira, reporter: a reporter linked to a Jira account after the issue was created is named on it too.
+  // One way only (who reported a bug never changes in BugFlow), and best effort: a Jira project that does not let
+  // the reporter be changed keeps its own, and the sync goes on.
+  const reporter = loaded.bug.reporterAccountId;
+  if (reporter && remote.reporter?.accountId !== reporter) {
+    try {
+      await jira.updateIssue(issueId, { fields: { reporter: { accountId: reporter } } });
+    } catch (error) {
+      if (!(error instanceof JiraApiError) || !["validation", "forbidden"].includes(error.kind))
+        throw error;
+    }
+  }
+
+  // BugFlow → Jira, name labels: people without a Jira account stay findable on the Jira board. Only Bug Board's
+  // own `reported-by-`/`assigned-to-` labels change (all removed when the option is off); best effort.
+  const labelOps = nameLabelChanges(remote.labels, config.nameLabels ? nameLabels(loaded.bug) : []);
+  if (labelOps) {
+    try {
+      await jira.updateIssue(issueId, { update: { labels: labelOps } });
+    } catch (error) {
+      if (!(error instanceof JiraApiError) || !["validation", "forbidden"].includes(error.kind))
+        throw error;
+    }
+  }
 
   // BugFlow → Jira, status: only through one of the transitions Jira offers for this issue right now.
   let moved = false;

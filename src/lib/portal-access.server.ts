@@ -192,11 +192,21 @@ export async function listMembers() {
   const { rows } = await neonQuery(
     "select p.id,p.user_id,u.name,u.email,p.type,p.active,u.active as user_active,p.token_ciphertext is not null as copyable,(u.active and p.active and p.revoked_at is null and (p.expires_at is null or p.expires_at>now())) as usable,o.collaborator_role,o.scope_note,coalesce(p.online_until>now(), p.last_seen_at>now()-interval '2 minutes') as online,to_json(greatest(p.last_seen_at, case when p.online_until is not null then least(p.online_until, now()) end)) as last_seen from bugflow.portals p join bugflow.users u on u.id=p.user_id join bugflow.portal_onboarding o on o.portal_id=p.id where u.deleted_at is null order by p.created_at desc,p.id desc limit 100",
   );
+  // The Jira account each member is linked to, when Jira sync is installed (migration 027) and connected.
+  const jira = new Map<string, string>();
+  if (await (await import("./jira/outbox-entry.server")).jiraOutboxOn()) {
+    const linked = await neonQuery(
+      "select um.user_id,um.display_name from bugflow.jira_user_mappings um join bugflow.jira_connections c on c.id=um.connection_id where c.disconnected_at is null and um.confirmed_at is not null",
+    );
+    for (const l of linked.rows) jira.set(String(l["user_id"]), String(l["display_name"] ?? ""));
+  }
   return rows.map((r) => ({
     id: String(r["id"]),
     userId: String(r["user_id"]),
     name: String(r["name"]),
     email: String(r["email"]),
+    /** The linked Jira account's name; null when the member is not linked to Jira. */
+    jiraName: jira.has(String(r["user_id"])) ? jira.get(String(r["user_id"]))! : null,
     type: String(r["type"]),
     active: r["usable"] === true,
     userActive: r["user_active"] === true,
@@ -276,12 +286,37 @@ export async function saveMember(data: z.infer<typeof saveMemberSchema>) {
   const ids = [...new Set(data.projectIds)];
   if (ids.some((id) => !projects.some((p) => p.id === id)))
     throw new Error("Choose active projects from this workspace.");
+  const value = data.collaborator;
+  // One person per email, one working link per person: saving the same email again must not quietly add a
+  // second portal to the member who already has one.
+  const existing = await neonQuery(
+    "select 1 from bugflow.users u join bugflow.portals p on p.user_id=u.id where u.email=$1 and p.type<>'admin' and p.active and p.revoked_at is null limit 1",
+    [value.email.toLowerCase()],
+  );
+  if (existing.rows.length)
+    throw new Error(
+      "A member with this email already exists. Use their row in Team & access to copy or replace their link.",
+    );
+  const trashed = await neonQuery(
+    "select 1 from bugflow.users where email=$1 and deleted_at is not null and purged_at is null limit 1",
+    [value.email.toLowerCase()],
+  );
+  if (trashed.rows.length)
+    throw new Error(
+      "This person was deleted and is in the Trash. Restore them from the Trash instead of adding them again.",
+    );
   const token = randomToken();
   const id = crypto.randomUUID();
   const userId = crypto.randomUUID();
-  const value = data.collaborator;
   const type = portalTypesByRole[value.role];
   await neonExecute([
+    // Someone deleted forever keeps their record (old bugs still name them) but no longer owns the email:
+    // it is released, so the same address can be added again as a new member.
+    {
+      query:
+        "update bugflow.users set email='purged-'||id||'@bugflow.invalid' where email=$1 and purged_at is not null",
+      params: [value.email.toLowerCase()],
+    },
     {
       query:
         "insert into bugflow.users(id,name,email) values($1,$2,$3) on conflict(email) do nothing",

@@ -1,3 +1,4 @@
+import { JIRA_SYNC_USER_ID } from "@/lib/jira/types";
 import { describe, expect, it } from "vitest";
 import {
   type AdfNode,
@@ -15,6 +16,8 @@ import {
   directions,
   localFields,
   markerLabel,
+  nameLabelChanges,
+  nameLabels,
   remoteFields,
   updateBody,
 } from "@/lib/jira/mapping";
@@ -163,15 +166,28 @@ describe("three-way decision", () => {
       base,
       base,
       { ...base, title: "New title", priority: "1" },
-      { ...base, expected: "Jira edit", priority: "5" },
+      { ...base, expected: "Jira edit", dueOn: "2026-12-01" },
       directions(CONFIG),
     );
     expect(plan).toEqual({
       push: ["title", "priority"],
-      pull: ["expected"],
+      pull: ["expected", "dueOn"],
       ack: [],
       conflict: [],
     });
+  });
+
+  it("asks a person when both sides changed priority differently, now that Jira's priority counts", () => {
+    const base = localFields(bug(), CONFIG);
+    const plan = planSync(
+      base,
+      base,
+      { ...base, priority: "1" },
+      { ...base, priority: "5" },
+      directions(CONFIG),
+    );
+    expect(plan.conflict).toEqual(["priority"]);
+    expect(plan.push).toEqual([]);
   });
 });
 
@@ -257,6 +273,7 @@ describe("mapping rules", () => {
       "Severity: High",
       "Environment: Staging",
       "Module: Checkout",
+      "Raised in: Tester portal",
       "Reported by: Asha",
       "Assigned to: Ravi, Meera",
       "Bug Board: BF-41 https://bugs.example.test/admin/bugs?bug=41",
@@ -343,5 +360,78 @@ describe("mapping rules", () => {
     expect(updateBody(["severity"], { ...local, severity: "" }, null, config)).toEqual({
       fields: { customfield_10050: null },
     });
+  });
+});
+
+describe("who raised a bug, as written on the Jira issue", () => {
+  const note = (over: Parameters<typeof bug>[0]) => localFields(bug(over), CONFIG).note.split("\n");
+  it("names the portal and the person for a bug raised in Bug Board", () => {
+    expect(note({ raisedIn: "qa", reporterName: "Divya" })).toEqual(
+      expect.arrayContaining(["Raised in: QA portal", "Reported by: Divya"]),
+    );
+  });
+  it("never names a person for the Admin panel", () => {
+    expect(note({ raisedIn: "admin", reporterName: "Arvind" })).toEqual(
+      expect.arrayContaining(["Raised in: Admin panel", "Reported by: Bug Board Admin"]),
+    );
+  });
+  it("keeps the Jira author of a bug made in Jira, member or not", () => {
+    expect(
+      note({ raisedIn: "jira", reporterId: JIRA_SYNC_USER_ID, jiraReporterName: "Meera (Jira)" }),
+    ).toEqual(expect.arrayContaining(["Raised in: Jira", "Reported by: Meera (Jira)"]));
+    expect(note({ raisedIn: "jira", reporterName: "Rohan Mehta" })).toEqual(
+      expect.arrayContaining(["Raised in: Jira", "Reported by: Rohan Mehta"]),
+    );
+  });
+});
+
+describe("name labels for people without a Jira account", () => {
+  it("labels an unlinked reporter and unlinked assignees, never the Admin or a Jira-made bug", () => {
+    expect(
+      nameLabels(
+        bug({
+          raisedIn: "reporter",
+          reporterName: "Rohan Mehta",
+          reporterAccountId: null,
+          assigneeNames: ["Priya Šarma"],
+          assigneeAccountId: null,
+        }),
+      ),
+    ).toEqual(["assigned-to-priya-sarma", "reported-by-rohan-mehta"]);
+    expect(
+      nameLabels(bug({ raisedIn: "admin", reporterAccountId: null, assigneeNames: [] })),
+    ).toEqual([]);
+    expect(
+      nameLabels(bug({ raisedIn: "jira", reporterAccountId: null, assigneeNames: [] })),
+    ).toEqual([]);
+    expect(
+      nameLabels(
+        bug({
+          raisedIn: "qa",
+          reporterAccountId: "acc",
+          assigneeNames: ["Ravi"],
+          assigneeAccountId: "acc2",
+        }),
+      ),
+    ).toEqual([]);
+  });
+  it("changes only Bug Board's own name labels and nothing when they already match", () => {
+    expect(
+      nameLabelChanges(["bf-1-abcdef12", "team-x", "assigned-to-old"], ["assigned-to-new"]),
+    ).toEqual([{ remove: "assigned-to-old" }, { add: "assigned-to-new" }]);
+    expect(nameLabelChanges(["team-x", "reported-by-a"], ["reported-by-a"])).toBeNull();
+    expect(nameLabelChanges(["team-x"], [])).toBeNull();
+  });
+});
+
+describe("create body name labels", () => {
+  it("adds name labels to a new issue only when the project turned them on", () => {
+    const b = bug({ raisedIn: "reporter", reporterName: "Rohan", reporterAccountId: null });
+    const target = { projectId: "10000", issueTypeId: "10004" };
+    const off = createBody(b, localFields(b, CONFIG), target, CONFIG, "bf-1-abcdef12");
+    expect(off.fields["labels"]).toEqual(["bf-1-abcdef12"]);
+    const on = { ...CONFIG, nameLabels: true };
+    const withLabels = createBody(b, localFields(b, on), target, on, "bf-1-abcdef12");
+    expect(withLabels.fields["labels"]).toContain("reported-by-rohan");
   });
 });

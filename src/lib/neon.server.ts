@@ -220,6 +220,12 @@ export function neonUserError(err: unknown): { status: number; message: string }
       return { status: 500, message: "The database request could not be completed." };
   }
 }
+/** A committed write that queued Jira work is sent straight away (see jira/kick.server.ts). */
+function afterWrite(query: string | Statement[]) {
+  const text = typeof query === "string" ? query : query.map((s) => s.query).join("\n");
+  if (!text.includes("insert into bugflow.jira_outbox")) return;
+  void import("./jira/kick.server").then((m) => m.kickJiraOutbox()).catch(() => undefined);
+}
 export async function neonQuery<T = NeonResult>(
   query: string | Statement[],
   params: unknown[] = [],
@@ -230,7 +236,10 @@ export async function neonQuery<T = NeonResult>(
   let retried429 = false;
   for (let attempt = 1; ; attempt++) {
     const r = await neonFetch(toBody(query, params), headers);
-    if (r.status >= 200 && r.status < 300) return r.json as T;
+    if (r.status >= 200 && r.status < 300) {
+      afterWrite(query);
+      return r.json as T;
+    }
     if (isStale(r.json) || isEndpointBlocked(r.json)) throw neonFailure(r, false);
     if (r.status === 429 && !retried429) {
       retried429 = true;
@@ -256,7 +265,10 @@ export async function neonExecute<T = NeonResult>(
   headers: Record<string, string> = {},
 ): Promise<T> {
   const r = await neonFetch(toBody(query, params), headers);
-  if (r.status >= 200 && r.status < 300) return r.json as T;
+  if (r.status >= 200 && r.status < 300) {
+    afterWrite(query);
+    return r.json as T;
+  }
   throw neonFailure(r, true);
 }
 /** Run several read-only queries in a single request (one network round trip); results come back in order. */

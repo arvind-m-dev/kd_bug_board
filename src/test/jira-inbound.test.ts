@@ -300,6 +300,7 @@ describe("Jira → BugFlow: a bug created in Jira", () => {
       priority: "P2",
       status: "NEW",
       reporterName: "Jira Sync",
+      raisedIn: "jira",
     });
     expect(store.links.get("900")).toMatchObject({ state: "linked", jiraIssueId: issue.id });
   });
@@ -310,7 +311,8 @@ describe("Jira → BugFlow: a bug created in Jira", () => {
     await arrive({ issueId: issue.id });
     expect(details(issue)).toEqual([
       "Severity: Medium",
-      "Reported by: Jira Sync",
+      "Raised in: Jira",
+      "Reported by: Jira",
       "Bug Board: BF-900 https://bugs.example.test/admin/bugs?bug=900",
     ]);
     expect(readDescription(issue.fields["description"]).description).toBe(

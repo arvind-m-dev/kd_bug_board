@@ -47,6 +47,51 @@ describe("BugFlow → Jira: create", () => {
     expect(jira.issues.size).toBe(1);
   });
 
+  it("names a reporter linked after the issue was created, once, and goes on when Jira refuses", async () => {
+    const { store, jira, run } = await synced();
+    store.put(bug({ reporterAccountId: "acc-rohan" }));
+    expect(await run()).toEqual({ kind: "done", note: "synced" });
+    expect(jira.raw("20001").fields["reporter"]).toEqual({ accountId: "acc-rohan" });
+    jira.calls = [];
+    expect(await run()).toEqual({ kind: "done", note: "synced" });
+    expect(jira.calls).toEqual(["getIssue"]); // already named: nothing to write
+
+    const refused = await synced();
+    refused.store.put(bug({ reporterAccountId: "acc-rohan" }));
+    refused.jira.fail.updateIssue = [new JiraApiError("forbidden", 403)];
+    expect(await refused.run()).toEqual({ kind: "done", note: "synced" });
+  });
+
+  it("keeps name labels for people without a Jira account, touching no other label", async () => {
+    const config = { ...MAPPING.config, nameLabels: true };
+    const store = new MemoryStore();
+    const jira = new FakeJira();
+    const unlinked = bug({
+      raisedIn: "reporter",
+      reporterName: "Rohan Mehta",
+      reporterAccountId: null,
+      assigneeNames: ["Priya"],
+      assigneeAccountId: null,
+    });
+    store.put(unlinked);
+    const run = () => syncBug(row(), { ...MAPPING, config }, store, jira, () => store.clock);
+    await run();
+    const labels = () => jira.raw("20001").fields["labels"] as string[];
+    expect(labels()).toEqual(
+      expect.arrayContaining(["reported-by-rohan-mehta", "assigned-to-priya"]),
+    );
+    jira.raw("20001").fields["labels"] = [...labels(), "team-x"];
+    // Priya gets a Jira account: her label goes, the rest stay.
+    store.put({ ...unlinked, assigneeAccountId: "acc-priya" });
+    await run();
+    expect(labels()).toContain("team-x");
+    expect(labels()).toContain("reported-by-rohan-mehta");
+    expect(labels()).not.toContain("assigned-to-priya");
+    jira.calls = [];
+    await run();
+    expect(jira.calls.filter((c) => c === "updateIssue")).toEqual([]); // nothing left to change
+  });
+
   it("moves a bug that is already past New to its Jira status right after creating it", async () => {
     const { jira, store, run } = world(bug({ status: "IN_PROGRESS" }));
     await run();
@@ -430,5 +475,70 @@ describe("one bounded run", () => {
       now: () => (t += 6),
     });
     expect(log).toEqual(["row-1:done", "row-2:later:0:false"]);
+  });
+});
+
+describe("deletes: safe on both sides", () => {
+  async function linked(over: Partial<typeof MAPPING.config>, b = bug({ status: "IN_PROGRESS" })) {
+    const mapping = { ...MAPPING, config: { ...MAPPING.config, ...over } };
+    const store = new MemoryStore();
+    const jira = new FakeJira();
+    store.put(b);
+    const run = () => syncBug(row(), mapping, store, jira, () => store.clock);
+    await run();
+    jira.calls = [];
+    const issue = () => jira.raw("20001").fields;
+    return { store, jira, run, issue, b };
+  }
+
+  it("Trash closes the Jira issue with a label, once; restore reopens it to Bug Board's status", async () => {
+    const { store, jira, run, issue, b } = await linked({ trashCloses: true });
+    expect(issue()["status"]).toEqual({ id: "2" });
+    store.put(b, true);
+    expect(await run()).toEqual({ kind: "done", note: "trashed" });
+    expect(issue()["status"]).toEqual({ id: "4" }); // the status mapped for Won't fix
+    expect(issue()["labels"]).toContain("bugboard-trashed");
+    expect(store.links.get("41")?.state).toBe("local_trashed");
+    jira.calls = [];
+    await run();
+    expect(jira.calls).toEqual([]); // already closed: nothing more
+
+    store.put(b, false); // restored in Bug Board
+    expect(await run()).toEqual({ kind: "done", note: "synced" });
+    expect(issue()["status"]).toEqual({ id: "2" });
+    expect(issue()["labels"]).not.toContain("bugboard-trashed");
+    expect(store.links.get("41")?.state).toBe("linked");
+    expect(store.inbound).toEqual([]); // the close was never taken back into Bug Board as a Jira change
+  });
+
+  it("without the option, Trash leaves the Jira issue exactly as it is", async () => {
+    const { store, jira, run, b } = await linked({});
+    store.put(b, true);
+    expect(await run()).toEqual({ kind: "done", note: "trashed" });
+    expect(jira.calls).toEqual([]);
+  });
+
+  it("a Jira issue deleted in Jira sends its bug to Bug Board's Trash when the project follows deletes", async () => {
+    const { store, jira, run } = await linked({ followJiraDeletes: true });
+    jira.fail.getIssue = [new JiraApiError("not_found", 404)];
+    expect(await run()).toEqual({ kind: "done", note: "trashed_from_jira" });
+    expect(store.trashedFromJira).toEqual(["41"]);
+    expect(store.links.get("41")?.state).toBe("remote_missing");
+  });
+
+  it("lost access to the Jira project never trashes anything", async () => {
+    const { store, jira, run } = await linked({ followJiraDeletes: true });
+    jira.projectReadable = false;
+    jira.fail.getIssue = [new JiraApiError("not_found", 404)];
+    expect(await run()).toEqual({ kind: "done", note: "remote_missing" });
+    expect(store.trashedFromJira).toEqual([]);
+  });
+
+  it("without the option, a deleted Jira issue only marks the link missing", async () => {
+    const { store, jira, run } = await linked({});
+    jira.fail.getIssue = [new JiraApiError("not_found", 404)];
+    expect(await run()).toEqual({ kind: "done", note: "remote_missing" });
+    expect(store.trashedFromJira).toEqual([]);
+    expect(jira.calls).not.toContain("projectVisible");
   });
 });

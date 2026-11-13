@@ -17,7 +17,7 @@ import {
 import { JIRA_CALLBACK_OUTCOMES, isCallbackOutcome } from "@/lib/jira/oauth";
 import { JIRA_STATE_LABEL, type JiraConnectionState, type JiraStatus } from "@/lib/jira/types";
 import { actionError, ConfirmAction, ErrorNotice } from "./action-feedback";
-import { JiraHealth, JiraPeople, JiraProjects } from "./jira-sync";
+import { JiraDuplicates, JiraHealth, JiraPeople, JiraProjects, JiraSyncLog } from "./jira-sync";
 
 const TONE: Record<JiraConnectionState, string> = {
   connected: "text-success",
@@ -121,6 +121,15 @@ export function JiraSettings() {
         )}
         {outcome && outcome !== "connected" && outcome !== "choose_site" && (
           <ErrorNotice message={JIRA_CALLBACK_OUTCOMES[outcome]} />
+        )}
+        {outcome === "connected" && c?.state === "connected" && (
+          <p
+            role="status"
+            className="mx-5 mt-4 rounded-md bg-success/10 px-3 py-2 text-sm text-success"
+          >
+            ✓ Signed in to Jira{c.account ? ` as ${c.account}` : ""}. Bug Board read Jira
+            successfully with the new sign-in.
+          </p>
         )}
         {error && <ErrorNotice message={error} />}
         {!s && q.isPending && (
@@ -341,6 +350,8 @@ export function JiraSettings() {
           <JiraProjects canEdit={c.state === "connected"} />
           <JiraPeople canSearch={c.state === "connected"} />
           <JiraHealth />
+          <JiraDuplicates canSearch={c.state === "connected"} />
+          <JiraSyncLog />
         </>
       )}
     </>

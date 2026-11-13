@@ -76,5 +76,16 @@ export function jiraPort(mapping: Mapping): JiraPort {
       });
       return parsed(searchSchema, raw).issues.map(({ id, key }) => ({ id, key }));
     },
+    async projectVisible(projectId) {
+      if (!/^\d{1,20}$/.test(projectId)) return false;
+      try {
+        await jiraFetch(connection, `/rest/api/3/project/${projectId}`);
+        return true;
+      } catch (error) {
+        if (error instanceof JiraApiError && ["not_found", "forbidden"].includes(error.kind))
+          return false;
+        throw error;
+      }
+    },
   };
 }

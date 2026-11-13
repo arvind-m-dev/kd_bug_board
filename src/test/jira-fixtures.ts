@@ -1,3 +1,4 @@
+import { JIRA_SYNC_USER_ID } from "@/lib/jira/types";
 import { STATUSES } from "@/lib/bugflow";
 import { DEFAULT_OPTIONS, type DropdownOptions } from "@/lib/bug-workflow";
 import { JiraApiError } from "@/lib/jira/errors";
@@ -66,6 +67,7 @@ export const bug = (over: Partial<LocalBug> = {}): LocalBug => ({
   reporterId: "aaaaaaaa-0000-4000-8000-0000000000a1",
   assigneeId: null,
   reporterName: "Asha",
+  raisedIn: "reporter",
   reporterAccountId: null,
   assigneeNames: [],
   assigneeAccountId: null,
@@ -153,8 +155,19 @@ export class FakeJira implements JiraPort {
     this.issues.set(issue.id, issue);
     return issue;
   }
-  async updateIssue(id: string, body: { fields: Record<string, unknown> }) {
+  async updateIssue(
+    id: string,
+    body: { fields?: Record<string, unknown>; update?: Record<string, unknown[]> },
+  ) {
     this.enter("updateIssue");
+    // Jira's "update" verbs: only labels add/remove are used.
+    for (const op of (body.update?.["labels"] ?? []) as { add?: string; remove?: string }[]) {
+      const labels = (this.raw(id).fields["labels"] as string[] | undefined) ?? [];
+      this.raw(id).fields["labels"] = op.add
+        ? [...new Set([...labels, op.add])]
+        : labels.filter((l) => l !== op.remove);
+    }
+    if (!body.fields) return;
     this.lastUpdate = body.fields;
     const fields = structuredClone(body.fields);
     // Jira takes a sprint as its number and shows it back as a list of sprint objects.
@@ -186,6 +199,12 @@ export class FakeJira implements JiraPort {
           (i.fields["labels"] as string[] | undefined)?.includes(label),
       )
       .map(({ id, key }) => ({ id, key }));
+  }
+  /** False: the Jira project cannot be read (lost access). */
+  projectReadable = true;
+  async projectVisible() {
+    this.enter("projectVisible");
+    return this.projectReadable;
   }
 }
 
@@ -245,6 +264,16 @@ export class MemoryStore implements SyncStore {
   }
   async setLinkState(linkId: string, state: LinkState) {
     for (const link of this.links.values()) if (link.id === linkId) link.state = state;
+  }
+  /** Bugs moved to the Trash because their Jira issue was deleted. */
+  trashedFromJira: string[] = [];
+  async trashFromJira(bugId: string, linkId: string) {
+    const b = this.bugs.get(bugId);
+    if (b && !b.trashed) {
+      b.trashed = true;
+      this.trashedFromJira.push(bugId);
+    }
+    await this.setLinkState(linkId, "remote_missing");
   }
 
   // ---- Jira → BugFlow ----
@@ -332,9 +361,11 @@ export class MemoryStore implements SyncStore {
       code: `${codePrefix}-${id}`,
       url: `https://bugs.example.test/admin/bugs?bug=${id}`,
       status: "NEW",
-      reporterId: member?.userId ?? "jira-sync",
+      reporterId: member?.userId ?? JIRA_SYNC_USER_ID,
       assigneeId: null,
       reporterName: member?.name ?? "Jira Sync",
+      raisedIn: "jira",
+      jiraReporterName: remote.reporter?.displayName ?? null,
       reporterAccountId: member ? remote.reporter!.accountId : null,
       assigneeNames: [],
       assigneeAccountId: null,

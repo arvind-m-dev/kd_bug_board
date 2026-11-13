@@ -2,7 +2,8 @@ import { formatBugCode } from "../bug-workflow";
 import { neonExecute, neonQuery } from "../neon.server";
 import { checkOrigin, requireAdmin } from "../portal-access.server";
 import { reconcileAndProcess } from "./jobs.server";
-import { SYNC_FIELDS, type SyncField } from "./types";
+import { describeSyncLog, type SyncLogEntry, type SyncLogFilter } from "./log";
+import { JIRA_SYNC_USER_ID, SYNC_FIELDS, type SyncField } from "./types";
 
 // What an Admin can see and do about the running sync: its health, the work that is waiting or parked, the
 // conflicts that need a person, and the decisions on them. A decision is only recorded here; the next sync pass
@@ -206,4 +207,78 @@ export async function syncJiraNow() {
   await requireAdmin();
   const run = await reconcileAndProcess();
   return { run, overview: await jiraOverview() };
+}
+
+// ---------------------------------------------------------------- sync log
+
+const IS_ADMIN = (col: string) =>
+  `(exists(select 1 from bugflow.portals p where p.user_id=${col} and p.type='admin') and not exists(select 1 from bugflow.portals p where p.user_id=${col} and p.type<>'admin'))`;
+const WHO = (col: string, name: string) =>
+  `case when ${col}='${JIRA_SYNC_USER_ID}' then 'jira-sync' when ${IS_ADMIN(col)} then 'admin' else ${name} end`;
+
+/**
+ * The sync log: what moved between Bug Board and Jira, when, which way and because of whom, plus every queue
+ * error that is still waiting or stopped. Newest first; at most 150 lines for the chosen filter.
+ */
+export async function jiraSyncLog(filter: SyncLogFilter = "all"): Promise<SyncLogEntry[]> {
+  await requireAdmin();
+  const wantErrors = filter === "all" || filter === "error";
+  const wantActivity = filter !== "error";
+  const { results } = await neonQuery<Batch>(
+    [
+      {
+        query: wantActivity
+          ? `select a.id::text as id,to_json(a.created_at) as at,a.action,a.detail,a.bug_id,b.code_prefix,${WHO("a.actor_id", "u.name")} as actor,
+        case when a.action in ('jira.created','jira.exported') then (select ${WHO("x.actor_id", "xu.name")} from bugflow.activity x join bugflow.users xu on xu.id=x.actor_id where x.bug_id=a.bug_id and x.actor_id<>'${JIRA_SYNC_USER_ID}' and x.action like 'bug.%' and x.created_at<=a.created_at and x.created_at>a.created_at-interval '15 minutes' order by x.created_at desc limit 1) end as changed_by,
+        case when a.action='bug.assign' then (select au.name from bugflow.users au where au.id::text=a.detail->>'assignee') end as assignee_name
+        from bugflow.activity a join bugflow.users u on u.id=a.actor_id left join bugflow.bugs b on b.id=a.bug_id
+        where (a.action like 'jira.%' or (a.action='member.updated' and a.detail->>'source'='jira') or (a.actor_id='${JIRA_SYNC_USER_ID}' and a.action like 'bug.%')) order by a.created_at desc limit 400`
+          : `select 1 where false`,
+      },
+      {
+        query: wantErrors
+          ? `select x.id,to_json(x.ts) as at,x.direction,x.state,x.last_error,x.bug_id,x.code_prefix,x.jira_issue_key from ((select 'o'||o.id as id,coalesce(o.processed_at,o.next_attempt_at,o.created_at) as ts,'to_jira' as direction,o.state,o.last_error,o.bug_id,b.code_prefix,l.jira_issue_key from bugflow.jira_outbox o join bugflow.bugs b on b.id=o.bug_id left join bugflow.jira_issue_links l on l.bug_id=o.bug_id and l.state<>'disabled' where o.state in ('retry','dead') and o.last_error is not null) union all (select 'i'||i.id,coalesce(i.processed_at,i.next_attempt_at,i.received_at),'from_jira',i.state,i.last_error,l.bug_id,b.code_prefix,coalesce(i.jira_issue_key,i.jira_issue_id) from bugflow.jira_inbox i left join bugflow.jira_issue_links l on l.jira_issue_id=i.jira_issue_id and l.state<>'disabled' left join bugflow.bugs b on b.id=l.bug_id where i.state in ('retry','dead') and i.last_error is not null)) x order by x.ts desc limit 100`
+          : `select 1 where false`,
+      },
+    ],
+    [],
+    { "Neon-Batch-Read-Only": "true" },
+  );
+  const code = (r: Row) =>
+    r["bug_id"] == null
+      ? null
+      : formatBugCode(String(r["bug_id"]), String(r["code_prefix"] ?? "BF"));
+  const activity = (results[0]?.rows ?? []).map((r) =>
+    describeSyncLog({
+      id: String(r["id"]),
+      at: String(r["at"]),
+      action: String(r["action"]),
+      detail: (r["detail"] as Record<string, unknown>) ?? {},
+      actor: String(r["actor"] ?? ""),
+      changedBy: r["changed_by"] == null ? null : String(r["changed_by"]),
+      assigneeName: r["assignee_name"] == null ? null : String(r["assignee_name"]),
+      bugId: r["bug_id"] == null ? null : String(r["bug_id"]),
+      bugCode: code(r),
+    }),
+  );
+  const errors = (results[1]?.rows ?? []).map((r) =>
+    describeSyncLog({
+      id: String(r["id"]),
+      at: String(r["at"]),
+      action: "queue.error",
+      detail: {
+        direction: r["direction"],
+        state: r["state"],
+        error: r["last_error"],
+        issueKey: r["jira_issue_key"],
+      },
+      actor: "",
+      bugId: r["bug_id"] == null ? null : String(r["bug_id"]),
+      bugCode: code(r),
+    }),
+  );
+  return [...activity, ...errors]
+    .filter((e) => filter === "all" || e.kind === filter)
+    .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+    .slice(0, 150);
 }

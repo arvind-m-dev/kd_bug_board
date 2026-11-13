@@ -117,7 +117,7 @@ export const neonQueue: OutboxQueue = {
 const LINK = `select id,state,jira_issue_id,create_op_id,bugflow_snapshot,jira_snapshot,overrides,(extract(epoch from updated_at)*1000)::bigint as touched_ms,updated_at::text as touched from bugflow.jira_issue_links where bug_id=$1 order by (state='disabled'),updated_at desc limit 1`;
 const account = (column: string) =>
   `(select um.account_id from bugflow.jira_user_mappings um where um.connection_id=$2 and um.user_id=${column} and um.confirmed_at is not null)`;
-const BUG = `select b.id,b.reporter_id,b.assignee_id,b.estimate,(select jl.jira_sprint_id::text from bugflow.sprint_items si join bugflow.sprints s on s.id=si.sprint_id join bugflow.jira_sprint_links jl on jl.sprint_id=s.id and jl.connection_id=$2 where si.bug_id=b.id and si.removed_at is null and s.state in ('planned','active') limit 1) as sprint_jira_id,b.code_prefix,b.title,b.description,b.expected,b.actual,b.priority,b.severity,b.status,b.due_on,b.environment,(b.deleted_at is not null) as trashed,b.updated_at::text as version,coalesce(d.module_name,'') as module_name,coalesce((select jsonb_agg(s.content order by s.position) from bugflow.steps s where s.bug_id=b.id),'[]'::jsonb) as steps,r.name as reporter_name,a.name as assignee_name,${account("b.reporter_id")} as reporter_account,${account("b.assignee_id")} as assignee_account,coalesce((select jsonb_agg(ux.name order by (ux.id=b.assignee_id) desc,ux.name) from bugflow.bug_assignees bx join bugflow.users ux on ux.id=bx.user_id where bx.bug_id=b.id),'[]'::jsonb) as assignee_names from bugflow.bugs b join bugflow.users r on r.id=b.reporter_id left join bugflow.users a on a.id=b.assignee_id left join bugflow.bug_details d on d.bug_id=b.id where b.id=$1 and b.kind='bug' and b.purged_at is null`;
+const BUG = `select b.id,b.reporter_id,b.assignee_id,b.estimate,(select jl.jira_sprint_id::text from bugflow.sprint_items si join bugflow.sprints s on s.id=si.sprint_id join bugflow.jira_sprint_links jl on jl.sprint_id=s.id and jl.connection_id=$2 where si.bug_id=b.id and si.removed_at is null and s.state in ('planned','active') limit 1) as sprint_jira_id,b.code_prefix,b.title,b.description,b.expected,b.actual,b.priority,b.severity,b.status,b.due_on,b.environment,(b.deleted_at is not null) as trashed,b.updated_at::text as version,coalesce(d.module_name,'') as module_name,coalesce((select jsonb_agg(s.content order by s.position) from bugflow.steps s where s.bug_id=b.id),'[]'::jsonb) as steps,r.name as reporter_name,(select coalesce(min(p.type) filter (where p.type<>'admin'),min(p.type)) from bugflow.portals p where p.user_id=b.reporter_id) as reporter_portal,(select l.remote_reporter->>'displayName' from bugflow.jira_issue_links l where l.bug_id=b.id and l.origin='jira' limit 1) as jira_reporter,exists(select 1 from bugflow.jira_issue_links l where l.bug_id=b.id and l.origin='jira') as from_jira,a.name as assignee_name,${account("b.reporter_id")} as reporter_account,${account("b.assignee_id")} as assignee_account,coalesce((select jsonb_agg(ux.name order by (ux.id=b.assignee_id) desc,ux.name) from bugflow.bug_assignees bx join bugflow.users ux on ux.id=bx.user_id where bx.bug_id=b.id),'[]'::jsonb) as assignee_names from bugflow.bugs b join bugflow.users r on r.id=b.reporter_id left join bugflow.users a on a.id=b.assignee_id left join bugflow.bug_details d on d.bug_id=b.id where b.id=$1 and b.kind='bug' and b.purged_at is null`;
 
 const text = (v: unknown) => (v == null ? "" : String(v));
 const names = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
@@ -173,6 +173,11 @@ export const neonStore: SyncStore = {
       reporterId: String(r["reporter_id"]),
       assigneeId: r["assignee_id"] ? String(r["assignee_id"]) : null,
       reporterName: text(r["reporter_name"]),
+      raisedIn:
+        r["from_jira"] === true || String(r["reporter_id"]) === JIRA_SYNC_USER_ID
+          ? "jira"
+          : String(r["reporter_portal"] ?? ""),
+      jiraReporterName: r["jira_reporter"] ? String(r["jira_reporter"]) : null,
       reporterAccountId: r["reporter_account"] ? String(r["reporter_account"]) : null,
       assigneeNames: all.length ? all : r["assignee_name"] ? [String(r["assignee_name"])] : [],
       assigneeAccountId: r["assignee_account"] ? String(r["assignee_account"]) : null,
@@ -270,6 +275,15 @@ export const neonStore: SyncStore = {
     await neonExecute(
       `update bugflow.jira_issue_links set state=$2,updated_at=now() where id=$1 and state<>'disabled'`,
       [linkId, state],
+    );
+  },
+
+  async trashFromJira(bugId, linkId) {
+    // Bug Board's own soft delete (restorable from the Trash for 30 days), attributed to the Jira integration;
+    // the audit row only when this call moved it, and the link marked missing in the same statement.
+    await neonExecute(
+      `with done as (update bugflow.bugs set deleted_at=now(),updated_at=clock_timestamp() where id=$1::bigint and deleted_at is null and purged_at is null returning id), logged as (insert into bugflow.activity(id,bug_id,actor_id,action,detail) select gen_random_uuid(),id,$3::uuid,'bug.deleted',jsonb_build_object('reason','Deleted in Jira','source','jira','issueKey',(select jira_issue_key from bugflow.jira_issue_links where id=$2::uuid)) from done), marked as (update bugflow.jira_issue_links set state='remote_missing',updated_at=now() where id=$2::uuid and state<>'disabled' returning id) select (select count(*) from done)::int as trashed`,
+      [bugId, linkId, JIRA_SYNC_USER_ID],
     );
   },
 };

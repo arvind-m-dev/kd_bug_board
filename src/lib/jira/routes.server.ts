@@ -26,14 +26,20 @@ async function sameSecret(given: string, expected: string) {
 }
 
 /**
- * Job endpoints are authorized only by `Authorization: Bearer <JIRA_JOB_SECRET>`. Cookies are never looked at,
- * so a signed-in browser has no authority here, and without a configured secret the endpoint stays closed.
+ * Job endpoints are authorized only by `Authorization: Bearer <secret>`: `JIRA_JOB_SECRET`, or Vercel Cron's
+ * `CRON_SECRET` (Vercel sends it on its scheduled calls). Cookies are never looked at, so a signed-in browser has
+ * no authority here, and without a configured secret (32+ characters) the endpoint stays closed.
  */
-export async function jobAuthorized(request: Request, secret = process.env["JIRA_JOB_SECRET"]) {
-  const expected = secret?.trim() ?? "";
-  if (expected.length < 32) return "not_configured" as const;
+export async function jobAuthorized(
+  request: Request,
+  secrets: (string | undefined)[] = [process.env["JIRA_JOB_SECRET"], process.env["CRON_SECRET"]],
+) {
+  const expected = secrets.map((s) => s?.trim() ?? "").filter((s) => s.length >= 32);
+  if (!expected.length) return "not_configured" as const;
   const given = /^Bearer (.+)$/.exec(request.headers.get("authorization") ?? "")?.[1] ?? "";
-  return given && (await sameSecret(given, expected)) ? ("ok" as const) : ("denied" as const);
+  if (!given) return "denied" as const;
+  for (const e of expected) if (await sameSecret(given, e)) return "ok" as const;
+  return "denied" as const;
 }
 
 export async function handleJiraRoute(request: Request): Promise<Response> {
@@ -47,7 +53,11 @@ export async function handleJiraRoute(request: Request): Promise<Response> {
     const { handleJiraWebhook } = await import("./webhook.server");
     return handleJiraWebhook(request, webhook[1] ?? "");
   }
-  if ((path === JIRA_PROCESS_PATH || path === JIRA_RECONCILE_PATH) && request.method === "POST") {
+  // POST from any scheduler; GET as well, because that is how Vercel Cron calls (with its secret).
+  if (
+    (path === JIRA_PROCESS_PATH || path === JIRA_RECONCILE_PATH) &&
+    (request.method === "POST" || request.method === "GET")
+  ) {
     const auth = await jobAuthorized(request);
     if (auth === "not_configured") return json({ error: "not_configured" }, 503);
     if (auth === "denied") return json({ error: "unauthorized" }, 401);

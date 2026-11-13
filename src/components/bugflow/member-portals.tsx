@@ -260,7 +260,17 @@ export function MemberPortals({ initialSearch = "" }: { initialSearch?: string }
                   >
                     <span className="bf-avatar">{m.name.slice(0, 2).toUpperCase()}</span>
                     <span>
-                      <strong className="bf-person-link block">{m.name}</strong>
+                      <strong className="bf-person-link block">
+                        {m.name}
+                        {m.jiraName !== null && (
+                          <span
+                            className="bf-tag ml-2 align-middle text-[10.5px]"
+                            title={`Linked to Jira account ${m.jiraName || "(no name)"}`}
+                          >
+                            Jira
+                          </span>
+                        )}
+                      </strong>
                       <span
                         className="block whitespace-nowrap font-mono text-[11.5px] text-muted-foreground"
                         title={m.id}

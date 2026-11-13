@@ -240,6 +240,7 @@ it("'Sync now' runs a bounded pass and reports what it did", async () => {
   const { run, overview } = await syncJiraNow();
   expect(run).toEqual({
     reconcile: { skipped: "not_configured" },
+    people: "skipped",
     inbox: { claimed: 0, done: 0, conflict: 0, retry: 0, dead: 0, waiting: 0 },
     outbox: { claimed: 0, done: 0, conflict: 0, retry: 0, dead: 0, waiting: 0 },
   });

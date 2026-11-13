@@ -42,6 +42,15 @@ export const mappingConfigSchema = z.object({
     .default({}),
   assignee: z.boolean().default(true),
   dueOn: z.boolean().default(true),
+  /** Adds `reported-by-…` / `assigned-to-…` labels in Jira for people with no linked Jira account. */
+  nameLabels: z.boolean().default(false),
+  /**
+   * A bug moved to Bug Board's Trash closes its Jira issue (the status mapped for Won't fix, plus a
+   * `bugboard-trashed` label); restoring it reopens the issue. Nothing is ever deleted in Jira.
+   */
+  trashCloses: z.boolean().default(false),
+  /** A Jira issue deleted in Jira moves its bug to Bug Board's Trash (recoverable there for 30 days). */
+  followJiraDeletes: z.boolean().default(false),
   /** Jira's Sprint field. Set: sprint membership is synchronized (Jira owns the sprints themselves). */
   sprintField: customFieldId.optional(),
   /** Jira's story-points field. Set: the estimate is synchronized. */
@@ -49,9 +58,9 @@ export const mappingConfigSchema = z.object({
   /** Fields a Jira edit may change in BugFlow. Off: BugFlow owns the field and Jira only receives it. */
   inbound: z
     .object({
-      priority: z.boolean().default(false),
-      severity: z.boolean().default(false),
-      dueOn: z.boolean().default(false),
+      priority: z.boolean().default(true),
+      severity: z.boolean().default(true),
+      dueOn: z.boolean().default(true),
       /**
        * A Jira move to the status that means Resolved may resolve a bug that is waiting for retest (and only
        * then), recorded as a verification by the Jira integration. Off: it always waits for BugFlow's QA.
