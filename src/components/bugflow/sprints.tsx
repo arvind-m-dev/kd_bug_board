@@ -62,7 +62,7 @@ export function SprintsView() {
 
   const { projects, sprints } = q.data;
   return (
-    <section className="grid gap-4">
+    <section className="grid grid-cols-1 gap-4">
       <div className="bf-section-heading">
         <div className="flex items-center gap-2">
           <CalendarRange size={18} className="text-primary" />
@@ -83,7 +83,7 @@ export function SprintsView() {
           No sprints yet. Create one to start planning.
         </p>
       )}
-      <div className="grid gap-3">
+      <div className="grid grid-cols-1 gap-3">
         {sprints.map((s) => (
           <SprintCard key={s.id} sprint={s} openSprints={sprints} onChanged={refresh} />
         ))}
@@ -406,7 +406,7 @@ export function PortalSprints({ access }: { access: BugAccess }) {
       </p>
     );
   return (
-    <div className="grid gap-3">
+    <div className="grid grid-cols-1 gap-3">
       {q.data.map((s) => (
         <div key={s.id} className="bf-panel">
           <div className="bf-panel-heading">

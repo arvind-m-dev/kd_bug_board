@@ -69,7 +69,7 @@ likely pairs) · "Raised in" + Admin naming on every issue · purged/trashed mem
 | T12 | Webhooks (needs HTTPS tunnel + `BUGFLOW_TRUST_PROXY=1`) | Jira change arrives in seconds; duplicate delivery ignored | to run on the Vercel deploy (HTTPS) |
 | T13 | Member added in Jira → Add to Bug Board → assigned in Jira | Linked, assignment applied, Jira notifies | PASS earlier today: Jira people listed, Add to Bug Board linked them, Jira assignments applied |
 | T14 | Member deleted, Trash emptied, re-added | Works; old history keeps old name | PASS earlier today: purged member re-added without the database error |
-| T15 | `npm run test:db`, `npm test`, `npm run build`, Playwright e2e | All green | PASS: 499 unit, 59 database (local Postgres), 6 smoke e2e (Chrome), tsc, lint, build. Full e2e not run: it writes many bugs that would sync to Jira |
+| T15 | `npm run test:db`, `npm test`, `npm run build`, Playwright e2e | All green | PASS: 499 unit, 59 database (local Postgres), 6 smoke + 56 full e2e (Chrome; Jira paused during the run, 0 test bugs reached Jira), tsc, lint, build. Fixed on the way: a long unbroken sprint name widened the Sprints page past the screen |
 
 Also verified live: name labels on 26 SCRUM issues (e.g. SCRUM-38 `reported-by-stephen`, `assigned-to-shathish`);
 Sync log and Same-bug panels render real data (found BF-000118/119 and BF-000120/121 same-title pairs).
