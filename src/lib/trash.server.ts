@@ -112,11 +112,22 @@ export async function restoreTrashItem(item: TrashItemRef) {
     return { kind: "file" as const, id: item.id, label: r.name };
   }
   if (item.kind === "bug") {
-    const { rows } = await neonExecute(
-      `with r as (update bugflow.bugs set deleted_at=null,updated_at=clock_timestamp() where id=$1 and deleted_at is not null and purged_at is null returning id)
+    const restoreId = crypto.randomUUID();
+    const restore = {
+      query: `with r as (update bugflow.bugs set deleted_at=null,updated_at=clock_timestamp() where id=$1 and deleted_at is not null and purged_at is null returning id)
       insert into bugflow.activity(id,bug_id,actor_id,action,detail) select $2,r.id,$3,'bug.restored','{}'::jsonb from r returning bug_id`,
-      [item.id, crypto.randomUUID(), admin.userId],
-    );
+      params: [item.id, restoreId, admin.userId],
+    };
+    // With Jira tables present the restore also marks the bug for Jira, in the same transaction.
+    const { jiraOutboxOn, outboxStatement } = await import("./jira/outbox-entry.server");
+    const rows = (await jiraOutboxOn())
+      ? ((
+          await neonExecute<{ results: { rows: Record<string, unknown>[] }[] }>([
+            restore,
+            outboxStatement(item.id, restoreId),
+          ])
+        ).results[0]?.rows ?? [])
+      : (await neonExecute(restore.query, restore.params)).rows;
     if (!rows.length) throw new Error("This bug is no longer in the Trash.");
     return { kind: "bug" as const, id: item.id, label: formatBugCode(item.id) };
   }

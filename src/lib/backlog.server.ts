@@ -10,6 +10,7 @@ import {
   type WorkKind,
 } from "./backlog";
 import type { Status } from "./bugflow";
+import { jiraOutboxOn, outboxMarker } from "./jira/outbox-entry.server";
 
 export type BacklogItem = {
   id: string;
@@ -215,7 +216,16 @@ export async function updateWorkItem(data: UpdateWorkItem) {
       },
     },
   );
-  const { rows } = await neonExecute(q.query, q.params);
+  // An estimate change is marked for Jira in the same transaction (the item row has no version to compare).
+  const jira = data.estimate !== undefined && (await jiraOutboxOn());
+  const rows = jira
+    ? ((
+        await neonExecute<{ results: { rows: Record<string, unknown>[] }[] }>([
+          q,
+          outboxMarker(data.id, "estimateField"),
+        ])
+      ).results[0]?.rows ?? [])
+    : (await neonExecute(q.query, q.params)).rows;
   if (!rows[0]) throw new Error("This item is not available.");
   return { saved: true };
 }

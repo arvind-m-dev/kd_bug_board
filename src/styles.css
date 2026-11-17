@@ -1980,9 +1980,38 @@ html[data-density=compact] .bf-settings-tabs { top: 52px; }
 .bf-role-tag[data-role=developer] { color: oklch(.62 .15 255); background: color-mix(in oklab, oklch(.62 .15 255) 16%, transparent); }
 .bf-role-tag[data-role=qa] { color: oklch(.66 .15 155); background: color-mix(in oklab, oklch(.66 .15 155) 16%, transparent); }
 .bf-role-tag[data-role=reporter] { color: oklch(.7 .14 70); background: color-mix(in oklab, oklch(.7 .14 70) 16%, transparent); }
+/* Jira → People: role-coloured avatars, link-status pills, clickable count chips. */
+.bf-avatar[data-role=developer] { color: oklch(.62 .15 255); background: color-mix(in oklab, oklch(.62 .15 255) 18%, transparent); }
+.bf-avatar[data-role=qa] { color: oklch(.66 .15 155); background: color-mix(in oklab, oklch(.66 .15 155) 18%, transparent); }
+.bf-avatar[data-role=reporter] { color: oklch(.7 .14 70); background: color-mix(in oklab, oklch(.7 .14 70) 18%, transparent); }
+.bf-link-pill { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 2px 9px; border-radius: 999px; border: 1px solid transparent; font-size: 12px; font-weight: 600; line-height: 1.5; }
+.bf-link-pill[data-state=linked] { color: var(--success); background: var(--success-soft); border-color: color-mix(in oklab, var(--success) 30%, transparent); }
+.bf-link-pill[data-state=unlinked] { color: var(--warning); background: var(--warning-soft); border-color: color-mix(in oklab, var(--warning) 30%, transparent); }
+.bf-link-pill[data-state=jira] { color: var(--info); background: var(--info-soft); border-color: color-mix(in oklab, var(--info) 30%, transparent); }
+.bf-count-chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); font-size: 12.5px; color: var(--muted-foreground); cursor: pointer; }
+.bf-count-chip strong { font-size: 18px; font-weight: 700; line-height: 1; }
+.bf-count-chip[data-tone=success] strong { color: var(--success); }
+.bf-count-chip[data-tone=warning] strong { color: var(--warning); }
+.bf-count-chip[data-tone=info] strong { color: var(--info); }
+.bf-count-chip[aria-pressed=true] { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); color: var(--foreground); }
+.bf-people-name { font-size: 14px !important; font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .bf-role-more { flex-shrink: 0; font-size: 11px; font-weight: 600; color: var(--muted-foreground); }
 /* Backlog on phones: the row wraps so estimate, ready and sprint controls drop under the title instead of clipping. */
 @media (max-width: 640px) {
   .bf-backlog-row { flex-wrap: wrap; row-gap: 6px; }
   .bf-backlog-title { flex-basis: calc(100% - 90px); }
 }
+/* Jira → Sync log: one line per change, coloured by which way it went. */
+.bf-sync-log { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; max-height: 520px; overflow-y: auto; overscroll-behavior: contain; }
+.bf-sync-log li { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: 8px; border-left: 3px solid var(--border); }
+.bf-sync-log li:nth-child(odd) { background: color-mix(in oklab, var(--foreground) 3%, transparent); }
+.bf-sync-text { margin: 0; font-size: 13.5px; overflow-wrap: anywhere; }
+.bf-sync-kind { flex-shrink: 0; min-width: 72px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; text-align: center; color: var(--muted-foreground); background: color-mix(in oklab, var(--foreground) 8%, transparent); }
+.bf-sync-log li[data-kind=to_jira] { border-left-color: var(--info); }
+.bf-sync-log li[data-kind=to_jira] .bf-sync-kind { color: var(--info); background: var(--info-soft); }
+.bf-sync-log li[data-kind=from_jira] { border-left-color: var(--success); }
+.bf-sync-log li[data-kind=from_jira] .bf-sync-kind { color: var(--success); background: var(--success-soft); }
+.bf-sync-log li[data-kind=decision] { border-left-color: var(--warning); }
+.bf-sync-log li[data-kind=decision] .bf-sync-kind { color: var(--warning); background: var(--warning-soft); }
+.bf-sync-log li[data-kind=error] { border-left-color: var(--destructive); }
+.bf-sync-log li[data-kind=error] .bf-sync-kind { color: var(--destructive); background: color-mix(in oklab, var(--destructive) 14%, transparent); }

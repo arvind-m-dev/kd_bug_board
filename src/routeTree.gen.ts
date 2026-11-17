@@ -34,6 +34,7 @@ import { Route as ReporterPortalTokenRouteImport } from './routes/reporter.$port
 import { Route as AdminSettingsAiRouteImport } from './routes/admin_.settings_.ai'
 import { Route as AdminSettingsAppearanceRouteImport } from './routes/admin_.settings_.appearance'
 import { Route as AdminSettingsHealthRouteImport } from './routes/admin_.settings_.health'
+import { Route as AdminSettingsJiraRouteImport } from './routes/admin_.settings_.jira'
 import { Route as AdminSettingsOptionsRouteImport } from './routes/admin_.settings_.options'
 import { Route as AdminSettingsStorageRouteImport } from './routes/admin_.settings_.storage'
 
@@ -162,6 +163,11 @@ const AdminSettingsHealthRoute = AdminSettingsHealthRouteImport.update({
   path: '/admin/settings/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminSettingsJiraRoute = AdminSettingsJiraRouteImport.update({
+  id: '/admin_/settings_/jira',
+  path: '/admin/settings/jira',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminSettingsOptionsRoute = AdminSettingsOptionsRouteImport.update({
   id: '/admin_/settings_/options',
   path: '/admin/settings/options',
@@ -199,6 +205,7 @@ export interface FileRoutesByFullPath {
   '/admin/settings/ai': typeof AdminSettingsAiRoute
   '/admin/settings/appearance': typeof AdminSettingsAppearanceRoute
   '/admin/settings/health': typeof AdminSettingsHealthRoute
+  '/admin/settings/jira': typeof AdminSettingsJiraRoute
   '/admin/settings/options': typeof AdminSettingsOptionsRoute
   '/admin/settings/storage': typeof AdminSettingsStorageRoute
 }
@@ -228,6 +235,7 @@ export interface FileRoutesByTo {
   '/admin/settings/ai': typeof AdminSettingsAiRoute
   '/admin/settings/appearance': typeof AdminSettingsAppearanceRoute
   '/admin/settings/health': typeof AdminSettingsHealthRoute
+  '/admin/settings/jira': typeof AdminSettingsJiraRoute
   '/admin/settings/options': typeof AdminSettingsOptionsRoute
   '/admin/settings/storage': typeof AdminSettingsStorageRoute
 }
@@ -258,6 +266,7 @@ export interface FileRoutesById {
   '/admin_/settings_/ai': typeof AdminSettingsAiRoute
   '/admin_/settings_/appearance': typeof AdminSettingsAppearanceRoute
   '/admin_/settings_/health': typeof AdminSettingsHealthRoute
+  '/admin_/settings_/jira': typeof AdminSettingsJiraRoute
   '/admin_/settings_/options': typeof AdminSettingsOptionsRoute
   '/admin_/settings_/storage': typeof AdminSettingsStorageRoute
 }
@@ -289,6 +298,7 @@ export interface FileRouteTypes {
     | '/admin/settings/ai'
     | '/admin/settings/appearance'
     | '/admin/settings/health'
+    | '/admin/settings/jira'
     | '/admin/settings/options'
     | '/admin/settings/storage'
   fileRoutesByTo: FileRoutesByTo
@@ -318,6 +328,7 @@ export interface FileRouteTypes {
     | '/admin/settings/ai'
     | '/admin/settings/appearance'
     | '/admin/settings/health'
+    | '/admin/settings/jira'
     | '/admin/settings/options'
     | '/admin/settings/storage'
   id:
@@ -347,6 +358,7 @@ export interface FileRouteTypes {
     | '/admin_/settings_/ai'
     | '/admin_/settings_/appearance'
     | '/admin_/settings_/health'
+    | '/admin_/settings_/jira'
     | '/admin_/settings_/options'
     | '/admin_/settings_/storage'
   fileRoutesById: FileRoutesById
@@ -377,6 +389,7 @@ export interface RootRouteChildren {
   AdminSettingsAiRoute: typeof AdminSettingsAiRoute
   AdminSettingsAppearanceRoute: typeof AdminSettingsAppearanceRoute
   AdminSettingsHealthRoute: typeof AdminSettingsHealthRoute
+  AdminSettingsJiraRoute: typeof AdminSettingsJiraRoute
   AdminSettingsOptionsRoute: typeof AdminSettingsOptionsRoute
   AdminSettingsStorageRoute: typeof AdminSettingsStorageRoute
 }
@@ -558,6 +571,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSettingsHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/settings_/jira': {
+      id: '/admin_/settings_/jira'
+      path: '/admin/settings/jira'
+      fullPath: '/admin/settings/jira'
+      preLoaderRoute: typeof AdminSettingsJiraRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin_/settings_/options': {
       id: '/admin_/settings_/options'
       path: '/admin/settings/options'
@@ -601,6 +621,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminSettingsAiRoute: AdminSettingsAiRoute,
   AdminSettingsAppearanceRoute: AdminSettingsAppearanceRoute,
   AdminSettingsHealthRoute: AdminSettingsHealthRoute,
+  AdminSettingsJiraRoute: AdminSettingsJiraRoute,
   AdminSettingsOptionsRoute: AdminSettingsOptionsRoute,
   AdminSettingsStorageRoute: AdminSettingsStorageRoute,
 }

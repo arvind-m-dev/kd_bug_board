@@ -3,7 +3,14 @@ export const NOTIFICATION_DAYS = 10;
  * File events (attached, removed, restored, renamed, marked up, cleared) are too frequent to notify about: they stay in
  * the activity log and on each bug, but never reach the bell. Bug events (reported, assigned, status, deleted…) do.
  */
-export const QUIET_ACTION_PREFIXES = ["bug.media_", "sprint.item_", "backlog.ranked"] as const;
+export const QUIET_ACTION_PREFIXES = [
+  "bug.media_",
+  "sprint.item_",
+  "backlog.ranked",
+  // Routine Jira sync bookkeeping; a sync problem that needs a person is a different event.
+  "jira.created",
+  "jira.exported",
+] as const;
 export const isQuietAction = (action: string) =>
   QUIET_ACTION_PREFIXES.some((p) => action.startsWith(p));
 export type NotificationItem = {
@@ -52,6 +59,21 @@ const words: Record<string, string> = {
   "settings.media_storage": "Media storage changed",
   "settings.media_quota": "Storage limit changed",
   "settings.mcp": "AI access settings changed",
+  "jira.connected": "Jira connected",
+  "jira.reconnected": "Jira sign-in renewed",
+  "jira.site_pending": "Jira sign-in done, site not chosen yet",
+  "jira.paused": "Jira paused",
+  "jira.resumed": "Jira resumed",
+  "jira.disconnected": "Jira disconnected",
+  "jira.mapping_saved": "Jira project mapping saved",
+  "jira.mapping_activated": "Jira sync switched on for a project",
+  "jira.mapping_paused": "Jira sync paused for a project",
+  "jira.conflict_resolved": "Jira conflict settled",
+  "jira.retry": "Jira sync retried",
+  "jira.person_linked": "Member linked to a Jira account",
+  "jira.person_unlinked": "Member unlinked from Jira",
+  "jira.created": "Sent to Jira",
+  "jira.exported": "Changes sent to Jira",
   "portal.created": "Portal link created",
   "portal.regenerated": "Portal link replaced",
   "ai_token.oauth_limit": "Oldest AI connection revoked",
@@ -85,6 +107,7 @@ export function notificationHref(n: NotificationItem): string {
   if (a === "settings.appearance") return "/admin/settings/appearance";
   if (a === "settings.dropdowns") return "/admin/settings/options";
   if (a === "settings.mcp") return "/admin/settings/ai";
+  if (a.startsWith("jira.")) return "/admin/settings/jira";
   if (a.startsWith("settings.media")) return "/admin/settings/storage";
   if (a.startsWith("settings.")) return "/admin/settings";
   if (a.startsWith("sprint.")) return "/admin/sprints";

@@ -32,6 +32,8 @@ dist-ssr
 *.sw?
 
 .env
+.env.jira-trial
+.jira-spike/
 .vercel
 e2e/shots/
 

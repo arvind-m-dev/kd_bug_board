@@ -54,6 +54,30 @@ const adminCache = new Map<
   string,
   { admin: { id: string; userId: string; name: string }; until: number }
 >();
+const ADMIN_SESSION_SQL =
+  "select p.id, p.user_id, u.name from bugflow.admin_sessions s join bugflow.portals p on p.id=s.portal_id join bugflow.users u on u.id=p.user_id where s.token_hash=$1 and s.expires_at>now() and p.type='admin' and p.active and u.active and p.revoked_at is null and (p.expires_at is null or p.expires_at>now()) limit 1";
+/**
+ * The live Admin session carried by a Request, with the session's hash, or null when signed out. For the few
+ * routes answered outside the Start runtime (where `requireAdmin` cannot read cookies), e.g. the Jira OAuth callback,
+ * and for binding a one-time value to the session that created it. Always checks the database (no cache).
+ */
+export async function adminSessionFromRequest(request: Request) {
+  const token = /(?:^|;\s*)bugflow_admin=([a-f0-9]{64})(?:;|$)/.exec(
+    request.headers.get("cookie") ?? "",
+  )?.[1];
+  if (!token) return null;
+  const sessionHash = await hashToken(token);
+  const { rows } = await neonQuery(ADMIN_SESSION_SQL, [sessionHash]);
+  const admin = rows[0];
+  return admin
+    ? {
+        id: String(admin["id"]),
+        userId: String(admin["user_id"]),
+        name: String(admin["name"]),
+        sessionHash,
+      }
+    : null;
+}
 export async function requireAdmin() {
   const token = getCookie("bugflow_admin");
   if (!token || !/^[a-f0-9]{64}$/.test(token)) throw new Error(ADMIN_SIGNED_OUT);
@@ -61,10 +85,7 @@ export async function requireAdmin() {
   const hit = adminCache.get(key);
   if (hit && hit.until > Date.now()) return hit.admin;
   adminCache.delete(key);
-  const { rows } = await neonQuery(
-    "select p.id, p.user_id, u.name from bugflow.admin_sessions s join bugflow.portals p on p.id=s.portal_id join bugflow.users u on u.id=p.user_id where s.token_hash=$1 and s.expires_at>now() and p.type='admin' and p.active and u.active and p.revoked_at is null and (p.expires_at is null or p.expires_at>now()) limit 1",
-    [key],
-  );
+  const { rows } = await neonQuery(ADMIN_SESSION_SQL, [key]);
   const admin = rows[0];
   if (!admin) throw new Error(ADMIN_EXPIRED);
   const result = {
@@ -171,11 +192,21 @@ export async function listMembers() {
   const { rows } = await neonQuery(
     "select p.id,p.user_id,u.name,u.email,p.type,p.active,u.active as user_active,p.token_ciphertext is not null as copyable,(u.active and p.active and p.revoked_at is null and (p.expires_at is null or p.expires_at>now())) as usable,o.collaborator_role,o.scope_note,coalesce(p.online_until>now(), p.last_seen_at>now()-interval '2 minutes') as online,to_json(greatest(p.last_seen_at, case when p.online_until is not null then least(p.online_until, now()) end)) as last_seen from bugflow.portals p join bugflow.users u on u.id=p.user_id join bugflow.portal_onboarding o on o.portal_id=p.id where u.deleted_at is null order by p.created_at desc,p.id desc limit 100",
   );
+  // The Jira account each member is linked to, when Jira sync is installed (migration 027) and connected.
+  const jira = new Map<string, string>();
+  if (await (await import("./jira/outbox-entry.server")).jiraOutboxOn()) {
+    const linked = await neonQuery(
+      "select um.user_id,um.display_name from bugflow.jira_user_mappings um join bugflow.jira_connections c on c.id=um.connection_id where c.disconnected_at is null and um.confirmed_at is not null",
+    );
+    for (const l of linked.rows) jira.set(String(l["user_id"]), String(l["display_name"] ?? ""));
+  }
   return rows.map((r) => ({
     id: String(r["id"]),
     userId: String(r["user_id"]),
     name: String(r["name"]),
     email: String(r["email"]),
+    /** The linked Jira account's name; null when the member is not linked to Jira. */
+    jiraName: jira.has(String(r["user_id"])) ? jira.get(String(r["user_id"]))! : null,
     type: String(r["type"]),
     active: r["usable"] === true,
     userActive: r["user_active"] === true,
@@ -255,12 +286,37 @@ export async function saveMember(data: z.infer<typeof saveMemberSchema>) {
   const ids = [...new Set(data.projectIds)];
   if (ids.some((id) => !projects.some((p) => p.id === id)))
     throw new Error("Choose active projects from this workspace.");
+  const value = data.collaborator;
+  // One person per email, one working link per person: saving the same email again must not quietly add a
+  // second portal to the member who already has one.
+  const existing = await neonQuery(
+    "select 1 from bugflow.users u join bugflow.portals p on p.user_id=u.id where u.email=$1 and p.type<>'admin' and p.active and p.revoked_at is null limit 1",
+    [value.email.toLowerCase()],
+  );
+  if (existing.rows.length)
+    throw new Error(
+      "A member with this email already exists. Use their row in Team & access to copy or replace their link.",
+    );
+  const trashed = await neonQuery(
+    "select 1 from bugflow.users where email=$1 and deleted_at is not null and purged_at is null limit 1",
+    [value.email.toLowerCase()],
+  );
+  if (trashed.rows.length)
+    throw new Error(
+      "This person was deleted and is in the Trash. Restore them from the Trash instead of adding them again.",
+    );
   const token = randomToken();
   const id = crypto.randomUUID();
   const userId = crypto.randomUUID();
-  const value = data.collaborator;
   const type = portalTypesByRole[value.role];
   await neonExecute([
+    // Someone deleted forever keeps their record (old bugs still name them) but no longer owns the email:
+    // it is released, so the same address can be added again as a new member.
+    {
+      query:
+        "update bugflow.users set email='purged-'||id||'@bugflow.invalid' where email=$1 and purged_at is not null",
+      params: [value.email.toLowerCase()],
+    },
     {
       query:
         "insert into bugflow.users(id,name,email) values($1,$2,$3) on conflict(email) do nothing",

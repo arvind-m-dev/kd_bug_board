@@ -11,6 +11,7 @@ import {
 } from "./sprints";
 import type { z } from "zod";
 import type { updateSprintSchema, sprintActionSchema, sprintItemSchema } from "./sprints";
+import { jiraOutboxOn, outboxMarker, outboxSprintMarkers } from "./jira/outbox-entry.server";
 
 function parseSprint(r: Record<string, unknown>): Sprint {
   return {
@@ -201,6 +202,8 @@ export async function closeSprint(data: z.infer<typeof sprintActionSchema>) {
         where exists(select 1 from bugflow.sprints c where c.id=$1::uuid and c.state='closed' and c.closed_at=now())`,
       params: [data.id, data.carryTo ?? null, admin.userId],
     },
+    // Bugs that left this sprint or were carried on are marked for Jira in the same transaction.
+    ...((await jiraOutboxOn()) ? [outboxSprintMarkers([data.id, data.carryTo ?? null])] : []),
   ]);
   if (!results[0]?.rows[0]) throw new Error("Only an active sprint can be closed.");
   return { closed: true };
@@ -235,6 +238,7 @@ export async function addToSprint(data: z.infer<typeof sprintItemSchema>) {
       params: [data.bugId],
     },
     q,
+    ...((await jiraOutboxOn()) ? [outboxMarker(data.bugId, "sprintField")] : []),
   ]);
   const rows = results[1]?.rows ?? [];
   if (!rows[0])
@@ -257,7 +261,14 @@ export async function removeFromSprint(data: z.infer<typeof sprintItemSchema>) {
       detail: { sprint: data.sprintId },
     },
   );
-  const { rows } = await neonExecute(q.query, q.params);
+  const rows = (await jiraOutboxOn())
+    ? ((
+        await neonExecute<{ results: { rows: Record<string, unknown>[] }[] }>([
+          q,
+          outboxMarker(data.bugId, "sprintField"),
+        ])
+      ).results[0]?.rows ?? [])
+    : (await neonExecute(q.query, q.params)).rows;
   if (!rows[0]) throw new Error("That bug is not in this sprint.");
   return { removed: true };
 }

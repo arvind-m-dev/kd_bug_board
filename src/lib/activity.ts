@@ -239,6 +239,8 @@ const CHANGE_VERBS: Record<string, string> = {
   "backlog.created": "created the item",
   "backlog.updated": "updated the item",
   "backlog.ranked": "re-ranked the item",
+  "jira.created": "sent the bug to Jira",
+  "jira.exported": "sent changes to Jira",
 };
 export function changeVerb(action: string) {
   return (
