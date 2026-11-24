@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { RoleTag } from "./role-tag";
 import { useUrlParam, useUrlNumber } from "@/hooks/use-url-param";
 import { SkeletonRows } from "./loading";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Bug,
@@ -129,6 +129,7 @@ export function BugWorkspace({
     retry: false,
     staleTime: 10000,
     refetchInterval: 20000,
+    placeholderData: keepPreviousData,
   });
   const isAdmin = access.kind === "admin";
   const fetchMembers = useServerFn(getMembers);
@@ -389,6 +390,12 @@ export function BugWorkspace({
     { value: "open", label: "Open bugs" },
     { value: "unassigned", label: "Unassigned" },
     { value: "overdue", label: "Overdue" },
+    { value: "stage-triage", label: "Triage" },
+    { value: "stage-ready", label: "Ready to assign" },
+    { value: "stage-dev", label: "In development" },
+    { value: "stage-qa", label: "QA retest" },
+    { value: "stage-resolved", label: "Resolved" },
+    { value: "stage-attention", label: "Needs attention" },
     ...STATUS_GROUPS.map((g) => ({ value: g.key, label: `${g.label} (group)` })),
     ...ALL_STATUSES.map((v) => ({ value: v, label: statusLabel(v) })),
   ];
@@ -870,7 +877,8 @@ export function BugWorkspace({
               else {
                 setCursor(pages.at(-1));
                 setPages((old) => old.slice(0, -1));
-                setPage(0);
+                // Land on the last client page of the previous window. A full server page is 50 rows.
+                setPage(Math.ceil(50 / PAGE) - 1);
               }
             }}
           >

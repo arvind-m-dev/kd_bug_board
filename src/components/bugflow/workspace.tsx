@@ -243,6 +243,12 @@ function useNavCounts(): Record<string, number | undefined> {
   const bugs = useServerFn(getBugWorkspace);
   const members = useServerFn(getMembers);
   const admin = { kind: "admin" } as const;
+  // Trash is only a badge. Let the bug list take the first database round trip.
+  const [trashReady, setTrashReady] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setTrashReady(true), 1500);
+    return () => window.clearTimeout(t);
+  }, []);
   const b = useQuery({
     queryKey: ["bug-workspace", admin, undefined],
     queryFn: () => bugs({ data: { access: admin } }),
@@ -261,6 +267,7 @@ function useNavCounts(): Record<string, number | undefined> {
   const t = useQuery({
     queryKey: ["trash"],
     queryFn: () => trash(),
+    enabled: trashReady,
     retry: false,
     staleTime: 30000,
     refetchInterval: 60000,
@@ -419,7 +426,7 @@ export function Workspace({ view = "overview" }: { view?: View }) {
                 <span>{g.label}</span>
                 <ChevronDown className="bf-nav-group-chevron" />
               </button>
-              <div className="bf-nav-group-items">
+              <div className="bf-nav-group-items" inert={open ? undefined : true}>
                 <nav className="bf-nav" aria-label={g.label}>
                   {g.items.map((n) => (
                     <Link

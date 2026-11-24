@@ -147,8 +147,15 @@ function parseBug(r: Record<string, unknown>, evidence = false): LiveBug {
   };
 }
 export async function workspaceData(access: BugAccess, cursor?: string): Promise<BugWorkspaceData> {
-  await (await import("./trash.server")).maybeExpireTrash().catch(() => undefined);
-  const actor = await actorFor(access);
+  // Media config and trash expiry do not depend on the bug rows. Start them with the session read.
+  const mediaP = import("./bug-media.server").then((m) => m.mediaClientConfig());
+  // Mark it handled now: if the session read throws first, mediaP is never awaited. The await below still sees the error.
+  mediaP.catch(() => undefined);
+  const [actor, timeZone] = await Promise.all([
+    actorFor(access),
+    workspaceTimeZone(),
+    import("./trash.server").then((m) => m.maybeExpireTrash().catch(() => undefined)),
+  ]);
   if (!actor.permissions.includes("view"))
     throw new Error("This portal does not have permission to view bugs.");
   const params = [
@@ -156,7 +163,6 @@ export async function workspaceData(access: BugAccess, cursor?: string): Promise
     actor.userId,
     actor.role === "qa" || actor.permissions.includes("view_all"),
   ];
-  const timeZone = await workspaceTimeZone();
   const today = new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
   const where = `${scope(actor)} and b.kind='bug'`; // the workspace lists bugs; other kinds live on the backlog
   const { results } = await neonQuery<{ results: { rows: Record<string, unknown>[] }[] }>(
@@ -192,7 +198,7 @@ export async function workspaceData(access: BugAccess, cursor?: string): Promise
   );
   const stats = results[1]?.rows[0] ?? {};
   const rows = results[2]?.rows ?? [];
-  const media = await (await import("./bug-media.server")).mediaClientConfig();
+  const media = await mediaP;
   return {
     media,
     options: cleanOptions(results[5]?.rows[0]?.["value"]),

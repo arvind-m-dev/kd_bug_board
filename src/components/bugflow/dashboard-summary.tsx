@@ -72,7 +72,7 @@ const STAGES = [
     hint: "New, validating or waiting for info",
     statuses: ["NEW", "VALIDATING", "NEEDS_INFORMATION"],
     tone: "info",
-    filter: "NEW",
+    filter: "stage-triage",
   },
   {
     key: "ready",
@@ -80,7 +80,7 @@ const STAGES = [
     hint: "Validated, waiting for an owner",
     statuses: ["VALIDATED", "READY_FOR_ASSIGNMENT"],
     tone: "violet",
-    filter: "READY_FOR_ASSIGNMENT",
+    filter: "stage-ready",
   },
   {
     key: "dev",
@@ -88,7 +88,7 @@ const STAGES = [
     hint: "Assigned, in progress or reopened",
     statuses: ["ASSIGNED", "IN_PROGRESS", "REOPENED"],
     tone: "teal",
-    filter: "IN_PROGRESS",
+    filter: "stage-dev",
   },
   {
     key: "qa",
@@ -96,7 +96,7 @@ const STAGES = [
     hint: "Fix waiting for verification",
     statuses: ["RECHECK"],
     tone: "warning",
-    filter: "RECHECK",
+    filter: "stage-qa",
   },
   {
     key: "done",
@@ -104,7 +104,7 @@ const STAGES = [
     hint: "Fix verified by QA",
     statuses: ["RESOLVED"],
     tone: "success",
-    filter: "RESOLVED",
+    filter: "stage-resolved",
   },
 ] as const;
 const CLOSED = ["NOT_A_BUG", "DUPLICATE", "WONT_FIX"];
@@ -267,7 +267,7 @@ export function DashboardSummary() {
         />
         <Kpi
           to="/admin/bugs"
-          search={{ filter: "open" }}
+          search={{ filter: "stage-attention" }}
           tone="danger"
           icon={Bell}
           label="Needs attention"
@@ -318,7 +318,7 @@ export function DashboardSummary() {
               <ul className="bf-urgent bf-urgent-scroll" key={`${page}-${perPage}`}>
                 {urgent.map((b) => (
                   <li key={b.id}>
-                    <Link to="/admin/bugs" search={{ filter: b.status }}>
+                    <Link to="/admin/bugs" search={{ bug: Number(b.id) }}>
                       <PriorityBadge value={b.priority} />
                       <span className="bf-urgent-main">
                         <span className="bf-urgent-title">

@@ -85,8 +85,8 @@ export function BoardView({
           } as BugChange,
         },
       });
-      await client.invalidateQueries({ queryKey: ["bug-workspace"] });
       toast.success(`${b.code} → ${statusLabel(action.status)}`);
+      void client.invalidateQueries({ queryKey: ["bug-workspace"] });
     } catch (e) {
       // A version conflict refetches, so the card simply stays where the latest data says it is.
       toast.error(actionError(e, "This move could not be saved."));
@@ -104,6 +104,7 @@ export function BoardView({
           <h2>Board</h2>
           <span className="text-xs text-muted-foreground">
             Drag a card, or use its Move menu. Assigning and retest verdicts open the bug.
+            {d.nextCursor ? ` Showing the latest ${d.bugs.length} of ${d.total}.` : ""}
           </span>
         </div>
         <ThemedSelect

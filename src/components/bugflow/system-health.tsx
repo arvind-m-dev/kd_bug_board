@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -201,9 +202,15 @@ export function Meter({ meter }: { meter: UsageMeter }) {
  */
 export function StorageAlarmBanner() {
   const read = useServerFn(getStorageAlarms);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setReady(true), 1500);
+    return () => window.clearTimeout(t);
+  }, []);
   const q = useQuery({
     queryKey: ["storage-alarms"],
     queryFn: () => read(),
+    enabled: ready,
     staleTime: 10 * 60_000,
     refetchInterval: 10 * 60_000,
     retry: false,

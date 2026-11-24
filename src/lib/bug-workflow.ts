@@ -498,6 +498,23 @@ export function matchesFilter(filter: string, b: FilterableBug, me: string): boo
   if (filter === "owned") return b.assigneeId === me || !!b.assignees?.some((a) => a.id === me);
   if (filter === "open")
     return !["RESOLVED", "DUPLICATE", "NOT_A_BUG", "WONT_FIX"].includes(b.status);
+  // Overview stages. These are not the sidebar groups: triage includes "needs info", and
+  // "in development" includes reopened work.
+  if (filter === "stage-triage")
+    return ["NEW", "VALIDATING", "NEEDS_INFORMATION"].includes(b.status);
+  if (filter === "stage-ready")
+    return ["VALIDATED", "READY_FOR_ASSIGNMENT"].includes(b.status);
+  if (filter === "stage-dev")
+    return ["ASSIGNED", "IN_PROGRESS", "REOPENED"].includes(b.status);
+  if (filter === "stage-qa") return b.status === "RECHECK";
+  if (filter === "stage-resolved") return b.status === "RESOLVED";
+  if (filter === "stage-attention")
+    return (
+      ["NEW", "REOPENED", "RECHECK", "NEEDS_INFORMATION"].includes(b.status) ||
+      (["VALIDATED", "READY_FOR_ASSIGNMENT"].includes(b.status) &&
+        b.assigneeId === null &&
+        !b.assignees?.length)
+    );
   const g = STATUS_GROUPS.find((x) => x.key === filter);
   return g ? (g.statuses as readonly string[]).includes(b.status) : b.status === filter;
 }

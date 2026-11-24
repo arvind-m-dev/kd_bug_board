@@ -86,13 +86,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   });
   const [draft, setDraft] = useState<Appearance | null>(null);
   useEffect(() => {
-    // The cached appearance was already seeded above; just mark ready and refresh from the server.
+    // The cached appearance was already seeded above. Refresh after the page's own data calls.
     setReady(true);
-    getAppearance()
-      .then((a) => setWorkspace(normalizeAppearance(a)))
-      .catch(() => {
-        /* keep the cached appearance */
-      });
+    const t = window.setTimeout(() => {
+      getAppearance()
+        .then((a) => setWorkspace(normalizeAppearance(a)))
+        .catch(() => {
+          /* keep the cached appearance */
+        });
+    }, 1500);
+    return () => window.clearTimeout(t);
   }, []);
   const effective = useMemo(
     () => draft ?? effectiveAppearance(workspace, personal),
