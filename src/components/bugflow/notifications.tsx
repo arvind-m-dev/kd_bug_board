@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SkeletonRows } from "./loading";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -53,11 +53,12 @@ function groupByDay(items: NotificationItem[]) {
   }
   return groups;
 }
-function useNotifications(limit: number) {
+function useNotifications(limit: number, enabled = true) {
   const fn = useServerFn(getNotifications);
   return useQuery({
     queryKey: ["notifications", limit],
     queryFn: () => fn({ data: { limit } }),
+    enabled,
     retry: false,
     staleTime: 30000,
     refetchInterval: 60000,
@@ -157,7 +158,13 @@ function Item({ n, onClick }: { n: NotificationItem; onClick?: () => void }) {
 
 export function NotificationMenu() {
   const [open, setOpen] = useState(false);
-  const q = useNotifications(5);
+  // The bell is not the page. Start it after the bug list has claimed the first database round trip.
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setReady(true), 800);
+    return () => window.clearTimeout(t);
+  }, []);
+  const q = useNotifications(5, ready);
   const mark = useMark();
   const unread = q.data?.unread ?? 0;
   return (

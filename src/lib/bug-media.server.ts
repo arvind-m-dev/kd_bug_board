@@ -154,8 +154,9 @@ export const mediaClientConfig = async (): Promise<MediaConfig> => {
   const { config, stored } = await mediaConfig();
   if (!config) return MEDIA_OFF;
   // Workspace loads are frequent, so the clean-up schedule gets a cheap, throttled chance to run here (once per 15 minutes per instance).
+  // Housekeeping must not sit in front of the bug list. sweep() still throttles itself.
   if (stored.cleanupDays && Date.now() - lastAuto > 15 * 60000)
-    await sweep(5).catch(() => undefined);
+    void sweep(5).catch(() => undefined);
   return MEDIA_ON;
 };
 const NOT_CONNECTED = "Media storage is not connected. Ask your Admin to connect it in Settings.";

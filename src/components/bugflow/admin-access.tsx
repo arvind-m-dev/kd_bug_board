@@ -66,13 +66,17 @@ export function AdminAccess({
       setBusy(false);
     }
   }
-  if (status.isPending)
+  if (status.isPending) {
+    // The sign-in page has nothing else to show. Workspace routes already ran this check in
+    // beforeLoad and redirect when it fails, so holding the page here only delays the bug list.
+    if (!signInPage) return <>{children}</>;
     return (
       <div className="bf-access">
         <ShieldCheck className="mx-auto text-primary" />
         <p>Checking private access…</p>
       </div>
     );
+  }
   if (status.isError)
     return (
       <section className="bf-access">
