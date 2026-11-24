@@ -79,6 +79,16 @@ export function MemberPortals({ initialSearch = "" }: { initialSearch?: string }
   const [state, setState] = useState("all");
   // The open profile lives in the URL (?member=…): notifications and links open it, and its row is highlighted.
   const [id, setId] = useUrlParam("member");
+  const missingMember = useRef<string | null>(null);
+  useEffect(() => {
+    if (!id || !members.data) return;
+    const hit = members.data.some((m) => m.id === id || m.userId === id);
+    if (hit) return;
+    if (missingMember.current === id) return;
+    missingMember.current = id;
+    toast.error("That member is not available. They may have been removed.");
+    setId(null);
+  }, [id, members.data, setId]);
   const recent = useHighlight(id, members.data);
   const jumped = useRef<string | null>(null);
   const [error, setError] = useState("");

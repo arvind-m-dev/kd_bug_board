@@ -207,6 +207,8 @@ export function ThemeStudio(props: Scope) {
     set({
       style: id,
       fonts: null,
+      ...(s.radius ? { radius: s.radius } : {}),
+      ...(s.density ? { density: s.density } : {}),
       ...(s.palette && draft.palette !== "custom" ? { palette: s.palette } : {}),
       ...(["halloween", "winter", "christmas", "autumn"].includes(id)
         ? { world: id as Appearance["world"] }

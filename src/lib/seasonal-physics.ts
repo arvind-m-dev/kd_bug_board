@@ -8,6 +8,10 @@ export type SnowBody = {
   radius: number;
   bounces: number;
   ignoreUntil: number;
+  /** Own sideways speed, so a gust does not pull every flake onto one path. */
+  drift?: number;
+  phase?: number;
+  sway?: number;
 };
 
 export function stepSnow(
@@ -18,9 +22,13 @@ export function stepSnow(
   wind: number,
 ) {
   const before = body.y;
-  body.vx += (wind - body.vx) * Math.min(1, dt * 0.7);
+  const drift = body.drift ?? 0;
+  const sway = body.sway ?? 0;
+  const phase = body.phase ?? 0;
+  // Wind is shared, but each flake keeps its own drift and a small sway, so they do not fall in one line.
+  body.vx += (wind * 0.35 + drift - body.vx) * Math.min(1, dt * 0.55);
   body.vy = Math.min(95, body.vy + 45 * dt);
-  body.x += body.vx * dt;
+  body.x += body.vx * dt + Math.sin(time * 1.2 + phase) * sway * dt;
   body.y += body.vy * dt;
   if (body.vy <= 0 || time < body.ignoreUntil) return false;
   const edge = edges

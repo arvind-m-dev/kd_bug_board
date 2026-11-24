@@ -77,7 +77,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { getMembers } from "@/lib/portal-access.functions";
 import { MemberProfile } from "./member-profile";
 import { ThemedSelect, ThemedMultiSelect } from "./themed-select";
-import { BugReportForm } from "./bug-report-form";
+import { BugReportForm, type ReportDraftApi } from "./bug-report-form";
 import { BugMedia } from "./bug-media";
 import { BugReportContent } from "./bug-report-content";
 import { RowStatus, RowAssign, RowRating } from "./row-actions";
@@ -100,6 +100,64 @@ const ALL_STATUSES = [
   "NOT_A_BUG",
   "WONT_FIX",
 ];
+
+/**
+ * Browser Back closes the open dialog. A dialog with unsaved edits stays open and asks what to do.
+ * Closing with the X or a click outside uses the same path, and drops the extra history entry.
+ */
+function useDialogBack(
+  open: boolean,
+  dirty: boolean,
+  onRequestClose: () => void,
+  clearKey?: string,
+) {
+  const dirtyRef = useRef(dirty);
+  const closeRef = useRef(onRequestClose);
+  dirtyRef.current = dirty;
+  closeRef.current = onRequestClose;
+  const generation = useRef(0);
+  useEffect(() => {
+    if (!open) return;
+    const gen = ++generation.current;
+    if (!(window.history.state as { bfDialog?: boolean } | null)?.bfDialog)
+      window.history.pushState({ bfDialog: true }, "");
+    let closedByBack = false;
+    const clear = () => {
+      if (!clearKey) return;
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has(clearKey)) return;
+      url.searchParams.delete(clearKey);
+      window.history.replaceState(window.history.state, "", url);
+    };
+    const onPop = () => {
+      if (dirtyRef.current) {
+        window.history.pushState({ bfDialog: true }, "");
+        closeRef.current();
+        return;
+      }
+      closedByBack = true;
+      clear();
+      closeRef.current();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      if (closedByBack) return;
+      queueMicrotask(() => {
+        if (generation.current !== gen) return;
+        const state = window.history.state as { bfDialog?: boolean } | null;
+        if (!state?.bfDialog) return;
+        const onLanded = () => {
+          window.removeEventListener("popstate", onLanded);
+          clear();
+        };
+        window.addEventListener("popstate", onLanded);
+        window.history.back();
+      });
+    };
+  }, [open, clearKey]);
+}
+
 export function BugWorkspace({
   access,
   initialFilter = "all",
@@ -154,6 +212,31 @@ export function BugWorkspace({
   const [rawId, setId] = useUrlParam("bug");
   // Only a real bug number from the address is used; anything else is ignored rather than sent to the server.
   const id = rawId && /^[1-9]\d*$/.test(rawId) ? rawId : null;
+  const [reportDirty, setReportDirty] = useState(false);
+  const [detailDirty, setDetailDirty] = useState(false);
+  const [askLeave, setAskLeave] = useState<null | "report" | "detail">(null);
+  // Kept while the prompt closes, so the exit animation does not swap to the other dialog's wording.
+  const leaveKind = useRef<"report" | "detail">("report");
+  if (askLeave) leaveKind.current = askLeave;
+  const reportApi = useRef<ReportDraftApi | null>(null);
+  function requestCloseReport() {
+    if (reportDirty) setAskLeave("report");
+    else setReport(false);
+  }
+  function requestCloseDetail() {
+    if (!id) return;
+    if (detailDirty) setAskLeave("detail");
+    else {
+      setId(null);
+      setEditOnOpen(false);
+    }
+  }
+  useDialogBack(
+    report || id !== null,
+    report ? reportDirty : detailDirty,
+    () => (report ? requestCloseReport() : requestCloseDetail()),
+    report ? undefined : id ? "bug" : undefined,
+  );
   // The bug just opened (from a notification, a link or a click) stays highlighted in the list for a moment.
   const [recent, setRecent] = useState<string | null>(null);
   useEffect(() => {
@@ -918,8 +1001,23 @@ export function BugWorkspace({
           {profile && <MemberProfile id={profile} onDeleted={() => setProfile(null)} />}
         </DialogContent>
       </Dialog>
-      <Dialog open={report} onOpenChange={setReport}>
-        <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto">
+      <Dialog
+        open={report}
+        onOpenChange={(open) => {
+          if (askLeave) return;
+          if (open) setReport(true);
+          else requestCloseReport();
+        }}
+      >
+        <DialogContent
+          className="max-w-2xl max-h-[88vh] overflow-y-auto"
+          onInteractOutside={(e) => {
+            if (askLeave) e.preventDefault();
+          }}
+          onPointerDownOutside={(e) => {
+            if (askLeave) e.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Raise a bug</DialogTitle>
             <DialogDescription>New report · {d.actor.name}</DialogDescription>
@@ -930,11 +1028,72 @@ export function BugWorkspace({
             options={d.options}
             media={d.media}
             canPlan={maySetDue(d.actor)}
+            onDirtyChange={setReportDirty}
+            draftApi={reportApi}
             onSaved={(saved) => {
+              setReportDirty(false);
               setReport(false);
               setId(saved);
             }}
           />
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={askLeave !== null}
+        onOpenChange={(open) => {
+          if (!open) setAskLeave(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {leaveKind.current === "report"
+                ? "Save this report as a draft?"
+                : "Leave without saving?"}
+            </DialogTitle>
+            <DialogDescription>
+              {leaveKind.current === "report"
+                ? "This report has not been submitted. A draft stays in this browser only. Attached files are not kept."
+                : "These edits have not been saved. Closing now leaves the bug as it was."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="outline" onClick={() => setAskLeave(null)}>
+              Keep editing
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (leaveKind.current === "report") {
+                  reportApi.current?.discardDraft();
+                  toast.success("Closed without saving. Nothing was submitted.");
+                  setReportDirty(false);
+                  setReport(false);
+                } else {
+                  toast.success("Closed without saving. The bug was not changed.");
+                  setDetailDirty(false);
+                  setId(null);
+                  setEditOnOpen(false);
+                }
+                setAskLeave(null);
+              }}
+            >
+              Discard
+            </Button>
+            {leaveKind.current === "report" && (
+              <Button
+                onClick={() => {
+                  const saved = reportApi.current?.saveDraft() ?? false;
+                  if (!saved) return;
+                  setReportDirty(false);
+                  setReport(false);
+                  setAskLeave(null);
+                }}
+              >
+                Save draft
+              </Button>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
       <ConfirmAction
@@ -972,10 +1131,8 @@ export function BugWorkspace({
       <Dialog
         open={id !== null}
         onOpenChange={(open) => {
-          if (!open) {
-            setId(null);
-            setEditOnOpen(false);
-          }
+          if (askLeave) return;
+          if (!open) requestCloseDetail();
         }}
       >
         <DialogContent className="max-w-3xl max-h-[88vh] overflow-y-auto">
@@ -987,6 +1144,7 @@ export function BugWorkspace({
             <BugDetails
               startEditing={editOnOpen}
               onDeleted={() => setId(null)}
+              onDirtyChange={setDetailDirty}
               key={id}
               id={id}
               access={access}
@@ -1003,6 +1161,7 @@ export function BugDetails({
   access,
   workspace,
   onDeleted = () => {},
+  onDirtyChange,
   startEditing = false,
   openMediaId,
 }: {
@@ -1011,6 +1170,7 @@ export function BugDetails({
   access: BugAccess;
   workspace: BugWorkspaceData;
   onDeleted?: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
   openMediaId?: string | undefined;
 }) {
   const client = useQueryClient();
@@ -1032,6 +1192,22 @@ export function BugDetails({
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const [editing, setEditing] = useState(startEditing);
   const [removing, setRemoving] = useState(false);
+  const told = useRef<string | null>(null);
+  const navigate = useNavigate();
+  const loadError = detail.isError
+    ? actionError(detail.error, "This bug could not be opened.")
+    : "";
+  useEffect(() => {
+    if (!loadError) return;
+    const key = `${id}:${loadError}`;
+    if (told.current === key) return;
+    told.current = key;
+    toast.error(loadError, {
+      ...(loadError.includes("Trash")
+        ? { action: { label: "Open Trash", onClick: () => void navigate({ to: "/admin/trash" }) } }
+        : {}),
+    });
+  }, [loadError, id, navigate]);
   const remove = useServerFn(deleteBug);
   const restoreBug = useServerFn(restoreFromTrash);
   const mutation = useMutation({
@@ -1055,7 +1231,7 @@ export function BugDetails({
   if (detail.isError)
     return (
       <ErrorNotice
-        message={actionError(detail.error, "This bug could not be loaded.")}
+        message={loadError || "This bug could not be opened."}
         onRetry={() => {
           void detail.refetch();
         }}
@@ -1069,7 +1245,14 @@ export function BugDetails({
       <div className="grid gap-3">
         <div className="flex items-center justify-between">
           <strong className="text-sm">Edit {b.code}</strong>
-          <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setEditing(false);
+              onDirtyChange?.(false);
+            }}
+          >
             Cancel
           </Button>
         </div>
@@ -1080,7 +1263,11 @@ export function BugDetails({
           media={workspace.media}
           initial={b}
           canPlan={maySetDue(actor)}
-          onSaved={() => setEditing(false)}
+          {...(onDirtyChange ? { onDirtyChange } : {})}
+          onSaved={() => {
+            onDirtyChange?.(false);
+            setEditing(false);
+          }}
         />
       </div>
     );

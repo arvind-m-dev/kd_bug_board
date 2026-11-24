@@ -9,6 +9,7 @@ export const BOARD_COLUMNS = [
   {
     key: "todo",
     label: "To do",
+    hint: "New, sent back, or waiting to be assigned",
     statuses: [
       "NEW",
       "VALIDATING",
@@ -18,12 +19,28 @@ export const BOARD_COLUMNS = [
       "REOPENED",
     ] as readonly Status[],
   },
-  { key: "assigned", label: "Assigned", statuses: ["ASSIGNED"] as readonly Status[] },
-  { key: "progress", label: "In progress", statuses: ["IN_PROGRESS"] as readonly Status[] },
-  { key: "retest", label: "Retest", statuses: ["RECHECK"] as readonly Status[] },
+  {
+    key: "assigned",
+    label: "Assigned",
+    hint: "Someone owns it and has not started",
+    statuses: ["ASSIGNED"] as readonly Status[],
+  },
+  {
+    key: "progress",
+    label: "In progress",
+    hint: "A fix is underway",
+    statuses: ["IN_PROGRESS"] as readonly Status[],
+  },
+  {
+    key: "retest",
+    label: "Retest",
+    hint: "Ready for QA to check",
+    statuses: ["RECHECK"] as readonly Status[],
+  },
   {
     key: "done",
     label: "Done",
+    hint: "Closed: fixed, duplicate, not a bug, or won't fix",
     statuses: ["RESOLVED", "DUPLICATE", "NOT_A_BUG", "WONT_FIX"] as readonly Status[],
   },
 ] as const;

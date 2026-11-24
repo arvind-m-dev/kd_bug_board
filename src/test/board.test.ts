@@ -30,6 +30,7 @@ describe("board columns", () => {
     expect(boardColumn("ASSIGNED")).toBe("assigned");
     expect(boardColumn("RECHECK")).toBe("retest");
     expect(boardColumn("WONT_FIX")).toBe("done");
+    for (const col of BOARD_COLUMNS) expect(col.hint.length).toBeGreaterThan(0);
   });
 });
 

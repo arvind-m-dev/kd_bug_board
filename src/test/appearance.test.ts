@@ -198,6 +198,37 @@ describe("scene knobs", () => {
   });
 });
 
+describe("design-system styles", () => {
+  const ids = [
+    "spatial",
+    "bento",
+    "liquid",
+    "maximal",
+    "minimal",
+    "brutal",
+    "clay",
+    "glassmorphism",
+    "skeuo",
+    "neu",
+    "shadcn",
+    "lightweight",
+  ];
+  it("each one resolves to its own skin, palette and font", () => {
+    for (const id of ids) {
+      const s = styleById(id);
+      expect(s.id).toBe(id);
+      expect(s.palette).toBeTruthy();
+      const r = resolveAppearance(
+        appearanceSchema.parse({ style: id, palette: s.palette }),
+        false,
+      );
+      expect(r.attrs["data-skin"]).toBe(id);
+      expect(r.vars["--primary"]).toBe(paletteById(s.palette).light.primary);
+      expect(r.vars["--font-sans"]).toBeTruthy();
+    }
+  });
+});
+
 describe("glass style", () => {
   it("uses the system font stack verbatim and its own palette", () => {
     const r = resolveAppearance(

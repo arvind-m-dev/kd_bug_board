@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Plus, Link2, X, LoaderCircle, ListChecks, Paperclip } from "lucide-react";
@@ -20,6 +20,21 @@ import { toast } from "sonner";
 import { ThemedSelect } from "./themed-select";
 import { MediaDropZone, useMediaUpload } from "./bug-media";
 import { MEDIA_OFF, type MediaConfig } from "@/lib/bug-media";
+import {
+  REPORT_DRAFT_KEY,
+  emptyReportDraft,
+  parseReportDraft,
+  reportDraftHasContent,
+  sameReportDraft,
+  type ReportDraft,
+} from "@/lib/report-draft";
+
+export type ReportDraftApi = {
+  /** Persist the typed report in this browser. Returns false when the dialog should stay open. */
+  saveDraft: () => boolean;
+  discardDraft: () => void;
+};
+
 export function BugReportForm({
   access,
   projects,
@@ -28,6 +43,8 @@ export function BugReportForm({
   options = DEFAULT_OPTIONS,
   media = MEDIA_OFF,
   canPlan = false,
+  onDirtyChange,
+  draftApi,
 }: {
   options?: DropdownOptions;
   access: BugAccess;
@@ -37,6 +54,10 @@ export function BugReportForm({
   media?: MediaConfig;
   /** Planners (Admin or `plan`) may set a due date; others never see the field and the server drops any value. */
   canPlan?: boolean;
+  /** True only after the open form differs from how it was when it opened. */
+  onDirtyChange?: (dirty: boolean) => void;
+  /** New reports only. The parent calls this when the user chooses Save draft or Discard. */
+  draftApi?: { current: ReportDraftApi | null };
 }) {
   const client = useQueryClient();
   const save = useServerFn(createBug);
@@ -45,12 +66,84 @@ export function BugReportForm({
   // After reporting, priority and severity are Admin decisions; the server refuses other changes.
   const adminOnly = !!initial && access.kind !== "admin";
   const [error, setError] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
+  const baseline = useRef<ReportDraft | null>(null);
+  const [restored] = useState<ReportDraft | null>(() => {
+    if (initial || typeof sessionStorage === "undefined") return null;
+    return parseReportDraft(sessionStorage.getItem(REPORT_DRAFT_KEY));
+  });
+  const severalProjects = !initial && projects.length > 1;
   const [links, setLinks] = useState<string[]>(
-    initial?.evidenceUrls.length ? initial.evidenceUrls : [""],
+    initial?.evidenceUrls.length
+      ? initial.evidenceUrls
+      : restored?.links.length
+        ? restored.links
+        : [""],
   );
   // Files are compressed while the report is written. On submit they move to the tab's background queue, so the
   // report saves at once and the dialog closes while compression and upload carry on (see the uploads tray).
   const uploads = useMediaUpload(access, null);
+  function currentDraft(): ReportDraft {
+    const form = formRef.current;
+    const read = (key: string) => (form ? String(new FormData(form).get(key) ?? "") : "");
+    return {
+      ...emptyReportDraft(),
+      description: read("description"),
+      steps: read("steps"),
+      title: read("title"),
+      projectId: severalProjects ? read("projectId") : "",
+      module: read("module"),
+      priority: read("priority") || "P3",
+      severity: read("severity") || "Medium",
+      expected: read("expected"),
+      actual: read("actual"),
+      browserDevice: read("browserDevice"),
+      environment: read("environment"),
+      dueOn: canPlan ? read("dueOn") : "",
+      codePrefix: read("codePrefix"),
+      links,
+    };
+  }
+  function publishDirty() {
+    if (!onDirtyChange || !formRef.current) return;
+    const d = currentDraft();
+    if (!baseline.current) baseline.current = d;
+    onDirtyChange(!sameReportDraft(d, baseline.current) || (!initial && uploads.staged > 0));
+  }
+  useEffect(() => {
+    publishDirty();
+    // The snapshot is taken from the form after each edit, link change, or staged file.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [links, uploads.staged]);
+  useEffect(() => {
+    if (!draftApi || initial) return;
+    draftApi.current = {
+      saveDraft() {
+        const d = currentDraft();
+        const changed = baseline.current ? !sameReportDraft(d, baseline.current) : false;
+        if (!reportDraftHasContent(d, severalProjects)) {
+          sessionStorage.removeItem(REPORT_DRAFT_KEY);
+          if (uploads.staged > 0) {
+            toast.error("Attached files are not kept in a draft. Submit the bug to upload them.");
+            return false;
+          }
+          if (changed) toast.success("Draft cleared. Nothing was submitted.");
+          return true;
+        }
+        sessionStorage.setItem(REPORT_DRAFT_KEY, JSON.stringify(d));
+        toast.success("Draft saved in this browser. It was not submitted.", {
+          description: uploads.staged > 0 ? "Attached files are not kept in a draft." : undefined,
+        });
+        return true;
+      },
+      discardDraft() {
+        sessionStorage.removeItem(REPORT_DRAFT_KEY);
+      },
+    };
+    return () => {
+      draftApi.current = null;
+    };
+  });
   const edit = useMutation({
     mutationFn: saveEdit,
     onSuccess: async () => {
@@ -69,6 +162,7 @@ export function BugReportForm({
     mutationFn: save,
     onSuccess: async (r) => {
       await client.invalidateQueries({ queryKey: ["bug-workspace"] });
+      sessionStorage.removeItem(REPORT_DRAFT_KEY);
       const files = uploads.staged ? uploads.handoff(r.id, r.code) : 0;
       toast.success(`Bug reported · ${r.code}`, {
         description: files
@@ -122,18 +216,23 @@ export function BugReportForm({
   }
   const busy = mutation.isPending || edit.isPending;
   return (
-    <form className="bf-form" onSubmit={submit}>
+    <form ref={formRef} className="bf-form" onSubmit={submit} onInput={publishDirty}>
       <fieldset disabled={busy} className="grid gap-4">
         <section className="bf-form-step" data-tone="teal">
           <h3 className="bf-form-step-title">
             <span className="bf-step-num">1</span>The bug report
             <span className="bf-step-hint">What went wrong and how to see it</span>
           </h3>
+          {restored && reportDraftHasContent(restored, severalProjects) && (
+            <p className="text-xs text-muted-foreground">
+              Draft restored from this browser. Nothing is submitted until you click Submit bug.
+            </p>
+          )}
           <label className="bf-field">
             Bug description <span className="bf-req">Required</span>
             <textarea
               name="description"
-              defaultValue={initial?.description}
+              defaultValue={initial?.description ?? restored?.description}
               required
               maxLength={8000}
               placeholder="What happened? Include the error or unexpected behaviour."
@@ -146,7 +245,7 @@ export function BugReportForm({
             </span>
             <textarea
               name="steps"
-              defaultValue={initial?.steps.join("\n")}
+              defaultValue={initial ? initial.steps.join("\n") : restored?.steps}
               required
               maxLength={12000}
               placeholder={"Open the page\nPerform the action\nObserve the issue"}
@@ -156,7 +255,7 @@ export function BugReportForm({
             Bug title <span className="bf-opt">Optional</span>
             <Input
               name="title"
-              defaultValue={initial?.title}
+              defaultValue={initial?.title ?? restored?.title}
               maxLength={180}
               placeholder="Use description as title if left blank"
             />
@@ -173,7 +272,13 @@ export function BugReportForm({
             ) : (
               <label className="bf-field">
                 Project <span className="bf-req">Required</span>
-                <select name="projectId" aria-label="Project" className="bf-select" required>
+                <select
+                  name="projectId"
+                  aria-label="Project"
+                  className="bf-select"
+                  required
+                  defaultValue={restored?.projectId ?? ""}
+                >
                   <option value="">Choose project</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -188,7 +293,8 @@ export function BugReportForm({
               <OptionField
                 name="module"
                 list={options.modules}
-                value={initial?.module}
+                value={initial?.module ?? restored?.module}
+                onValue={publishDirty}
                 placeholder="e.g. Sign in"
               />
             </label>
@@ -202,7 +308,12 @@ export function BugReportForm({
                 <FormSelect
                   name="codePrefix"
                   label="Bug ID prefix"
-                  initial={initial ? initial.code.split("-")[0]! : options.prefixes[0]!}
+                  initial={
+                    initial
+                      ? initial.code.split("-")[0]!
+                      : restored?.codePrefix || options.prefixes[0]!
+                  }
+                  onValue={publishDirty}
                   options={options.prefixes.map((p) => ({ value: p, label: `${p}-…` }))}
                 />
               </label>
@@ -212,7 +323,8 @@ export function BugReportForm({
               <FormSelect
                 name="priority"
                 label="Priority"
-                initial={initial?.priority ?? "P3"}
+                initial={initial?.priority ?? restored?.priority ?? "P3"}
+                onValue={publishDirty}
                 disabled={adminOnly}
                 options={PRIORITIES.map((p) => ({ value: p, label: `${p} · ${priorityNames[p]}` }))}
               />
@@ -222,7 +334,8 @@ export function BugReportForm({
               <FormSelect
                 name="severity"
                 label="Severity"
-                initial={initial?.severity ?? "Medium"}
+                initial={initial?.severity ?? restored?.severity ?? "Medium"}
+                onValue={publishDirty}
                 disabled={adminOnly}
                 options={[
                   ...new Set([...(initial ? [initial.severity] : []), ...options.severities]),
@@ -235,7 +348,7 @@ export function BugReportForm({
               Expected result
               <textarea
                 name="expected"
-                defaultValue={initial?.expected}
+                defaultValue={initial?.expected ?? restored?.expected}
                 maxLength={4000}
                 placeholder="What should have happened?"
               />
@@ -244,7 +357,7 @@ export function BugReportForm({
               Actual result
               <textarea
                 name="actual"
-                defaultValue={initial?.actual}
+                defaultValue={initial?.actual ?? restored?.actual}
                 maxLength={4000}
                 placeholder="Uses the description if left blank"
               />
@@ -256,7 +369,8 @@ export function BugReportForm({
               <OptionField
                 name="browserDevice"
                 list={options.devices}
-                value={initial?.browserDevice}
+                value={initial?.browserDevice ?? restored?.browserDevice}
+                onValue={publishDirty}
                 placeholder="e.g. Chrome · Desktop"
               />
             </label>
@@ -265,7 +379,8 @@ export function BugReportForm({
               <OptionField
                 name="environment"
                 list={options.environments}
-                value={initial?.environment}
+                value={initial?.environment ?? restored?.environment}
+                onValue={publishDirty}
                 placeholder="e.g. Staging"
               />
             </label>
@@ -274,7 +389,7 @@ export function BugReportForm({
             <div className="bf-form-grid">
               <label className="bf-field">
                 Due date<span className="bf-opt">Optional</span>
-                <Input type="date" name="dueOn" defaultValue={initial?.dueOn ?? ""} />
+                <Input type="date" name="dueOn" defaultValue={initial?.dueOn ?? restored?.dueOn ?? ""} />
               </label>
             </div>
           )}
@@ -374,11 +489,13 @@ function OptionField({
   list,
   value,
   placeholder,
+  onValue,
 }: {
   name: string;
   list: string[];
   value?: string | undefined;
   placeholder: string;
+  onValue?: () => void;
 }) {
   if (!list.length)
     return <Input name={name} defaultValue={value} maxLength={100} placeholder={placeholder} />;
@@ -388,6 +505,7 @@ function OptionField({
       name={name}
       label={name}
       initial={value ?? ""}
+      {...(onValue ? { onValue } : {})}
       options={[{ value: "", label: "Not specified" }, ...all.map((o) => ({ value: o, label: o }))]}
     />
   );
@@ -398,14 +516,24 @@ function FormSelect({
   initial,
   options,
   disabled = false,
+  onValue,
 }: {
   name: string;
   label: string;
   initial: string;
   options: { value: string; label: string }[];
   disabled?: boolean;
+  onValue?: () => void;
 }) {
   const [value, setValue] = useState(initial);
+  const skip = useRef(true);
+  useEffect(() => {
+    if (skip.current) {
+      skip.current = false;
+      return;
+    }
+    onValue?.();
+  }, [value]);
   return (
     <>
       <input type="hidden" name={name} value={value} />

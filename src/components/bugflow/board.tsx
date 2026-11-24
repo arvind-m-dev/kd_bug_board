@@ -64,7 +64,11 @@ export function BoardView({
 
   async function moveTo(b: LiveBug, column: BoardColumnKey) {
     const action = dropAction(d.actor, b, column);
-    if (!action) return;
+    if (!action) {
+      if (boardColumn(b.status) !== column)
+        toast.info("That column cannot take this bug from its current stage.");
+      return;
+    }
     if (action.kind === "open") {
       toast.info(action.reason);
       openBug(b);
@@ -102,10 +106,6 @@ export function BoardView({
         <div className="flex items-center gap-2">
           <Kanban size={18} className="text-primary" />
           <h2>Board</h2>
-          <span className="text-xs text-muted-foreground">
-            Drag a card, or use its Move menu. Assigning and retest verdicts open the bug.
-            {d.nextCursor ? ` Showing the latest ${d.bugs.length} of ${d.total}.` : ""}
-          </span>
         </div>
         <ThemedSelect
           label="Project"
@@ -117,6 +117,12 @@ export function BoardView({
           ]}
         />
       </div>
+      <p className="text-sm text-muted-foreground">
+        Cards move left to right: waiting, assigned, being fixed, ready for QA, then closed. Drag a
+        card or use Move. A faded column cannot take that card. Assigning and a retest verdict open
+        the bug.
+        {d.nextCursor ? ` Showing the latest ${d.bugs.length} of ${d.total} bugs.` : ""}
+      </p>
       <div className="bf-board" data-busy={busy || undefined}>
         {BOARD_COLUMNS.map((col) => {
           const cards = bugs.filter((b) => boardColumn(b.status) === col.key);
@@ -126,6 +132,7 @@ export function BoardView({
               key={col.key}
               className="bf-board-col"
               data-dim={dim || undefined}
+              title={dim ? "This bug cannot move here" : undefined}
               onDragOver={(e) => {
                 if (draggingBug && dropAction(d.actor, draggingBug, col.key)) e.preventDefault();
               }}
@@ -140,6 +147,7 @@ export function BoardView({
                 <span>{col.label}</span>
                 <span className="bf-board-count">{cards.length}</span>
               </header>
+              <p className="bf-board-hint">{col.hint}</p>
               <div className="bf-board-cards">
                 {cards.map((b) => {
                   const draggable = !busy && mayDragCard(d.actor, b);
@@ -203,7 +211,7 @@ export function BoardView({
                     </article>
                   );
                 })}
-                {cards.length === 0 && <p className="bf-board-empty">Nothing here.</p>}
+                {cards.length === 0 && <p className="bf-board-empty">No bugs in this stage.</p>}
               </div>
             </div>
           );

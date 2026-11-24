@@ -294,7 +294,19 @@ export async function bugDetail(access: BugAccess, id: string) {
     ],
   );
   const r = rows[0];
-  if (!r) throw new Error("This bug is not available in your portal.");
+  if (!r) {
+    const gone = await neonQuery(
+      `select (deleted_at is not null) as trashed, (purged_at is not null) as purged from bugflow.bugs where id=$1 limit 1`,
+      [id],
+    );
+    const g = gone.rows[0];
+    const yes = (v: unknown) => v === true || v === "t" || v === "true";
+    if (g && yes(g["purged"]))
+      throw new Error("This bug was deleted forever and cannot be opened.");
+    if (g && yes(g["trashed"]))
+      throw new Error("This bug is in the Trash. Restore it from Trash to open it.");
+    throw new Error("This bug is not available in your portal.");
+  }
   const summary = actor.role !== "admin";
   const keep = ["status", "previousStatus", "priority", "previousPriority"];
   const { rows: events } = await neonQuery(

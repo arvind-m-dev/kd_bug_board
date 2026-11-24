@@ -854,15 +854,21 @@ export function createSeasonalScene(
   flakes.instanceMatrix.setUsage(T.DynamicDrawUsage);
   flakes.frustumCulled = false;
   scene.add(flakes);
-  const bodies: SnowBody[] = Array.from({ length: count }, (_, i) => ({
-    x: (i * 179.3) % innerWidth,
-    y: (i * 67.4) % innerHeight,
-    vx: 8,
-    vy: 15 + (i % 20),
-    radius: isAutumn ? 6 + (i % 4) : 2 + (i % 3),
-    bounces: 0,
-    ignoreUntil: 0,
-  }));
+  const bodies: SnowBody[] = Array.from({ length: count }, () => {
+    const body: SnowBody = {
+      x: Math.random() * innerWidth,
+      y: Math.random() * innerHeight,
+      vx: (Math.random() - 0.5) * 24,
+      vy: 8 + Math.random() * 28,
+      radius: isAutumn ? 6 + Math.random() * 4 : 2.2 + Math.random() * 2.4,
+      bounces: 0,
+      ignoreUntil: 0,
+      drift: (Math.random() - 0.5) * 50,
+      phase: Math.random() * Math.PI * 2,
+      sway: 14 + Math.random() * 40,
+    };
+    return body;
+  });
   const floorCount = isAutumn ? Math.round(72 * knobs.amount) : 0;
   const floorLeaves = new T.InstancedMesh(leafGeometry, flakes.material, floorCount);
   floorLeaves.frustumCulled = false;
@@ -1385,10 +1391,14 @@ export function createSeasonalScene(
           leaf.lift = 0;
           b.y = height + 16;
         }
-        if (b.y > height + 15 || b.x > width + 30 || b.x < -30) {
-          b.x = (i * 173 + time * 31) % width;
-          b.y = -12;
-          b.vy = 10;
+        if (b.y > height + 15 || b.x > width + 40 || b.x < -40) {
+          b.x = Math.random() * width;
+          b.y = -16 - Math.random() * 70;
+          b.vx = (Math.random() - 0.5) * 24;
+          b.vy = 8 + Math.random() * 26;
+          b.drift = (Math.random() - 0.5) * 50;
+          b.phase = Math.random() * Math.PI * 2;
+          b.sway = 14 + Math.random() * 40;
           b.bounces = 0;
         }
         dummy.position.set(b.x, height - b.y, 40 + (i % 5));

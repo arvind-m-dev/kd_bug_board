@@ -6,7 +6,7 @@ import { useUrlParam } from "@/hooks/use-url-param";
 import { useRestoredQueries } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { lazy, Suspense, useEffect, useLayoutEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Bug,
   ChartPie,
@@ -719,10 +719,18 @@ function ProjectsView({ onDialog }: { onDialog: (s: string) => void }) {
   // ?project=… (from a notification) highlights that project for a moment, switching to Archived if it is there.
   const [project, setProject] = useUrlParam("project");
   const recentProject = useHighlight(project, projects.data);
+  const missingProject = useRef<string | null>(null);
   useEffect(() => {
     if (!project || !projects.data) return;
     const hit = projects.data.find((p) => p.id === project);
-    if (hit) setState(hit.archived ? "archived" : "active");
+    if (!hit) {
+      if (missingProject.current === project) return;
+      missingProject.current = project;
+      toast.error("That project is not available. It may have been removed.");
+      setProject(null);
+      return;
+    }
+    setState(hit.archived ? "archived" : "active");
     const t = window.setTimeout(() => setProject(null), 2500);
     return () => window.clearTimeout(t);
   }, [project, projects.data, setProject]);

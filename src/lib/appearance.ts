@@ -259,6 +259,74 @@ export const PALETTES: Palette[] = [
       accent: "oklch(0.3 0.015 260)",
     },
   },
+  {
+    id: "zinc",
+    name: "Zinc",
+    description: "Neutral zinc — the shadcn dashboard palette.",
+    light: {
+      primary: "oklch(0.21 0.006 286)",
+      primaryForeground: "oklch(0.985 0 0)",
+      brand2: "oklch(0.45 0.02 286)",
+      accent: "oklch(0.967 0.001 286)",
+    },
+    dark: {
+      primary: "oklch(0.92 0.004 286)",
+      primaryForeground: "oklch(0.21 0.006 286)",
+      brand2: "oklch(0.7 0.02 286)",
+      accent: "oklch(0.274 0.006 286)",
+    },
+  },
+  {
+    id: "clay",
+    name: "Clay",
+    description: "Peach and lilac pastels for soft, puffy surfaces.",
+    light: {
+      primary: "oklch(0.62 0.14 35)",
+      primaryForeground: "oklch(0.99 0.01 80)",
+      brand2: "oklch(0.62 0.12 310)",
+      accent: "oklch(0.94 0.03 70)",
+    },
+    dark: {
+      primary: "oklch(0.78 0.12 45)",
+      primaryForeground: "oklch(0.25 0.04 40)",
+      brand2: "oklch(0.75 0.1 310)",
+      accent: "oklch(0.32 0.04 50)",
+    },
+  },
+  {
+    id: "signal",
+    name: "Signal",
+    description: "Black, white and a loud yellow — for brutalist layouts.",
+    light: {
+      primary: "oklch(0.18 0 0)",
+      primaryForeground: "oklch(0.97 0.16 100)",
+      brand2: "oklch(0.86 0.18 98)",
+      accent: "oklch(0.96 0.04 98)",
+    },
+    dark: {
+      primary: "oklch(0.9 0.17 100)",
+      primaryForeground: "oklch(0.15 0 0)",
+      brand2: "oklch(0.7 0.2 30)",
+      accent: "oklch(0.28 0.02 100)",
+    },
+  },
+  {
+    id: "neu",
+    name: "Soft grey",
+    description: "One quiet grey so raised and pressed surfaces can share it.",
+    light: {
+      primary: "oklch(0.45 0.05 250)",
+      primaryForeground: "oklch(0.98 0.005 250)",
+      brand2: "oklch(0.55 0.07 250)",
+      accent: "oklch(0.9 0.012 250)",
+    },
+    dark: {
+      primary: "oklch(0.78 0.05 250)",
+      primaryForeground: "oklch(0.22 0.02 250)",
+      brand2: "oklch(0.68 0.07 250)",
+      accent: "oklch(0.32 0.02 250)",
+    },
+  },
 ];
 export const DEFAULT_PALETTE = "teal";
 export const paletteById = (id: string | null | undefined) =>
@@ -395,6 +463,9 @@ export type Style = {
   palette?: string;
   monochrome?: boolean;
   decorated?: boolean;
+  /** Applied when this style is chosen, so the shape matches the look. */
+  radius?: "sharp" | "soft" | "round";
+  density?: "comfortable" | "compact";
 };
 export const STYLES: Style[] = [
   {
@@ -478,6 +549,104 @@ export const STYLES: Style[] = [
     fonts: "mono",
     palette: "emerald",
     decorated: true,
+  },
+  {
+    id: "spatial",
+    name: "Spatial UI",
+    description: "Floating panels with deep soft shadows, as if the workspace sits in space.",
+    fonts: "jakarta",
+    palette: "indigo",
+    radius: "round",
+  },
+  {
+    id: "bento",
+    name: "Bento grid",
+    description: "Tiles of different weights, tight gaps, and a clear first column.",
+    fonts: "jakarta",
+    palette: "teal",
+    radius: "soft",
+  },
+  {
+    id: "liquid",
+    name: "Liquid glass",
+    description: "Apple’s Liquid Glass: a clear lens, a bright top edge, and capsule controls over a soft colour wash.",
+    fonts: "system",
+    palette: "glass",
+    radius: "round",
+  },
+  {
+    id: "maximal",
+    name: "Maximalism",
+    description: "Loud colour, heavy type and patterned surfaces. Status colours stay readable.",
+    fonts: "grotesk",
+    palette: "sunset",
+    radius: "soft",
+  },
+  {
+    id: "minimal",
+    name: "Minimalism",
+    description: "Quiet type, hairline rules and almost no shadow.",
+    fonts: "inter",
+    palette: "graphite",
+    radius: "sharp",
+    density: "comfortable",
+  },
+  {
+    id: "brutal",
+    name: "Brutalism",
+    description: "Hard black frames, flat colour and no rounding.",
+    fonts: "grotesk",
+    palette: "signal",
+    radius: "sharp",
+  },
+  {
+    id: "clay",
+    name: "Claymorphism",
+    description: "Puffy pastel cards with a soft inner highlight.",
+    fonts: "nunito",
+    palette: "clay",
+    radius: "round",
+  },
+  {
+    id: "glassmorphism",
+    name: "Glassmorphism",
+    description: "Frosted translucent cards with a coloured rim. Distinct from Liquid glass.",
+    fonts: "system",
+    palette: "glass",
+    radius: "round",
+  },
+  {
+    id: "skeuo",
+    name: "Skeuomorphism",
+    description: "Bevelled controls and a paper grain, like objects you could pick up.",
+    fonts: "serif",
+    palette: "sand",
+    radius: "soft",
+  },
+  {
+    id: "neu",
+    name: "Neumorphism",
+    description: "Surfaces pressed into the same grey, with light from the top left.",
+    fonts: "dm",
+    palette: "neu",
+    radius: "round",
+  },
+  {
+    id: "shadcn",
+    name: "shadcn",
+    description: "Zinc surfaces, Inter, and a thin border. The classic shadcn dashboard.",
+    fonts: "inter",
+    palette: "zinc",
+    radius: "soft",
+  },
+  {
+    id: "lightweight",
+    name: "Lightweight",
+    description: "System type, compact spacing and almost no decoration.",
+    fonts: "system",
+    palette: "zinc",
+    radius: "sharp",
+    density: "compact",
   },
 ];
 export const styleById = (id: string | null | undefined) =>

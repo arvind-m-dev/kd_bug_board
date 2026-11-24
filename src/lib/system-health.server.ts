@@ -26,6 +26,7 @@ const MIGRATIONS: [string, string, string | null][] = [
   ["019", "bug_media", "restorable_until"],
   ["020", "bug_media", "has_thumb"],
   ["026", "ai_tokens", "expires_at"],
+  ["027", "jira_connections", null],
 ];
 export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1]![0];
 
