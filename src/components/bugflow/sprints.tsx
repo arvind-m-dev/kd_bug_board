@@ -24,7 +24,7 @@ import {
 import type { SprintsData } from "@/lib/sprints.server";
 import { parseBugRef, type BugAccess } from "@/lib/bug-workflow";
 import { ThemedSelect } from "./themed-select";
-import { ErrorNotice, actionError } from "./action-feedback";
+import { ConfirmAction, ErrorNotice, actionError } from "./action-feedback";
 import { SkeletonRows } from "./loading";
 import { toast } from "sonner";
 
@@ -118,6 +118,7 @@ function SprintCard({
   const [bugId, setBugId] = useState("");
   const [carryTo, setCarryTo] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
   const closed = sprint.state === "closed";
 
   const run = async (fn: () => Promise<unknown>, done: string) => {
@@ -185,16 +186,28 @@ function SprintCard({
                 size="sm"
                 variant="outline"
                 disabled={busy}
-                onClick={() =>
-                  void run(
-                    () => close({ data: { id: sprint.id, carryTo: carryTo || undefined } }),
-                    "Sprint closed",
-                  )
-                }
+                onClick={() => setConfirmClose(true)}
               >
                 <Flag />
                 Close
               </Button>
+              <ConfirmAction
+                open={confirmClose}
+                onOpenChange={setConfirmClose}
+                title={`Close “${sprint.name}”?`}
+                description={
+                  carryTo
+                    ? "Unfinished bugs move to the sprint you picked. A closed sprint stays closed."
+                    : "Unfinished bugs are not carried forward. A closed sprint stays closed."
+                }
+                confirmLabel="Close sprint"
+                destructive
+                onConfirm={async () => {
+                  await close({ data: { id: sprint.id, carryTo: carryTo || undefined } });
+                  await onChanged();
+                  toast.success("Sprint closed");
+                }}
+              />
             </>
           )}
         </div>

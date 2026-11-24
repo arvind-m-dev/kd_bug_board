@@ -20,6 +20,21 @@ describe("dashboard status counts", () => {
   it("assignments view counts only assigned bugs", () => {
     expect(groupCounts(counts, true).total).toBe(1);
   });
+  it("overview stages match every status in the stage", () => {
+    const bug = (status: string, assigneeId: string | null = null) => ({
+      status,
+      assigneeId,
+      reporterId: "y",
+    });
+    expect(matchesFilter("stage-triage", bug("NEEDS_INFORMATION"), "z")).toBe(true);
+    expect(matchesFilter("stage-triage", bug("IN_PROGRESS"), "z")).toBe(false);
+    expect(matchesFilter("stage-ready", bug("VALIDATED"), "z")).toBe(true);
+    expect(matchesFilter("stage-dev", bug("REOPENED", "x"), "z")).toBe(true);
+    expect(matchesFilter("stage-dev", bug("NEW"), "z")).toBe(false);
+    expect(matchesFilter("stage-attention", bug("RECHECK", "x"), "z")).toBe(true);
+    expect(matchesFilter("stage-attention", bug("VALIDATED", null), "z")).toBe(true);
+    expect(matchesFilter("stage-attention", bug("VALIDATED", "x"), "z")).toBe(false);
+  });
   it("group filter matches its statuses", () => {
     expect(
       matchesFilter("g:progress", { status: "ASSIGNED", assigneeId: "x", reporterId: "y" }, "z"),
